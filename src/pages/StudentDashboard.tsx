@@ -7,11 +7,19 @@ import { BottomNav } from '@/components/BottomNav';
 import { TeacherProfileModal } from '@/components/ProfileModals';
 import { mockQuery, mockStore } from '@/data/mockData';
 import type { Teacher } from '@/types/schema';
+import { JoinClassModal } from '@/features/student/quick-actions/JoinClassModal';
+import { BookClassModal } from '@/features/student/quick-actions/BookClassModal';
+import { AIStudyBuddyModal } from '@/features/student/quick-actions/AIStudyBuddyModal';
+import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsModal';
+import { ProgressModal } from '@/features/student/quick-actions/ProgressModal';
+import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [showJoinCTA, setShowJoinCTA] = useState(true); // Mock 15 mins before class
   const { currentUser } = mockStore;
   const { topTeachers, upcomingClasses } = mockQuery;
 
@@ -53,6 +61,40 @@ const StudentDashboard = () => {
             </div>
           </div>
         </header>
+
+        {/* Dynamic CTA: Join Next Class */}
+        {showJoinCTA && (
+          <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-between relative overflow-hidden">
+              {/* Glossy overlay */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium animate-pulse">Starting Soon</span>
+                  <span className="text-sm opacity-90">Starts in 12 mins</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-1">Advanced Spanish Conversation</h2>
+                <p className="text-indigo-100 flex items-center gap-2 text-sm">
+                  <Avatar className="w-6 h-6 border border-white/50">
+                    <AvatarImage src="https://i.pravatar.cc/150?u=garcia" />
+                    <AvatarFallback>MG</AvatarFallback>
+                  </Avatar>
+                  with Mrs. Garcia
+                </p>
+              </div>
+
+              <Button
+                size="lg"
+                onClick={() => setActiveModal('join-class')}
+                className="relative z-10 bg-white text-indigo-700 hover:bg-gray-100 font-bold shadow-md h-12 px-6 rounded-xl"
+              >
+                <span className="material-symbols-outlined mr-2">videocam</span>
+                Join Now
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Progress Section */}
         <section className="mb-8">
@@ -128,41 +170,64 @@ const StudentDashboard = () => {
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-4 text-text-light dark:text-text-dark">Quick Actions</h2>
           <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-6 gap-3 sm:gap-4">
-            <div className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-shadow">
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('progress')}
+            >
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-blue-500 dark:text-blue-400">schedule</span>
+                <span className="material-symbols-outlined text-blue-500 dark:text-blue-400">monitoring</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Manage Time</p>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Progress</p>
             </div>
-            <div className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-shadow">
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('book-class')}
+            >
               <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/40 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-yellow-600 dark:text-yellow-400">event</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Book a Class</p>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Book Class</p>
             </div>
-            <div className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-shadow">
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('assignments')}
+            >
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-green-500 dark:text-green-400">description</span>
+                <span className="material-symbols-outlined text-green-500 dark:text-green-400">assignment</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Revision Notes</p>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Assignments</p>
             </div>
-            <div className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-shadow">
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('message')}
+            >
               <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-pink-500 dark:text-pink-400">style</span>
+                <span className="material-symbols-outlined text-pink-500 dark:text-pink-400">mail</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Flashcards</p>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Message</p>
             </div>
-            <div className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-shadow">
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('join-class')}
+            >
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-purple-500 dark:text-purple-400">videocam</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Video Meeting</p>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Join Class</p>
             </div>
-            <div className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-shadow">
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('ai-buddy')}
+            >
               <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/40 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-orange-500 dark:text-orange-400">psychology</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">AI Study Buddy</p>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">AI Buddy</p>
             </div>
           </div>
         </section>
@@ -211,6 +276,14 @@ const StudentDashboard = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {/* Quick Action Modals */}
+      <JoinClassModal isOpen={activeModal === 'join-class'} onClose={() => setActiveModal(null)} className="Advanced Spanish Conversation" />
+      <BookClassModal isOpen={activeModal === 'book-class'} onClose={() => setActiveModal(null)} />
+      <AIStudyBuddyModal isOpen={activeModal === 'ai-buddy'} onClose={() => setActiveModal(null)} />
+      <AssignmentsModal isOpen={activeModal === 'assignments'} onClose={() => setActiveModal(null)} />
+      <ProgressModal isOpen={activeModal === 'progress'} onClose={() => setActiveModal(null)} />
+      <MessageTeacherModal isOpen={activeModal === 'message'} onClose={() => setActiveModal(null)} />
     </div>
   );
 };

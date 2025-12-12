@@ -28,6 +28,11 @@ Inspired by modern learning applications with soft pastel palette
     --yellow-orange-start: #FEF3D7;
     --yellow-orange-end: #FDEBC8;
 
+    /* Student Quick Action Theme Colors */
+    --student-primary: #30e86e;
+    --student-bg-dark: #112116;
+    --student-surface-dark: #1a2c20;
+
     /* Base - Soft purple/lavender gradient background */
     --background: 280 50% 95%;
     /* #E8D9F5 - Soft lavender */

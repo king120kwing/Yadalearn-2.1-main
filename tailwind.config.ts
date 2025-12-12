@@ -44,6 +44,10 @@ const config = {
         "text-dark": "#E5E7EB",
         "subtext-light": "#6B7280",
         "subtext-dark": "#9CA3AF",
+        // Student Quick Action Theme Colors
+        "student-primary": "#30e86e",
+        "student-bg-dark": "#112116",
+        "student-surface-dark": "#1a2c20",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

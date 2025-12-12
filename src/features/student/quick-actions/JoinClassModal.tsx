@@ -1,0 +1,309 @@
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface JoinClassModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    className: string;
+}
+
+type VirtualBackground = 'none' | 'blur' | 'library' | 'space' | 'office';
+
+export const JoinClassModal = ({ isOpen, onClose, className }: JoinClassModalProps) => {
+    const [micEnabled, setMicEnabled] = useState(true);
+    const [cameraEnabled, setCameraEnabled] = useState(true);
+    const [selectedBackground, setSelectedBackground] = useState<VirtualBackground>('blur');
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+
+    // Request camera access
+    useEffect(() => {
+        if (isOpen && cameraEnabled) {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                .then((stream) => {
+                    streamRef.current = stream;
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                    }
+                    setCameraError(null);
+                })
+                .catch((error) => {
+                    console.error('Camera access error:', error);
+                    setCameraError('Camera access denied. Please enable camera permissions.');
+                });
+        }
+
+        // Cleanup function
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
+        };
+    }, [isOpen, cameraEnabled]);
+
+    // Handle camera toggle
+    const handleCameraToggle = () => {
+        if (cameraEnabled && streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        setCameraEnabled(!cameraEnabled);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-md mx-auto bg-student-bg-dark text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+                {/* Header */}
+                <div className="flex items-center p-4 pb-2 justify-between z-10 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="text-white flex size-10 shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[24px]">close</span>
+                    </button>
+                    <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em] text-center">
+                        Pre-Class Check
+                    </h2>
+                    <button className="flex h-10 px-2 items-center justify-end rounded-full active:bg-white/10 transition-colors">
+                        <p className="text-student-primary text-sm font-bold leading-normal tracking-[0.015em] shrink-0">
+                            Help
+                        </p>
+                    </button>
+                </div>
+
+                {/* Scrollable Main Content */}
+                <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
+                    {/* Class Info */}
+                    <div className="flex flex-col items-center pt-2 pb-6 px-4">
+                        <h1 className="text-white tracking-tight text-[28px] font-bold leading-tight text-center mb-1">
+                            {className}
+                        </h1>
+                        <div className="flex items-center gap-2 text-student-primary/80 text-sm font-medium">
+                            <span>Prof. Alan Grant</span>
+                            <span className="size-1 rounded-full bg-student-primary/50"></span>
+                            <span className="text-student-primary flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[16px] fill-1">timer</span>
+                                Starts in 04:12
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Video Preview Card */}
+                    <div className="px-4 mb-6">
+                        <div className="relative w-full aspect-[3/4] bg-student-surface-dark rounded-3xl overflow-hidden shadow-2xl border border-white/5 ring-1 ring-white/5 group">
+                            {/* Camera Feed */}
+                            {cameraEnabled ? (
+                                cameraError ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+                                        <div className="text-center px-4">
+                                            <span className="material-symbols-outlined text-6xl text-red-500 mb-2">error</span>
+                                            <p className="text-gray-400 text-sm">{cameraError}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <video
+                                        ref={videoRef}
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        className={`w-full h-full object-cover ${selectedBackground === 'blur' ? 'blur-sm' : ''
+                                            }`}
+                                    />
+                                )
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+                                    <div className="text-center">
+                                        <span className="material-symbols-outlined text-6xl text-gray-600 mb-2">videocam_off</span>
+                                        <p className="text-gray-500 text-sm">Camera Off</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Overlay Gradient */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none"></div>
+
+                            {/* Floating Controls Overlay */}
+                            <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-6 px-4 z-20">
+                                {/* Mic Toggle */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <button
+                                        onClick={() => setMicEnabled(!micEnabled)}
+                                        className={`flex shrink-0 items-center justify-center rounded-full size-12 shadow-lg transition-transform active:scale-95 ${micEnabled
+                                            ? 'bg-white text-student-bg-dark hover:bg-gray-200'
+                                            : 'bg-red-500 text-white hover:bg-red-600'
+                                            }`}
+                                    >
+                                        <span className="material-symbols-outlined text-[24px]">
+                                            {micEnabled ? 'mic' : 'mic_off'}
+                                        </span>
+                                    </button>
+                                    <span className="text-[11px] font-medium text-white/90">
+                                        {micEnabled ? 'Mic On' : 'Mic Off'}
+                                    </span>
+                                </div>
+
+                                {/* Camera Toggle (Primary) */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <button
+                                        onClick={handleCameraToggle}
+                                        className={`flex shrink-0 items-center justify-center rounded-full size-16 shadow-[0_0_20px_rgba(48,232,110,0.4)] transition-transform active:scale-95 ${cameraEnabled
+                                                ? 'bg-student-primary text-student-bg-dark hover:brightness-110'
+                                                : 'bg-red-500 text-white hover:bg-red-600'
+                                            }`}
+                                    >
+                                        <span className="material-symbols-outlined text-[32px] font-variation-settings-fill">
+                                            {cameraEnabled ? 'videocam' : 'videocam_off'}
+                                        </span>
+                                    </button>
+                                    <span className="text-[11px] font-medium text-white/90">
+                                        {cameraEnabled ? 'Cam On' : 'Cam Off'}
+                                    </span>
+                                </div>
+
+                                {/* Effects Toggle */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <button className="flex shrink-0 items-center justify-center rounded-full size-12 bg-student-surface-dark/80 backdrop-blur-md text-white border border-white/10 shadow-lg hover:bg-student-surface-dark transition-transform active:scale-95">
+                                        <span className="material-symbols-outlined text-[24px]">auto_awesome</span>
+                                    </button>
+                                    <span className="text-[11px] font-medium text-white/90">Effects</span>
+                                </div>
+                            </div>
+
+                            {/* Connection Status Badge (Top Right) */}
+                            <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+                                <span className="material-symbols-outlined text-student-primary text-[16px]">wifi</span>
+                                <span className="text-xs font-medium text-white">Good</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Hardware & Connection Status */}
+                    <div className="px-4 mb-8">
+                        <div className="flex flex-col gap-3">
+                            {/* Dropdowns Row */}
+                            <div className="flex gap-3 overflow-x-auto no-scrollbar">
+                                <button className="flex items-center gap-2 px-4 py-3 bg-student-surface-dark rounded-xl border border-white/5 flex-shrink-0 active:bg-white/5 transition-colors">
+                                    <span className="material-symbols-outlined text-student-primary text-[20px]">mic</span>
+                                    <div className="flex flex-col items-start">
+                                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Microphone</span>
+                                        <span className="text-sm font-medium text-white truncate max-w-[100px]">MacBook Pro Mic</span>
+                                    </div>
+                                    <span className="material-symbols-outlined text-gray-500 text-[20px]">expand_more</span>
+                                </button>
+                                <button className="flex items-center gap-2 px-4 py-3 bg-student-surface-dark rounded-xl border border-white/5 flex-shrink-0 active:bg-white/5 transition-colors">
+                                    <span className="material-symbols-outlined text-student-primary text-[20px]">headphones</span>
+                                    <div className="flex flex-col items-start">
+                                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Output</span>
+                                        <span className="text-sm font-medium text-white truncate max-w-[100px]">AirPods Pro</span>
+                                    </div>
+                                    <span className="material-symbols-outlined text-gray-500 text-[20px]">expand_more</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Virtual Backgrounds */}
+                    <div className="px-4 mb-4">
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <h3 className="text-white text-sm font-bold">Virtual Background</h3>
+                            <button className="text-student-primary text-xs font-medium">View All</button>
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                            {/* None Option */}
+                            <button
+                                onClick={() => setSelectedBackground('none')}
+                                className="flex flex-col gap-2 items-center group shrink-0"
+                            >
+                                <div className={`size-16 rounded-2xl border-2 flex items-center justify-center transition-all ${selectedBackground === 'none'
+                                    ? 'border-student-primary bg-student-primary/10 shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    : 'border-white/10 bg-student-surface-dark group-hover:border-white/30'
+                                    }`}>
+                                    <span className={`material-symbols-outlined text-[24px] ${selectedBackground === 'none' ? 'text-student-primary' : 'text-gray-400'
+                                        }`}>block</span>
+                                </div>
+                                <span className={`text-xs font-medium ${selectedBackground === 'none' ? 'text-student-primary' : 'text-gray-400'
+                                    }`}>None</span>
+                            </button>
+
+                            {/* Blur Option (Default Selected) */}
+                            <button
+                                onClick={() => setSelectedBackground('blur')}
+                                className="flex flex-col gap-2 items-center group shrink-0"
+                            >
+                                <div className={`size-16 rounded-2xl border-2 overflow-hidden relative transition-all ${selectedBackground === 'blur'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    : 'border-transparent group-hover:border-white/20'
+                                    }`}>
+                                    <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 blur-sm opacity-50"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className={`material-symbols-outlined text-[24px] drop-shadow-md ${selectedBackground === 'blur' ? 'text-student-primary' : 'text-white'
+                                            }`}>blur_on</span>
+                                    </div>
+                                </div>
+                                <span className={`text-xs font-medium ${selectedBackground === 'blur' ? 'text-student-primary' : 'text-gray-400 group-hover:text-gray-300'
+                                    }`}>Blur</span>
+                            </button>
+
+                            {/* Library Option */}
+                            <button
+                                onClick={() => setSelectedBackground('library')}
+                                className="flex flex-col gap-2 items-center group shrink-0"
+                            >
+                                <div className={`size-16 rounded-2xl border-2 overflow-hidden transition-all ${selectedBackground === 'library'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    : 'border-transparent group-hover:border-white/20'
+                                    }`}>
+                                    <div className="w-full h-full bg-gradient-to-br from-amber-700 to-amber-900 opacity-80 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                                <span className={`text-xs font-medium ${selectedBackground === 'library' ? 'text-student-primary' : 'text-gray-400 group-hover:text-gray-300'
+                                    }`}>Library</span>
+                            </button>
+
+                            {/* Space Option */}
+                            <button
+                                onClick={() => setSelectedBackground('space')}
+                                className="flex flex-col gap-2 items-center group shrink-0"
+                            >
+                                <div className={`size-16 rounded-2xl border-2 overflow-hidden transition-all ${selectedBackground === 'space'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    : 'border-transparent group-hover:border-white/20'
+                                    }`}>
+                                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-black opacity-80 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                                <span className={`text-xs font-medium ${selectedBackground === 'space' ? 'text-student-primary' : 'text-gray-400 group-hover:text-gray-300'
+                                    }`}>Space</span>
+                            </button>
+
+                            {/* Office Option */}
+                            <button
+                                onClick={() => setSelectedBackground('office')}
+                                className="flex flex-col gap-2 items-center group shrink-0"
+                            >
+                                <div className={`size-16 rounded-2xl border-2 overflow-hidden transition-all ${selectedBackground === 'office'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    : 'border-transparent group-hover:border-white/20'
+                                    }`}>
+                                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-300 opacity-80 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                                <span className={`text-xs font-medium ${selectedBackground === 'office' ? 'text-student-primary' : 'text-gray-400 group-hover:text-gray-300'
+                                    }`}>Office</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sticky Footer */}
+                <div className="absolute bottom-0 left-0 right-0 bg-student-bg-dark/95 backdrop-blur-xl border-t border-white/5 p-4 z-50 pb-8">
+                    <button className="w-full bg-student-primary hover:bg-[#25c45b] text-student-bg-dark font-bold text-lg h-14 rounded-2xl shadow-[0_4px_20px_rgba(48,232,110,0.25)] flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
+                        <span>Join Class Now</span>
+                        <span className="material-symbols-outlined text-[24px]">arrow_forward</span>
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
