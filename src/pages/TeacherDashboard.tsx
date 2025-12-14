@@ -11,6 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload } from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
 import { StudentProfileModal } from '@/components/ProfileModals';
+import {
+  StartClassModal,
+  CreateSessionModal,
+  ReviewSubmissionsModal,
+  StudentOverviewModal,
+  QuickAnnouncementModal,
+  UploadMaterialsModal
+} from '@/features/teacher/quick-actions';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
@@ -191,42 +199,60 @@ const TeacherDashboard = () => {
         {/* Quick Actions */}
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-4 text-text-light dark:text-text-dark">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5">
             <div
-              className="bg-gradient-to-br from-[var(--mint-start)] to-[var(--mint-end)] p-5 rounded-3xl flex flex-col justify-between shadow-soft text-[#2F857B] h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('class')}
+              className="bg-gradient-to-br from-emerald-400 to-emerald-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setActiveModal('start-class')}
             >
-              <div className="w-12 h-12 bg-white/70 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>school</span>
+              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>videocam</span>
               </div>
-              <p className="text-base font-semibold">Manage Classes</p>
+              <p className="text-base font-semibold">Start Class</p>
             </div>
             <div
-              className="bg-gradient-to-br from-[var(--lavender-start)] to-[var(--lavender-end)] p-5 rounded-3xl flex flex-col justify-between shadow-soft text-[#674EA7] h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('students')}
+              className="bg-gradient-to-br from-blue-400 to-blue-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setActiveModal('create-session')}
             >
-              <div className="w-12 h-12 bg-white/70 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>calendar_add_on</span>
+              </div>
+              <p className="text-base font-semibold">Create Session</p>
+            </div>
+            <div
+              className="bg-gradient-to-br from-purple-400 to-purple-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setActiveModal('review-submissions')}
+            >
+              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>fact_check</span>
+              </div>
+              <p className="text-base font-semibold">Review</p>
+            </div>
+            <div
+              className="bg-gradient-to-br from-orange-400 to-orange-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setActiveModal('student-overview')}
+            >
+              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>groups</span>
               </div>
-              <p className="text-base font-semibold">View Students</p>
+              <p className="text-base font-semibold">Students</p>
             </div>
             <div
-              className="bg-gradient-to-br from-[var(--sky-start)] to-[var(--sky-end)] p-5 rounded-3xl flex flex-col justify-between shadow-soft text-[#3E82A8] h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('schedule')}
+              className="bg-gradient-to-br from-pink-400 to-pink-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setActiveModal('announcement')}
             >
-              <div className="w-12 h-12 bg-white/70 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>campaign</span>
+              </div>
+              <p className="text-base font-semibold">Announce</p>
+            </div>
+            <div
+              className="bg-gradient-to-br from-teal-400 to-teal-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setActiveModal('upload-materials')}
+            >
+              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>upload_file</span>
               </div>
-              <p className="text-base font-semibold">Upload Materials</p>
-            </div>
-            <div
-              className="bg-gradient-to-br from-gray-200 to-gray-300 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-gray-600 h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('earnings')}
-            >
-              <div className="w-12 h-12 bg-white/70 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>add</span>
-              </div>
-              <p className="text-base font-semibold">Mini Live Session</p>
+              <p className="text-base font-semibold">Upload</p>
             </div>
           </div>
         </section>
@@ -273,7 +299,33 @@ const TeacherDashboard = () => {
         onClose={() => setIsModalOpen(false)}
       />
 
-      {/* Modals (kept from original implementation) */}
+      {/* Teacher Quick Action Modals */}
+      <StartClassModal
+        isOpen={activeModal === 'start-class'}
+        onClose={() => setActiveModal(null)}
+      />
+      <CreateSessionModal
+        isOpen={activeModal === 'create-session'}
+        onClose={() => setActiveModal(null)}
+      />
+      <ReviewSubmissionsModal
+        isOpen={activeModal === 'review-submissions'}
+        onClose={() => setActiveModal(null)}
+      />
+      <StudentOverviewModal
+        isOpen={activeModal === 'student-overview'}
+        onClose={() => setActiveModal(null)}
+      />
+      <QuickAnnouncementModal
+        isOpen={activeModal === 'announcement'}
+        onClose={() => setActiveModal(null)}
+      />
+      <UploadMaterialsModal
+        isOpen={activeModal === 'upload-materials'}
+        onClose={() => setActiveModal(null)}
+      />
+
+      {/* Legacy Modals (kept from original implementation) */}
       {activeModal === 'students' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-4xl bg-white max-h-[90vh] overflow-hidden">
