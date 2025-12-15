@@ -10,7 +10,12 @@ import Signup from "./pages/Signup";
 import Premium from "./pages/Premium";
 import RoleSelection from "./pages/RoleSelection";
 import StudentDashboard from "./pages/StudentDashboard";
+import StudentSearch from "./pages/StudentSearch";
+import StudentCalendar from "./pages/StudentCalendar";
+
 import TeacherDashboard from "./pages/TeacherDashboard";
+import TeacherStudents from "./pages/TeacherStudents";
+import TeacherCalendar from "./pages/TeacherCalendar";
 import LearningClass from "./pages/LearningClass";
 import AIFeatures from "./pages/AIFeatures";
 import Settings from "./pages/Settings";
@@ -35,8 +40,18 @@ const App = () => (
         <Route path="/premium" element={<Premium />} />
         <Route path="/role-selection" element={<RoleSelection />} />
         <Route path="/onboarding" element={<Onboarding />} />
+
+        {/* Student Routes */}
         <Route path="/student-dashboard" element={<StudentDashboard />} />
+        <Route path="/student-search" element={<StudentSearch />} />
+        <Route path="/student-calendar" element={<StudentCalendar />} />
+
+
+        {/* Teacher Routes */}
         <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+        <Route path="/teacher-students" element={<TeacherStudents />} />
+        <Route path="/teacher-calendar" element={<TeacherCalendar />} />
+
         <Route path="/learning-class" element={<LearningClass />} />
         <Route path="/ai-features" element={<AIFeatures />} />
         <Route path="/settings" element={<Settings />} />
