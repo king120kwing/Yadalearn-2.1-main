@@ -16,19 +16,25 @@ import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTea
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { seedDatabase } from '@/utils/seedData';
 
+import { useUser } from '@clerk/clerk-react';
+
 const StudentDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useUser(); // use Clerk hook
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [showJoinCTA, setShowJoinCTA] = useState(true); // Mock 15 mins before class
-  const { currentUser } = mockStore;
+  // const { currentUser } = mockStore; // Removed mockStore usage for user
   // const { topTeachers, upcomingClasses } = mockQuery; // Removed mock
   const { topTeachers: dbTeachers, upcomingClasses: dbClasses, loading } = useDashboardData();
 
   // Use DB data if available/loaded, otherwise fallback (or empty)
   const topTeachers = dbTeachers.length > 0 ? dbTeachers : mockQuery.topTeachers;
   const upcomingClasses = dbClasses.length > 0 ? dbClasses : mockQuery.upcomingClasses;
+
+  const userId = user?.id;
+  const userName = user?.fullName || user?.firstName || 'Student';
 
 
   const handleTeacherClick = (teacher: Teacher) => {
@@ -52,11 +58,14 @@ const StudentDashboard = () => {
           <div>
             <p className="text-base text-subtext-light dark:text-subtext-dark mb-1">Welcome back, Student</p>
             <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
-              Hi, {currentUser.name.split(' ')[0]}
+              Hi, {userName}
             </h1>
             {/* Temporary Seed Button - Always Visible for Verification */}
             <Button
-              onClick={() => seedDatabase(currentUser.id || 'test_user')}
+              onClick={() => {
+                if (userId) seedDatabase(userId, 'student');
+                else alert('Please wait for user to load');
+              }}
               variant="outline"
               className="mt-2 text-xs border-dashed border-indigo-500 text-indigo-500 hover:bg-indigo-50"
             >

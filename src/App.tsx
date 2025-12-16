@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Welcome from "./pages/Welcome";
 import Browse from "./pages/Browse";
 import Bookings from "./pages/Bookings";
@@ -33,30 +34,32 @@ const App = () => (
         <Route path="/" element={<Welcome />} />
         <Route path="/browse" element={<Browse />} />
         <Route path="/bookings" element={<Bookings />} />
-        <Route path="/profile" element={<Profile />} />
         <Route path="/teacher/:id" element={<TeacherProfile />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/premium" element={<Premium />} />
-        <Route path="/role-selection" element={<RoleSelection />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/mobile-screens" element={<MobileScreensShowcase />} />
+
+        {/* Protected Routes */}
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+        <Route path="/role-selection" element={<ProtectedRoute><RoleSelection /></ProtectedRoute>} />
 
         {/* Student Routes */}
-        <Route path="/student-dashboard" element={<StudentDashboard />} />
-        <Route path="/student-search" element={<StudentSearch />} />
-        <Route path="/student-calendar" element={<StudentCalendar />} />
-
+        <Route path="/student-dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+        <Route path="/student-search" element={<ProtectedRoute><StudentSearch /></ProtectedRoute>} />
+        <Route path="/student-calendar" element={<ProtectedRoute><StudentCalendar /></ProtectedRoute>} />
 
         {/* Teacher Routes */}
-        <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
-        <Route path="/teacher-students" element={<TeacherStudents />} />
-        <Route path="/teacher-calendar" element={<TeacherCalendar />} />
+        <Route path="/teacher-dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
+        <Route path="/teacher-students" element={<ProtectedRoute><TeacherStudents /></ProtectedRoute>} />
+        <Route path="/teacher-calendar" element={<ProtectedRoute><TeacherCalendar /></ProtectedRoute>} />
 
-        <Route path="/learning-class" element={<LearningClass />} />
-        <Route path="/ai-features" element={<AIFeatures />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/logout" element={<Logout />} />
-        <Route path="/mobile-screens" element={<MobileScreensShowcase />} />
+        <Route path="/learning-class" element={<ProtectedRoute><LearningClass /></ProtectedRoute>} />
+        <Route path="/ai-features" element={<ProtectedRoute><AIFeatures /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/logout" element={<ProtectedRoute><Logout /></ProtectedRoute>} />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AuthProvider>
