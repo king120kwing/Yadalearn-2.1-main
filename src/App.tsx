@@ -26,44 +26,46 @@ import Onboarding from "./pages/Onboarding";
 import MobileScreensShowcase from "./pages/MobileScreensShowcase";
 import "@/assets/css/fonts.css";
 
-const App = () => (
-  <BrowserRouter>
-    <AuthProvider>
-      <Routes>
-        <Route path="/welcome" element={<Welcome />} />
-        <Route path="/" element={<Welcome />} />
-        <Route path="/browse" element={<Browse />} />
-        <Route path="/bookings" element={<Bookings />} />
-        <Route path="/teacher/:id" element={<TeacherProfile />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/mobile-screens" element={<MobileScreensShowcase />} />
+const App = () => {
+  console.log('App: Rendering...');
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/welcome" element={<Welcome />} />
+          <Route path="/" element={<Welcome />} />
+          <Route path="/browse" element={<Browse />} />
+          <Route path="/bookings" element={<Bookings />} />
+          <Route path="/teacher/:id" element={<TeacherProfile />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/mobile-screens" element={<MobileScreensShowcase />} />
 
-        {/* Protected Routes */}
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
-        <Route path="/role-selection" element={<ProtectedRoute><RoleSelection /></ProtectedRoute>} />
+          {/* Protected Routes */}
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+          <Route path="/role-selection" element={<ProtectedRoute><RoleSelection /></ProtectedRoute>} />
 
-        {/* Student Routes */}
-        <Route path="/student-dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
-        <Route path="/student-search" element={<ProtectedRoute><StudentSearch /></ProtectedRoute>} />
-        <Route path="/student-calendar" element={<ProtectedRoute><StudentCalendar /></ProtectedRoute>} />
+          {/* Student Routes */}
+          <Route path="/student-dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student-search" element={<ProtectedRoute><StudentSearch /></ProtectedRoute>} />
+          <Route path="/student-calendar" element={<ProtectedRoute><StudentCalendar /></ProtectedRoute>} />
 
-        {/* Teacher Routes */}
-        <Route path="/teacher-dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
-        <Route path="/teacher-students" element={<ProtectedRoute><TeacherStudents /></ProtectedRoute>} />
-        <Route path="/teacher-calendar" element={<ProtectedRoute><TeacherCalendar /></ProtectedRoute>} />
+          {/* Teacher Routes */}
+          <Route path="/teacher-dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
+          <Route path="/teacher-students" element={<ProtectedRoute><TeacherStudents /></ProtectedRoute>} />
+          <Route path="/teacher-calendar" element={<ProtectedRoute><TeacherCalendar /></ProtectedRoute>} />
 
-        <Route path="/learning-class" element={<ProtectedRoute><LearningClass /></ProtectedRoute>} />
-        <Route path="/ai-features" element={<ProtectedRoute><AIFeatures /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/logout" element={<ProtectedRoute><Logout /></ProtectedRoute>} />
+          <Route path="/learning-class" element={<ProtectedRoute><LearningClass /></ProtectedRoute>} />
+          <Route path="/ai-features" element={<ProtectedRoute><AIFeatures /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/logout" element={<ProtectedRoute><Logout /></ProtectedRoute>} />
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AuthProvider>
-  </BrowserRouter>
-);
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 
-export default App;
+  export default App;

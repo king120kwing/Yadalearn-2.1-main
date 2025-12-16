@@ -25,13 +25,15 @@ const Welcome = () => {
     }
   }, [isLoaded]);
 
+  console.log('Welcome: Rendering...', { isLoaded });
+
   return (
     <div className="min-h-screen w-full gradient-welcome relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 gradient-mesh opacity-30"></div>
 
       {/* Main Content Container */}
-      <div className={`min-h-screen w-full relative z-10 transition-all duration-1000 ease-in-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`min-h-screen w-full relative z-10`}>
 
         {/* Desktop Layout - Enhanced */}
         <div className="hidden lg:flex justify-center items-center min-h-screen">
