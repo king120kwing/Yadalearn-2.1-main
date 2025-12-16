@@ -118,7 +118,31 @@ export const seedDatabase = async (userId: string, role: 'teacher' | 'student' =
             }
 
             // 5. Create Assignments/Submissions
-            // ... (Skipping for brevity, can add later)
+            if (createdCourses.length > 0) {
+                // Create one assignment for the first course
+                const assignmentData = {
+                    course_id: createdCourses[0].id,
+                    title: 'Midterm Essay: History of Math',
+                    description: 'Write a 500 word essay on the origins of calculus.',
+                    due_date: addDays(new Date(), 7).toISOString()
+                };
+
+                const { data: assignment } = await supabase.from('assignments').insert(assignmentData).select().single();
+
+                if (assignment) {
+                    // Create submissions for the dummy students
+                    const submissionsData = dummyStudents.slice(0, 3).map((student, index) => ({
+                        assignment_id: assignment.id,
+                        student_id: student.clerk_id,
+                        content: index % 2 === 0 ? 'Here is my essay link: https://docs.google.com/essay' : 'Calculus started with Newton and Leibniz...',
+                        submission_type: index % 2 === 0 ? 'link' : 'text',
+                        submitted_at: subDays(new Date(), index).toISOString(),
+                        status: 'submitted'
+                    }));
+
+                    await supabase.from('submissions').insert(submissionsData);
+                }
+            }
 
         } else {
             // --- STUDENT SEEDING LOGIC (Existing) ---

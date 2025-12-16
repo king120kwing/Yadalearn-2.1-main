@@ -7,7 +7,21 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { user, isLoaded, refreshUser } = useAuth();
+  const { user, isLoaded, refreshUser, logout } = useAuth();
+  const userRole = localStorage.getItem('yadalearn-user-role');
+
+  if (!isLoaded) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  }
+
+  // Debugging log
+  console.log('Settings Render - User:', user, 'IsLoaded:', isLoaded);
+
+  if (!user) {
+    // Should be handled by ProtectedRoute, but double safety
+    return <div className="flex h-screen items-center justify-center">Redirecting...</div>;
+  }
+
   const [notifications, setNotifications] = useState({
     push: true,
     email: false,
@@ -15,7 +29,6 @@ const Settings = () => {
   const [uploadedCV, setUploadedCV] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileInputRef = useRef<HTMLInputElement>(null);
-  const userRole = localStorage.getItem('yadalearn-user-role');
 
   const handleProfileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -36,44 +49,29 @@ const Settings = () => {
     }
   };
 
-  useEffect(() => {
-    if (isLoaded && !user) {
-      navigate("/login");
-    }
-  }, [user, isLoaded, navigate]);
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  // Get user display name
   const getDisplayName = () => {
-    if (user.firstName && user.lastName) {
-      return `${user.firstName} ${user.lastName}`;
-    }
-    if (user.firstName) return user.firstName;
-    if (user.name) return user.name;
-    return user.email?.split('@')[0] || 'User';
+    if (user?.name) return user.name;
+    if (user?.firstName && user?.lastName) return `${user.firstName} ${user.lastName}`;
+    if (user?.firstName) return user.firstName;
+    return 'User';
   };
 
-  // Get user initials for avatar fallback
   const getInitials = () => {
-    const name = getDisplayName();
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    if (user?.name) {
+      const names = user.name.split(' ');
+      if (names.length >= 2) return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+      return names[0][0].toUpperCase();
+    }
+    if (user?.firstName && user?.lastName) return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    if (user?.firstName) return user.firstName[0].toUpperCase();
+    return 'U';
   };
 
   const handleLogout = () => {
     localStorage.removeItem('yadalearn-user');
     localStorage.removeItem('yadalearn-user-role');
-    navigate("/welcome");
+    logout();
+    navigate("/login");
   };
 
   const handleCVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +123,7 @@ const Settings = () => {
             className="relative cursor-pointer group"
             onClick={() => profileInputRef.current?.click()}
           >
-            {user.imageUrl ? (
+            {user?.imageUrl ? (
               <img
                 src={user.imageUrl}
                 alt="User Avatar"
