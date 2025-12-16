@@ -13,6 +13,8 @@ import { AIStudyBuddyModal } from '@/features/student/quick-actions/AIStudyBuddy
 import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsModal';
 import { ProgressModal } from '@/features/student/quick-actions/ProgressModal';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { seedDatabase } from '@/utils/seedData';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
@@ -21,7 +23,13 @@ const StudentDashboard = () => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [showJoinCTA, setShowJoinCTA] = useState(true); // Mock 15 mins before class
   const { currentUser } = mockStore;
-  const { topTeachers, upcomingClasses } = mockQuery;
+  // const { topTeachers, upcomingClasses } = mockQuery; // Removed mock
+  const { topTeachers: dbTeachers, upcomingClasses: dbClasses, loading } = useDashboardData();
+
+  // Use DB data if available/loaded, otherwise fallback (or empty)
+  const topTeachers = dbTeachers.length > 0 ? dbTeachers : mockQuery.topTeachers;
+  const upcomingClasses = dbClasses.length > 0 ? dbClasses : mockQuery.upcomingClasses;
+
 
   const handleTeacherClick = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
@@ -46,6 +54,15 @@ const StudentDashboard = () => {
             <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
               Hi, {currentUser.name.split(' ')[0]}
             </h1>
+            {/* Temporary Seed Button - Always Visible for Verification */}
+            <Button
+              onClick={() => seedDatabase(currentUser.id || 'test_user')}
+              variant="outline"
+              className="mt-2 text-xs border-dashed border-indigo-500 text-indigo-500 hover:bg-indigo-50"
+            >
+              <span className="material-symbols-outlined text-sm mr-1">database</span>
+              Initialize Demo Data
+            </Button>
           </div>
           <div className="flex items-center -space-x-3">
             {topTeachers.slice(0, 2).map((teacher, idx) => (

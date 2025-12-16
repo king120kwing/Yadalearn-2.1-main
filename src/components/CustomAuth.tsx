@@ -1,7 +1,12 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSignIn, useSignUp, useUser } from "@clerk/clerk-react";
 
 export default function CustomAuth() {
+  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn();
+  const { isLoaded: isSignUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
+  const { user, isLoaded: isUserLoaded } = useUser();
+
   const [isActive, setIsActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -9,45 +14,108 @@ export default function CustomAuth() {
   const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "" });
   const navigate = useNavigate();
 
-  const handleSignIn = (e: React.FormEvent) => {
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (isUserLoaded && user) {
+      navigate("/role-selection");
+    }
+  }, [isUserLoaded, user, navigate]);
+
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState("");
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    // ... existing login logic ...
     e.preventDefault();
+    if (!isSignInLoaded) return;
+
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      if (signInData.email && signInData.password) {
-        localStorage.setItem('user', JSON.stringify({
-          email: signInData.email,
-        }));
+    try {
+      const result = await signIn.create({
+        identifier: signInData.email,
+        password: signInData.password,
+      });
+
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
         navigate("/role-selection");
       } else {
-        setError("Please fill in all fields");
+        console.log("SignIn incomplete", result);
+        setError("Login requires further steps not supported in this form yet.");
       }
+    } catch (err: any) {
+      console.error("SignIn error:", err);
+      setError(err.errors?.[0]?.message || "Failed to sign in");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSignUpLoaded) return;
+
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      if (signUpData.name && signUpData.email && signUpData.password) {
-        localStorage.setItem('user', JSON.stringify({
-          email: signUpData.email,
-        }));
+    try {
+      const result = await signUp.create({
+        firstName: signUpData.name.split(" ")[0],
+        lastName: signUpData.name.split(" ").slice(1).join(" ") || "",
+        emailAddress: signUpData.email,
+        password: signUpData.password,
+      });
+
+      if (result.status === "complete") {
+        await setSignUpActive({ session: result.createdSessionId });
         navigate("/role-selection");
       } else {
-        setError("Please fill in all fields");
+        // Send email code
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        setPendingVerification(true);
       }
+    } catch (err: any) {
+      console.error("SignUp error:", err);
+      setError(err.errors?.[0]?.message || "Failed to sign up");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSignUpLoaded) return;
+
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const result = await signUp.attemptEmailAddressVerification({
+        code,
+      });
+
+      if (result.status === "complete") {
+        await setSignUpActive({ session: result.createdSessionId });
+        navigate("/role-selection");
+      } else {
+        console.log("Verification incomplete", result);
+        setError("Verification failed. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      setError(err.errors?.[0]?.message || "Invalid code");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <>
+      {/* ... styles ... */}
       <style>{`
+        /* ... existing styles ... */
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
 
         * {
@@ -302,6 +370,7 @@ export default function CustomAuth() {
         }
       `}</style>
 
+      {/* ... rest of your UI ... */}
       <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
@@ -341,40 +410,60 @@ export default function CustomAuth() {
           </div>
 
           <div className="form-container sign-up">
-            <form className="form-content" onSubmit={handleSignUp}>
-              <h1>Create Account</h1>
-              <div className="social-icons">
-                <a href="#" className="google"><i className="fa-brands fa-google"></i></a>
-                <a href="#" className="facebook"><i className="fa-brands fa-facebook-f"></i></a>
-              </div>
-              <span>or use your email for registration</span>
-              <input
-                type="text"
-                placeholder="Name"
-                value={signUpData.name}
-                onChange={(e) => setSignUpData({ ...signUpData, name: e.target.value })}
-                required
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={signUpData.email}
-                onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={signUpData.password}
-                onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
-                required
-              />
-              {error && <p style={{ color: "red", fontSize: "12px" }}>{error}</p>}
-              <button type="submit" disabled={isLoading}>
-                {isLoading ? "Creating Account..." : "Sign Up"}
-              </button>
-            </form>
+            {pendingVerification ? (
+              <form className="form-content" onSubmit={handleVerify}>
+                <h1>Verify Email</h1>
+                <span>Enter the code sent to your email</span>
+                <input
+                  type="text"
+                  placeholder="Verification Code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                />
+                {error && <p style={{ color: "red", fontSize: "12px" }}>{error}</p>}
+                <button type="submit" disabled={isLoading}>
+                  {isLoading ? "Verifying..." : "Verify Code"}
+                </button>
+              </form>
+            ) : (
+              <form className="form-content" onSubmit={handleSignUp}>
+                <h1>Create Account</h1>
+                <div className="social-icons">
+                  <a href="#" className="google"><i className="fa-brands fa-google"></i></a>
+                  <a href="#" className="facebook"><i className="fa-brands fa-facebook-f"></i></a>
+                </div>
+                <span>or use your email for registration</span>
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={signUpData.name}
+                  onChange={(e) => setSignUpData({ ...signUpData, name: e.target.value })}
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={signUpData.email}
+                  onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={signUpData.password}
+                  onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                  required
+                />
+                {error && <p style={{ color: "red", fontSize: "12px" }}>{error}</p>}
+                <button type="submit" disabled={isLoading}>
+                  {isLoading ? "Creating Account..." : "Sign Up"}
+                </button>
+              </form>
+            )}
           </div>
+          {/* ... toggle containers ... */}
+
 
           <div className="toggle-container">
             <div className="toggle">

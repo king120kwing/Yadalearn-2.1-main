@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockQuery, mockRootProps } from '@/data/mockData';
 import { SessionStatus } from '@/types/enums';
 import type { Student } from '@/types/schema';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeacherDashboardData } from '@/hooks/useTeacherDashboardData';
+import { seedDatabase } from '@/utils/seedData'; // Import seed utility
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,11 +24,14 @@ import {
 const TeacherDashboard = () => {
   const navigate = useNavigate();
   const { user, isLoaded, userRole } = useAuth();
+  const { teacherSchedule, topStudents, stats, loading } = useTeacherDashboardData(); // Use the hook
+
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const { topStudents, teacherSchedule } = mockQuery;
-  const { teacherStats, studentProgress } = mockRootProps;
+
+  // Use real stats if available, else standard mocks for UI structure
+  const studentProgress = { completedTasks: 45, pendingTasks: 12 };
 
   // ALL hooks must be called before any conditional logic
   useEffect(() => {
@@ -82,7 +86,7 @@ const TeacherDashboard = () => {
   }
 
   // Show loading state after hooks are called
-  if (!isReady) {
+  if (!isReady || loading) {
     return (
       <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -110,18 +114,30 @@ const TeacherDashboard = () => {
             <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
               Hi, {currentUser?.firstName || (currentUser?.name ? currentUser.name.split(' ')[0] : 'Teacher')}
             </h1>
+
+            {/* Seed Button for Teachers */}
+            {teacherSchedule.length === 0 && (
+              <Button
+                onClick={() => seedDatabase(currentUser.id, 'teacher')}
+                variant="outline"
+                className="mt-2 text-xs border-dashed border-indigo-500 text-indigo-500 hover:bg-indigo-50"
+              >
+                <span className="material-symbols-outlined text-sm mr-1">database</span>
+                Initialize Teacher Data
+              </Button>
+            )}
           </div>
           <div className="flex items-center -space-x-3">
             {topStudents.slice(0, 2).map((student, idx) => (
               <Avatar key={idx} className="w-10 h-10 border-2 border-background-light dark:border-background-dark">
                 <AvatarImage src={student.avatar} alt={student.name} />
                 <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
-                  {student.name.split(' ').map(n => n[0]).join('')}
+                  {student.name.split(' ').map((n: string) => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
             ))}
             <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
-              <span className="text-sm font-semibold text-slate-600">+{topStudents.length - 2}</span>
+              <span className="text-sm font-semibold text-slate-600">+{Math.max(0, stats.totalStudents - 2)}</span>
             </div>
           </div>
         </header>

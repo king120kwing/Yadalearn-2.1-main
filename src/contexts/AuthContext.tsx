@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useUser, useClerk } from "@clerk/clerk-react";
 
 interface User {
+  id: string; // Added ID for Supabase
   email: string;
   name: string;
   firstName?: string;
@@ -22,47 +24,46 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const { signOut, openSignIn } = useClerk();
+
   const [user, setUser] = useState<User | null>(null);
-  const [isLoaded, setIsLoaded] = useState(true);
   const [userRole, setUserRoleState] = useState<'teacher' | 'student' | null>(null);
 
-  // Load user and role from localStorage on mount
+  // Sync Clerk user with local User state
   useEffect(() => {
-    const savedUser = localStorage.getItem('yadalearn-user');
-    const savedRole = localStorage.getItem('yadalearn-user-role');
-
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    if (clerkUser) {
+      setUser({
+        id: clerkUser.id,
+        email: clerkUser.primaryEmailAddress?.emailAddress || '',
+        name: clerkUser.fullName || '',
+        firstName: clerkUser.firstName || '',
+        lastName: clerkUser.lastName || '',
+        imageUrl: clerkUser.imageUrl,
+      });
+    } else {
+      setUser(null);
     }
+  }, [clerkUser]);
 
+  // Load role from localStorage on mount
+  useEffect(() => {
+    const savedRole = localStorage.getItem('yadalearn-user-role');
     if (savedRole && (savedRole === 'teacher' || savedRole === 'student')) {
       setUserRoleState(savedRole as 'teacher' | 'student');
     }
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
-    // Simulate authentication
-    return new Promise<void>((resolve, reject) => {
-      setTimeout(() => {
-        if (email && password) {
-          const userData = {
-            email,
-            name: email.split('@')[0]
-          };
-          setUser(userData);
-          localStorage.setItem('yadalearn-user', JSON.stringify(userData));
-          resolve();
-        } else {
-          reject(new Error('Invalid credentials'));
-        }
-      }, 1000);
-    });
+    // For Clerk, "login" typically opens the modal or redirects.
+    // We can use openSignIn() here.
+    return openSignIn();
   };
 
   const logout = () => {
+    signOut();
     setUser(null);
     setUserRoleState(null);
-    localStorage.removeItem('yadalearn-user');
     localStorage.removeItem('yadalearn-user-role');
   };
 
@@ -83,21 +84,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AuthContext.Provider value={{
       user,
-      isLoaded,
+      isLoaded: isClerkLoaded,
       userRole,
       setUserRole,
       clearUserRole,
-      login,
+      login, // Now opens Clerk sign in
       logout,
       refreshUser: () => {
-        const savedUser = localStorage.getItem('yadalearn-user');
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-        }
-        const savedRole = localStorage.getItem('yadalearn-user-role');
-        if (savedRole && (savedRole === 'teacher' || savedRole === 'student')) {
-          setUserRoleState(savedRole as 'teacher' | 'student');
-        }
+        // No-op for Clerk as it handles state automatically, 
+        // but keeping for interface compatibility if needed.
       }
     }}>
       {children}
