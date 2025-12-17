@@ -67,5 +67,6 @@ const App = () => {
       </AuthProvider>
     </BrowserRouter>
   );
+};
 
-  export default App;
+export default App;
