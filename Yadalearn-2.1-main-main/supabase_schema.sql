@@ -192,10 +192,13 @@ ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public read access" ON bookings;
 DROP POLICY IF EXISTS "Authenticated insert" ON bookings;
 DROP POLICY IF EXISTS "Authenticated update" ON bookings;
+DROP POLICY IF EXISTS "Authenticated delete" ON bookings;
 
 -- Define booking policies
 CREATE POLICY "Public read access" ON bookings FOR SELECT USING (true);
 CREATE POLICY "Authenticated insert" ON bookings FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated update" ON bookings FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated delete" ON bookings FOR DELETE USING (auth.role() = 'authenticated');
+
 
 

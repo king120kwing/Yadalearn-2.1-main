@@ -67,66 +67,6 @@ export function useTeacherDashboardData() {
 
                 if (bookingsError) throw bookingsError;
 
-                // Auto-seeding: if bookings is empty, seed default bookings using first student
-                if (!bookings || bookings.length === 0) {
-                    console.log('No bookings found. Seeding default bookings for teacher:', userId);
-                    const { data: studentsList } = await supabase
-                        .from('profiles')
-                        .select('id')
-                        .eq('role', 'student')
-                        .limit(1);
-
-                    if (studentsList && studentsList.length > 0) {
-                        const studentId = studentsList[0].id;
-                        const defaultBookings = [
-                            {
-                                student_id: studentId,
-                                teacher_id: userId,
-                                subject: 'AP Physics',
-                                date: '2026-06-27',
-                                time: '09:00 AM',
-                                status: 'confirmed'
-                            },
-                            {
-                                student_id: studentId,
-                                teacher_id: userId,
-                                subject: 'Office Hours',
-                                date: '2026-06-28',
-                                time: '10:00 AM',
-                                status: 'confirmed'
-                            },
-                            {
-                                student_id: studentId,
-                                teacher_id: userId,
-                                subject: 'Grading',
-                                date: '2026-06-29',
-                                time: '11:30 AM',
-                                status: 'confirmed'
-                            },
-                            {
-                                student_id: studentId,
-                                teacher_id: userId,
-                                subject: 'Advanced Mathematics',
-                                date: '2026-07-02',
-                                time: '02:00 PM',
-                                status: 'pending'
-                            }
-                        ];
-
-                        const { error: seedError } = await supabase
-                            .from('bookings')
-                            .insert(defaultBookings);
-
-                        if (!seedError) {
-                            const { data: refetchedBookings } = await supabase
-                                .from('bookings')
-                                .select('*, student:profiles!bookings_student_id_fkey(*)')
-                                .eq('teacher_id', userId);
-                            if (refetchedBookings) bookings = refetchedBookings;
-                        }
-                    }
-                }
-
                 const dbBookings = bookings || [];
                 const confirmedBookings = dbBookings.filter((b: any) => b.status === 'confirmed');
                 const pendingBookingsList = dbBookings.filter((b: any) => b.status === 'pending');
@@ -140,7 +80,11 @@ export function useTeacherDashboardData() {
                     date: b.date,
                     time: b.time,
                     status: 'confirmed'
-                }));
+                })).sort((a: any, b: any) => {
+                    const dateCompare = a.date.localeCompare(b.date);
+                    if (dateCompare !== 0) return dateCompare;
+                    return a.time.localeCompare(b.time);
+                });
                 setTeacherSchedule(formattedSchedule);
 
                 // Build unique students list from confirmed bookings

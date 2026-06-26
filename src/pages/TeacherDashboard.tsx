@@ -247,8 +247,14 @@ const TeacherDashboard = () => {
       {/* Sidebar on desktop */}
       <aside className="hidden md:flex flex-col justify-between w-64 p-8 border-r border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10">
         <div className="flex flex-col gap-10">
-          <div className="flex items-center gap-3 px-2">
-            <img src="/logo (2).png" alt="YadaLearn Logo" className="w-9 h-9 object-contain rounded-xl" />
+          <div className="flex items-center gap-2.5 px-1">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100 dark:border-zinc-700 shadow-sm relative">
+              <img 
+                src="/logo (2).png" 
+                alt="YadaLearn Logo" 
+                className="absolute w-[185%] h-[185%] max-w-none object-contain top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" 
+              />
+            </div>
             <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
           </div>
           
@@ -572,7 +578,12 @@ const TeacherDashboard = () => {
 
                 <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
                   <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
-                  <p className="text-xs font-bold">Session Prep: Advanced Maths</p>
+                  <p className="text-xs font-bold">
+                    {teacherSchedule && teacherSchedule.length > 0 
+                      ? `Session Prep: ${teacherSchedule[0].title}`
+                      : "No Upcoming Sessions"
+                    }
+                  </p>
                 </div>
               </div>
             </div>
