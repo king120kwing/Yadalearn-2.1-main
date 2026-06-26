@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, getDate, isSameDay } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { Plus } from 'lucide-react';
 
 const TeacherCalendar = () => {
     const { user, isLoaded } = useAuth();
@@ -276,7 +277,7 @@ const TeacherCalendar = () => {
                 onClick={() => setShowAddModal(true)}
                 className="fixed bottom-24 right-6 w-16 h-16 bg-purple-600 text-white rounded-full shadow-xl shadow-purple-600/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
             >
-                <span className="material-symbols-outlined text-3xl">add</span>
+                <Plus className="h-6 w-6" />
             </button>
 
             {/* Add Plan Modal */}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, getDate, getDay, isSameDay } from 'date-fns';
+import { Plus } from 'lucide-react';
 
 const StudentCalendar = () => {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -188,7 +189,7 @@ const StudentCalendar = () => {
                 onClick={() => setShowAddModal(true)}
                 className="fixed bottom-24 right-6 w-16 h-16 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full shadow-xl shadow-gray-400/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
             >
-                <span className="material-symbols-outlined text-3xl">add</span>
+                <Plus className="h-6 w-6" />
             </button>
 
             {/* Add Plan Modal */}
