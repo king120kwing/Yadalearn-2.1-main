@@ -61,11 +61,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
   const [subjects, setSubjectsState] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(() => {
+    const hash = window.location.hash;
+    const search = window.location.search;
+    const hasOAuthToken = 
+      hash.includes('access_token=') || 
+      hash.includes('id_token=') || 
+      hash.includes('refresh_token=') || 
+      search.includes('code=') ||
+      search.includes('access_token=');
+      
+    if (hasOAuthToken) {
+      return false; // Force loading state during OAuth redirect parsing
+    }
+
     const hasRole = localStorage.getItem('yadalearn-user-role');
     const hasUser = localStorage.getItem('yadalearn-user');
     return !!(hasRole && hasUser);
   });
   const fetchingUserIdRef = useRef<string | null>(null);
+  const initialCheckCompletedRef = useRef(false);
 
   useEffect(() => {
     // Check for OAuth redirect errors in hash or query parameters
@@ -81,6 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       sessionStorage.setItem('oauth_error', decodeURIComponent(errorMsg).replace(/\+/g, ' '));
       
       window.location.hash = '';
+      initialCheckCompletedRef.current = true;
       setIsLoaded(true);
       return;
     } else if (search && (search.includes('error=') || search.includes('error_description='))) {
@@ -90,17 +105,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('Supabase OAuth Error:', errorMsg);
       sessionStorage.setItem('oauth_error', decodeURIComponent(errorMsg).replace(/\+/g, ' '));
       
+      initialCheckCompletedRef.current = true;
       setIsLoaded(true);
       return;
     }
 
-    const hasHashToken = window.location.hash.includes('access_token=') || window.location.href.includes('access_token=');
-    let isProcessingOAuth = hasHashToken;
+    const hasHashToken = 
+      window.location.hash.includes('access_token=') || 
+      window.location.hash.includes('id_token=') || 
+      window.location.hash.includes('refresh_token=') || 
+      window.location.search.includes('code=') ||
+      window.location.search.includes('access_token=');
 
     // Check active session on mount
     console.log('AuthContext: getSession started on mount');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('AuthContext: getSession returned session:', session);
+      initialCheckCompletedRef.current = true;
       try {
         await handleSession(session);
         console.log('AuthContext: getSession handleSession completed');
@@ -110,6 +131,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }).catch(err => {
       console.error('AuthContext: getSession promise rejected:', err);
+      initialCheckCompletedRef.current = true;
       setIsLoaded(true);
     });
 
@@ -117,6 +139,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthContext: onAuthStateChange event:', event, 'session:', session);
       if (event === 'SIGNED_IN') {
+        initialCheckCompletedRef.current = true;
         const hasCache = localStorage.getItem('yadalearn-user-role') && localStorage.getItem('yadalearn-user');
         if (!hasCache) {
           setIsLoaded(false);
@@ -128,10 +151,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error('AuthContext: onAuthStateChange handleSession failed:', err);
         setIsLoaded(true);
-      } finally {
-        if (event === 'SIGNED_IN') {
-          isProcessingOAuth = false;
-        }
       }
     });
 
@@ -140,6 +159,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (hasHashToken) {
       timeoutId = setTimeout(() => {
         console.log('AuthContext: OAuth fallback timer fired, setting isLoaded to true');
+        initialCheckCompletedRef.current = true;
         setIsLoaded(true);
       }, 2000);
     }
@@ -153,6 +173,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const handleSession = async (session: any) => {
     console.log('AuthContext: handleSession start for user:', session?.user?.id);
     if (session?.user) {
+      initialCheckCompletedRef.current = true;
       const u = session.user;
       
       // If we are already fetching/fetched this user's profile, skip database query
@@ -220,18 +241,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .select('role, onboarding_completed, subjects, avatar_url, full_name, bio, country')
           .eq('id', u.id)
           .single();
- 
+
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Profile fetch query timed out after 30 seconds')), 30000)
         );
- 
+
         const { data: profile, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
- 
+
         if (error) {
           console.warn('AuthContext: Profile fetch returned error:', error);
         }
         console.log('AuthContext: Profile fetch completed, profile:', profile);
- 
+
         if (profile) {
           if (profile.role) {
             setUserRoleState(profile.role as 'teacher' | 'student');
@@ -281,7 +302,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('yadalearn-user-role');
       localStorage.removeItem('yadalearn-onboarding-completed');
       fetchingUserIdRef.current = null;
-      setIsLoaded(true);
+
+      const hasOAuthToken = 
+        window.location.hash.includes('access_token=') || 
+        window.location.hash.includes('id_token=') || 
+        window.location.hash.includes('refresh_token=') || 
+        window.location.search.includes('code=') ||
+        window.location.search.includes('access_token=');
+        
+      if (!hasOAuthToken || initialCheckCompletedRef.current) {
+        setIsLoaded(true);
+      } else {
+        console.log('AuthContext: Skipping setIsLoaded(true) during OAuth initialization');
+      }
     }
     console.log('AuthContext: handleSession end');
   };
