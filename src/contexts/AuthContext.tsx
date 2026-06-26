@@ -335,11 +335,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signInWithGoogle = async (): Promise<void> => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://yxqezrvgvfwdgrlwczea.supabase.co';
-    const redirectUrl = encodeURIComponent(window.location.origin + '/role-selection');
-    const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${redirectUrl}&prompt=select_account`;
-    window.location.assign(authUrl);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/role-selection`,
+        queryParams: {
+          prompt: 'select_account',
+        }
+      }
+    });
+    if (error) throw error;
   };
+
 
   const logout = async () => {
     await supabase.auth.signOut();
