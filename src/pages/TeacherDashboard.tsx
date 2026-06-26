@@ -40,6 +40,46 @@ const TeacherDashboard = () => {
   const { user, isLoaded, userRole, logout } = useAuth();
   const { teacherSchedule, topStudents, stats, pendingBookings, loading } = useTeacherDashboardData(); // Use the hook
 
+  // Find the next upcoming/active event based on the current actual time
+  const getNextUpcomingEvent = (schedule: any[]) => {
+    if (!schedule || schedule.length === 0) return null;
+    const now = new Date();
+    
+    const parseDateTime = (dateStr: string, timeStr: string) => {
+      try {
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return new Date(0);
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+
+        const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+        let hours = 0;
+        let minutes = 0;
+        if (match) {
+          hours = parseInt(match[1], 10);
+          minutes = parseInt(match[2], 10);
+          const ampm = match[3].toUpperCase();
+          if (ampm === 'PM' && hours < 12) hours += 12;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+        }
+        return new Date(year, month, day, hours, minutes);
+      } catch (e) {
+        return new Date(0);
+      }
+    };
+
+    const upcoming = schedule.filter((event: any) => {
+      const start = parseDateTime(event.date, event.time);
+      const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
+      return end > now;
+    });
+
+    return upcoming.length > 0 ? upcoming[0] : null;
+  };
+
+  const nextEvent = getNextUpcomingEvent(teacherSchedule);
+
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -576,15 +616,12 @@ const TeacherDashboard = () => {
                   })()}
                 </div>
 
-                <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
-                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
-                  <p className="text-xs font-bold">
-                    {teacherSchedule && teacherSchedule.length > 0 
-                      ? `Session Prep: ${teacherSchedule[0].title}`
-                      : "No Upcoming Sessions"
-                    }
-                  </p>
-                </div>
+                {nextEvent && (
+                  <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
+                    <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
+                    <p className="text-xs font-bold">Session Prep: {nextEvent.title}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
