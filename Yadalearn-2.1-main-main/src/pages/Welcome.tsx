@@ -25,13 +25,15 @@ const Welcome = () => {
     }
   }, [isLoaded]);
 
+  console.log('Welcome: Rendering...', { isLoaded });
+
   return (
     <div className="min-h-screen w-full gradient-welcome relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 gradient-mesh opacity-30"></div>
 
       {/* Main Content Container */}
-      <div className={`min-h-screen w-full relative z-10 transition-all duration-1000 ease-in-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`min-h-screen w-full relative z-10`}>
 
         {/* Desktop Layout - Enhanced */}
         <div className="hidden lg:flex justify-center items-center min-h-screen">
@@ -40,9 +42,8 @@ const Welcome = () => {
             <div className="relative animate-fade-in-scale">
               {/* Enhanced 3D cutout shape with multiple shadow layers */}
               <div
-                className={`bg-gradient-to-br from-purple-200 to-purple-300 transition-all duration-1000 ease-out ${
-                  imageVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                }`}
+                className={`bg-gradient-to-br from-purple-200 to-purple-300 transition-all duration-1000 ease-out ${imageVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                  }`}
                 style={{
                   width: 'clamp(480px, 45vw, 620px)',
                   height: 'clamp(600px, 55vw, 720px)',
@@ -95,16 +96,15 @@ const Welcome = () => {
         </div>
 
         {/* Mobile Layout */}
-        <div className="md:hidden h-full flex flex-col items-center justify-center px-6">
+        <div className="md:hidden min-h-screen flex flex-col items-center justify-center px-6 py-12">
           {/* Hero Video with Complex Shadow - Mobile */}
-          <div className="mb-12">
+          <div className="mb-8">
             <div
-              className={`bg-gradient-to-br from-purple-200 to-purple-300 transition-all duration-1000 ease-out ${
-                imageVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-              }`}
+              className={`bg-gradient-to-br from-purple-200 to-purple-300 transition-all duration-1000 ease-out ${imageVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                }`}
               style={{
-                width: '320px',
-                height: '420px',
+                width: 'min(85vw, 340px)',
+                height: 'min(110vw, 440px)',
                 borderRadius: '20px',
                 overflow: 'hidden',
                 display: 'flex',
@@ -126,38 +126,35 @@ const Welcome = () => {
           </div>
 
           {/* Text and Authentication - Mobile */}
-          <div className="text-center space-y-6">
+          <div className="text-center space-y-4 w-full max-w-sm">
             <h1
-              className={`text-5xl font-bold text-gray-800 transition-all duration-700 ease-out ${
-                titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
+              className={`text-4xl sm:text-5xl font-bold text-gray-800 transition-all duration-700 ease-out ${titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
             >
               YadaLearn
             </h1>
             <p
-              className={`text-xl text-gray-600 transition-all duration-700 ease-out delay-200 ${
-                sloganVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
+              className={`text-lg sm:text-xl text-gray-600 transition-all duration-700 ease-out delay-200 ${sloganVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
             >
               Every Lesson a Treasure
             </p>
 
             {/* Authentication Section - Mobile */}
             <div
-              className={`transition-all duration-700 ease-out ${
-                buttonVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
+              className={`transition-all duration-700 ease-out pt-4 ${buttonVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
             >
-              <div className="space-y-4">
+              <div className="space-y-3 w-full">
                 <button
                   onClick={() => navigate('/login')}
-                  className="w-full rounded-full bg-black px-16 py-5 font-semibold text-white text-xl shadow-lg hover:scale-105 hover:bg-gray-900 transition-all"
+                  className="w-full rounded-full bg-black px-12 py-4 font-semibold text-white text-lg shadow-lg hover:scale-105 hover:bg-gray-900 transition-all active:scale-95"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => navigate('/signup')}
-                  className="w-full rounded-full border-2 border-black bg-white px-16 py-5 font-semibold text-black text-xl shadow-lg hover:scale-105 hover:bg-gray-50 transition-all"
+                  className="w-full rounded-full border-2 border-black bg-white px-12 py-4 font-semibold text-black text-lg shadow-lg hover:scale-105 hover:bg-gray-50 transition-all active:scale-95"
                 >
                   Sign Up
                 </button>

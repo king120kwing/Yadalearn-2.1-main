@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
 import { TeacherProfileModal } from '@/components/ProfileModals';
-import { mockQuery, mockStore } from '@/data/mockData';
 import type { Teacher } from '@/types/schema';
 import { JoinClassModal } from '@/features/student/quick-actions/JoinClassModal';
 import { BookClassModal } from '@/features/student/quick-actions/BookClassModal';
@@ -14,24 +13,17 @@ import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsMo
 import { ProgressModal } from '@/features/student/quick-actions/ProgressModal';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { seedDatabase } from '@/utils/seedData';
 
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
-  const { user } = useUser(); // use Clerk hook
+  const { user } = useAuth(); // use custom AuthContext hook
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [showJoinCTA, setShowJoinCTA] = useState(true); // Mock 15 mins before class
-  // const { currentUser } = mockStore; // Removed mockStore usage for user
-  // const { topTeachers, upcomingClasses } = mockQuery; // Removed mock
-  const { topTeachers: dbTeachers, upcomingClasses: dbClasses, loading } = useDashboardData();
-
-  // Use DB data if available/loaded, otherwise fallback (or empty)
-  const topTeachers = dbTeachers.length > 0 ? dbTeachers : mockQuery.topTeachers;
-  const upcomingClasses = dbClasses.length > 0 ? dbClasses : mockQuery.upcomingClasses;
+  const [showJoinCTA, setShowJoinCTA] = useState(false); // Only show when a real class is active
+  const { topTeachers, upcomingClasses, loading } = useDashboardData();
 
   const userId = user?.id;
   const userName = user?.fullName || user?.firstName || 'Student';
@@ -42,13 +34,7 @@ const StudentDashboard = () => {
     setIsModalOpen(true);
   };
 
-  // Mock courses data
-  const courses = [
-    { name: 'Chemistry', icon: 'science', gradient: 'from-[var(--lavender-purple-start)] to-[var(--lavender-purple-end)]', textColor: 'text-[#674EA7]' },
-    { name: 'Spanish', icon: 'translate', gradient: 'from-[var(--yellow-orange-start)] to-[var(--yellow-orange-end)]', textColor: 'text-[#C47529]' },
-    { name: 'History', icon: 'history_edu', gradient: 'from-sky-100 to-blue-200', textColor: 'text-[#3E82A8]' },
-    { name: 'Art Class', icon: 'art_track', gradient: 'from-emerald-100 to-green-200', textColor: 'text-[#2F857B]' },
-  ];
+
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark">
@@ -60,18 +46,6 @@ const StudentDashboard = () => {
             <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
               Hi, {userName}
             </h1>
-            {/* Temporary Seed Button - Always Visible for Verification */}
-            <Button
-              onClick={() => {
-                if (userId) seedDatabase(userId, 'student');
-                else alert('Please wait for user to load');
-              }}
-              variant="outline"
-              className="mt-2 text-xs border-dashed border-indigo-500 text-indigo-500 hover:bg-indigo-50"
-            >
-              <span className="material-symbols-outlined text-sm mr-1">database</span>
-              Initialize Demo Data
-            </Button>
           </div>
           <div className="flex items-center -space-x-3">
             {topTeachers.slice(0, 2).map((teacher, idx) => (
@@ -82,9 +56,11 @@ const StudentDashboard = () => {
                 </AvatarFallback>
               </Avatar>
             ))}
-            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
-              <span className="text-sm font-semibold text-slate-600">+{topTeachers.length - 2}</span>
-            </div>
+            {topTeachers.length > 2 && (
+              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
+                <span className="text-sm font-semibold text-slate-600">+{topTeachers.length - 2}</span>
+              </div>
+            )}
           </div>
         </header>
 
@@ -265,33 +241,39 @@ const StudentDashboard = () => {
             <a className="text-sm font-medium text-indigo-500 dark:text-indigo-400" href="#">View All</a>
           </div>
           <div className="space-y-4">
-            {upcomingClasses.slice(0, 2).map((classItem, idx) => (
-              <div key={classItem.id} className="bg-white dark:bg-zinc-800 px-5 py-6 rounded-4xl flex items-center justify-between shadow-soft-float">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className={`w-14 h-14 ${idx === 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-blue-100 dark:bg-blue-900/40'} rounded-2xl flex items-center justify-center`}>
-                      <span className={`material-symbols-outlined text-3xl ${idx === 0 ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400'}`}>
-                        {idx === 0 ? 'quiz' : 'edit_document'}
-                      </span>
+            {upcomingClasses.length > 0 ? (
+              upcomingClasses.slice(0, 2).map((classItem, idx) => (
+                <div key={classItem.id} className="bg-white dark:bg-zinc-800 px-5 py-6 rounded-4xl flex items-center justify-between shadow-soft-float">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center">
+                        <span className="material-symbols-outlined text-3xl text-indigo-500 dark:text-indigo-400">
+                          edit_document
+                        </span>
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-indigo-400 rounded-full border-2 border-white dark:border-zinc-800 flex items-center justify-center shadow-sm">
+                        <span className="material-symbols-outlined text-white text-xs" style={{ fontVariationSettings: "'wght' 700" }}>
+                          hourglass_top
+                        </span>
+                      </div>
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${idx === 0 ? 'bg-red-400' : 'bg-blue-400'} rounded-full border-2 border-white dark:border-zinc-800 flex items-center justify-center shadow-sm`}>
-                      <span className="material-symbols-outlined text-white text-xs" style={{ fontVariationSettings: "'wght' 700" }}>
-                        {idx === 0 ? 'priority_high' : 'hourglass_top'}
-                      </span>
+                    <div>
+                      <p className="font-semibold text-base text-text-light dark:text-text-dark">
+                        {classItem.title}
+                      </p>
+                      <p className="text-sm text-subtext-light dark:text-subtext-dark">
+                        {classItem.day ? `Schedule: ${classItem.day}` : 'Scheduled'}
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-base text-text-light dark:text-text-dark">
-                      {idx === 0 ? 'Chemistry Quiz' : classItem.title}
-                    </p>
-                    <p className="text-sm text-subtext-light dark:text-subtext-dark">
-                      {idx === 0 ? 'Due: Tomorrow, 11:59 PM' : `Due: ${classItem.day}, ${classItem.time}`}
-                    </p>
-                  </div>
+                  <span className="material-symbols-outlined text-subtext-light dark:text-subtext-dark cursor-pointer">more_vert</span>
                 </div>
-                <span className="material-symbols-outlined text-subtext-light dark:text-subtext-dark cursor-pointer">more_vert</span>
+              ))
+            ) : (
+              <div className="text-center py-10 text-gray-500 bg-white dark:bg-zinc-800 rounded-3xl border border-gray-100 dark:border-zinc-800 shadow-sm font-medium">
+                No upcoming classes scheduled.
               </div>
-            ))}
+            )}
           </div>
         </section>
       </div>

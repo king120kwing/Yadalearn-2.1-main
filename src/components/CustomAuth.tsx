@@ -1,15 +1,14 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSignIn, useSignUp, useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CustomAuth() {
-  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn();
-  const { isLoaded: isSignUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
-  const { user, isLoaded: isUserLoaded } = useUser();
+  const { user, isLoaded: isUserLoaded, userRole, onboardingCompleted, login, signUpWithEmail, signInWithGoogle } = useAuth();
 
   const [isActive, setIsActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [signInData, setSignInData] = useState({ email: "", password: "" });
   const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "" });
   const navigate = useNavigate();
@@ -17,37 +16,57 @@ export default function CustomAuth() {
   // Auto-redirect if already logged in
   useEffect(() => {
     if (isUserLoaded && user) {
-      navigate("/role-selection");
+      if (onboardingCompleted) {
+        if (userRole === 'teacher') {
+          navigate("/teacher-dashboard");
+        } else if (userRole === 'student') {
+          navigate("/student-dashboard");
+        } else {
+          navigate("/role-selection");
+        }
+      } else {
+        if (userRole) {
+          navigate("/onboarding", { state: { role: userRole } });
+        } else {
+          navigate("/role-selection");
+        }
+      }
     }
-  }, [isUserLoaded, user, navigate]);
+  }, [isUserLoaded, user, userRole, onboardingCompleted, navigate]);
+
+  useEffect(() => {
+    const oauthError = sessionStorage.getItem('oauth_error');
+    if (oauthError) {
+      setError(oauthError);
+      sessionStorage.removeItem('oauth_error');
+    }
+  }, []);
 
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
 
+  const getFriendlyErrorMessage = (errorMsg: string): string => {
+    if (errorMsg.includes("rate limit exceeded")) {
+      return "Signup rate limit exceeded. Please wait a minute before trying again. (If you are the admin, you can adjust this limit in your Supabase Dashboard under Settings -> Auth -> Rate Limits).";
+    }
+    if (errorMsg.includes("email_not_confirmed")) {
+      return "Please confirm your email address by clicking the link sent to your inbox before signing in.";
+    }
+    return errorMsg;
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
-    // ... existing login logic ...
     e.preventDefault();
-    if (!isSignInLoaded) return;
 
     setError("");
+    setSuccessMsg("");
     setIsLoading(true);
 
     try {
-      const result = await signIn.create({
-        identifier: signInData.email,
-        password: signInData.password,
-      });
-
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        navigate("/role-selection");
-      } else {
-        console.log("SignIn incomplete", result);
-        setError("Login requires further steps not supported in this form yet.");
-      }
+      await login(signInData.email, signInData.password);
     } catch (err: any) {
       console.error("SignIn error:", err);
-      setError(err.errors?.[0]?.message || "Failed to sign in");
+      setError(getFriendlyErrorMessage(err.message || "Failed to sign in"));
     } finally {
       setIsLoading(false);
     }
@@ -55,30 +74,34 @@ export default function CustomAuth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSignUpLoaded) return;
 
     setError("");
+    setSuccessMsg("");
     setIsLoading(true);
 
     try {
-      const result = await signUp.create({
-        firstName: signUpData.name.split(" ")[0],
-        lastName: signUpData.name.split(" ").slice(1).join(" ") || "",
-        emailAddress: signUpData.email,
-        password: signUpData.password,
-      });
-
-      if (result.status === "complete") {
-        await setSignUpActive({ session: result.createdSessionId });
-        navigate("/role-selection");
-      } else {
-        // Send email code
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        setPendingVerification(true);
+      const data = await signUpWithEmail(signUpData.email, signUpData.password, signUpData.name);
+      if (!data?.session) {
+        setSuccessMsg("Account created! Please check your email to confirm your registration before signing in.");
       }
     } catch (err: any) {
       console.error("SignUp error:", err);
-      setError(err.errors?.[0]?.message || "Failed to sign up");
+      setError(getFriendlyErrorMessage(err.message || "Failed to sign up"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccessMsg("");
+    setIsLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error("Google sign in error:", err);
+      setError(getFriendlyErrorMessage(err.message || "Failed to sign in with Google"));
     } finally {
       setIsLoading(false);
     }
@@ -86,29 +109,7 @@ export default function CustomAuth() {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSignUpLoaded) return;
-
-    setError("");
-    setIsLoading(true);
-
-    try {
-      const result = await signUp.attemptEmailAddressVerification({
-        code,
-      });
-
-      if (result.status === "complete") {
-        await setSignUpActive({ session: result.createdSessionId });
-        navigate("/role-selection");
-      } else {
-        console.log("Verification incomplete", result);
-        setError("Verification failed. Please try again.");
-      }
-    } catch (err: any) {
-      console.error("Verification error:", err);
-      setError(err.errors?.[0]?.message || "Invalid code");
-    } finally {
-      setIsLoading(false);
-    }
+    setError("Verification is currently disabled");
   };
 
   return (
@@ -201,32 +202,32 @@ export default function CustomAuth() {
           margin-bottom: 20px;
         }
 
-        .social-icons {
-          margin: 20px 0;
-        }
-
-        .social-icons a {
-          border: 1px solid #ccc;
-          border-radius: 20%;
-          display: inline-flex;
-          justify-content: center;
+        .google-btn {
+          background-color: #ffffff;
+          color: #333333;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 500;
+          display: flex;
           align-items: center;
-          margin: 0 3px;
-          width: 40px;
-          height: 40px;
+          justify-content: center;
+          width: 100%;
+          cursor: pointer;
           transition: all 0.3s;
+          margin: 15px 0;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
-        .social-icons a:hover {
-          border-color: #512da8;
+        .google-btn:hover {
+          background-color: #f8fafc;
+          border-color: #cbd5e0;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
-        .social-icons a.google {
-          color: #4285F4;
-        }
-
-        .social-icons a.facebook {
-          color: #1877F2;
+        .google-btn svg {
+          margin-right: 8px;
         }
 
         span {
@@ -382,10 +383,15 @@ export default function CustomAuth() {
           <div className="form-container sign-in">
             <form className="form-content" onSubmit={handleSignIn}>
               <h1>Sign In</h1>
-              <div className="social-icons">
-                <a href="#" className="google"><i className="fa-brands fa-google"></i></a>
-                <a href="#" className="facebook"><i className="fa-brands fa-facebook-f"></i></a>
-              </div>
+              <button type="button" onClick={handleGoogleSignIn} className="google-btn">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                </svg>
+                Continue with Google
+              </button>
               <span>or use your email password</span>
               <input
                 type="email"
@@ -401,7 +407,8 @@ export default function CustomAuth() {
                 onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
                 required
               />
-              {error && <p style={{ color: "red", fontSize: "12px" }}>{error}</p>}
+              {error && <p style={{ color: "red", fontSize: "12px", marginTop: "10px" }}>{error}</p>}
+              {successMsg && <p style={{ color: "green", fontSize: "12px", marginTop: "10px" }}>{successMsg}</p>}
               <a href="#">Forget Your Password?</a>
               <button type="submit" disabled={isLoading}>
                 {isLoading ? "Signing in..." : "Sign In"}
@@ -429,10 +436,15 @@ export default function CustomAuth() {
             ) : (
               <form className="form-content" onSubmit={handleSignUp}>
                 <h1>Create Account</h1>
-                <div className="social-icons">
-                  <a href="#" className="google"><i className="fa-brands fa-google"></i></a>
-                  <a href="#" className="facebook"><i className="fa-brands fa-facebook-f"></i></a>
-                </div>
+                <button type="button" onClick={handleGoogleSignIn} className="google-btn">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                  Continue with Google
+                </button>
                 <span>or use your email for registration</span>
                 <input
                   type="text"
@@ -455,7 +467,8 @@ export default function CustomAuth() {
                   onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
                   required
                 />
-                {error && <p style={{ color: "red", fontSize: "12px" }}>{error}</p>}
+                {error && <p style={{ color: "red", fontSize: "12px", marginTop: "10px" }}>{error}</p>}
+                {successMsg && <p style={{ color: "green", fontSize: "12px", marginTop: "10px" }}>{successMsg}</p>}
                 <button type="submit" disabled={isLoading}>
                   {isLoading ? "Creating Account..." : "Sign Up"}
                 </button>

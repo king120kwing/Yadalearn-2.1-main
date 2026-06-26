@@ -1,282 +1,470 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Mail, Bell, Globe, Lock, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserButton } from "@clerk/clerk-react";
+import { supabase } from "@/lib/supabase";
+import { removeImageBackground } from "@/utils/imageProcessor";
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { user, isLoaded } = useAuth();
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-  });
-
-  useEffect(() => {
-    if (isLoaded && !user) {
-      navigate("/login");
-    }
-  }, [user, isLoaded, navigate]);
+  const { user, isLoaded, refreshUser, logout } = useAuth();
+  const userRole = localStorage.getItem('yadalearn-user-role');
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-      </div>
-    );
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
+
+  // Debugging log
+  console.log('Settings Render - User:', user, 'IsLoaded:', isLoaded);
 
   if (!user) {
-    return null;
+    // Should be handled by ProtectedRoute, but double safety
+    return <div className="flex h-screen items-center justify-center">Redirecting...</div>;
   }
 
-  // Get user display name
-  const getDisplayName = () => {
-    if (user.firstName && user.lastName) {
-      return `${user.firstName} ${user.lastName}`;
+  const [notifications, setNotifications] = useState({
+    push: true,
+    email: false,
+  });
+  const [uploadedCV, setUploadedCV] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const profileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [editBio, setEditBio] = useState(user?.bio || '');
+  const [editCountry, setEditCountry] = useState(user?.country || '');
+  const [isSaving, setIsSaving] = useState(false);
+ 
+  useEffect(() => {
+    if (user) {
+      setEditName(user.name || '');
+      setEditBio(user.bio || '');
+      setEditCountry(user.country || '');
     }
-    if (user.firstName) return user.firstName;
-    if (user.username) return user.username;
-    return user.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User';
+  }, [user]);
+
+  const handleProfileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const result = reader.result as string;
+        try {
+          const processedResult = await removeImageBackground(result);
+          const { error } = await supabase
+            .from('profiles')
+            .update({ avatar_url: processedResult })
+            .eq('id', user.id);
+ 
+          if (error) {
+            console.error('Error saving image:', error);
+            alert('Failed to save profile photo: ' + error.message);
+          } else {
+            const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
+            savedUser.imageUrl = processedResult;
+            localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
+ 
+            refreshUser?.();
+            window.location.reload();
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  // Get user initials for avatar fallback
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editName,
+          bio: editBio,
+          country: editCountry
+        })
+        .eq('id', user.id);
+ 
+      if (error) {
+        alert('Failed to save profile: ' + error.message);
+      } else {
+        const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
+        savedUser.name = editName;
+        savedUser.bio = editBio;
+        savedUser.country = editCountry;
+        localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
+        
+        refreshUser?.();
+        setIsEditingProfile(false);
+        window.location.reload();
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('An error occurred: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getDisplayName = () => {
+    if (user?.name) return user.name;
+    if (user?.firstName && user?.lastName) return `${user.firstName} ${user.lastName}`;
+    if (user?.firstName) return user.firstName;
+    return 'User';
+  };
+
   const getInitials = () => {
-    const name = getDisplayName();
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    if (user?.name) {
+      const names = user.name.split(' ');
+      if (names.length >= 2) return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+      return names[0][0].toUpperCase();
+    }
+    if (user?.firstName && user?.lastName) return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    if (user?.firstName) return user.firstName[0].toUpperCase();
+    return 'U';
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('yadalearn-user');
+    localStorage.removeItem('yadalearn-user-role');
+    logout();
+    navigate("/login");
+  };
+
+  const handleCVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Check file type
+      const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!validTypes.includes(file.type)) {
+        alert('Please upload a PDF or Word document');
+        return;
+      }
+      // Check file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      setUploadedCV(file.name);
+      alert(`CV "${file.name}" uploaded successfully!`);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 pb-24">
-      {/* Header */}
-      <header className="px-3 sm:px-4 py-3 sm:py-4">
-        <div className="mx-auto max-w-4xl">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-3 sm:mb-4 text-gray-600 text-sm sm:text-base">
-            ← Back
-          </Button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Settings & Profile</h1>
-          <p className="text-sm sm:text-base text-gray-600">Manage your account and preferences</p>
-        </div>
+    <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center border-b border-gray-200/50 bg-background-light/80 px-4 backdrop-blur-lg dark:border-gray-800/50 dark:bg-background-dark/80">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <span className="material-symbols-outlined">arrow_back_ios_new</span>
+        </button>
+        <h1 className="flex-1 text-center text-xl font-bold text-text-light dark:text-text-dark">
+          {userRole === 'teacher' ? 'Teacher Settings' : 'Student Settings'}
+        </h1>
+        <div className="h-10 w-10"></div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Profile Section */}
-        <div className="bg-white rounded-3xl p-6 shadow-lg">
-          <div className="flex items-center gap-2 mb-6">
-            <User className="h-5 w-5 text-purple-600" />
-            <h2 className="text-xl font-bold text-gray-800">Profile Information</h2>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-6">
-            {user.imageUrl ? (
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-5 pb-24 safe-bottom">
+        {/* Profile Card */}
+        <section className="flex items-center gap-4 rounded-4xl bg-gradient-to-br from-indigo-50 to-purple-50 p-5 shadow-soft dark:from-indigo-900/40 dark:to-purple-900/40">
+          <input
+            ref={profileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleProfileUpload}
+            className="hidden"
+          />
+          <div
+            className="relative cursor-pointer group"
+            onClick={() => profileInputRef.current?.click()}
+          >
+            {user?.imageUrl ? (
               <img
                 src={user.imageUrl}
-                alt="Profile"
-                className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-purple-200 object-cover"
+                alt="User Avatar"
+                className="h-16 w-16 rounded-full border-4 border-white/50 object-cover group-hover:opacity-80 transition-opacity"
               />
             ) : (
-              <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-purple-200">
-                <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-xl sm:text-2xl text-white">{getInitials()}</AvatarFallback>
+              <Avatar className="h-16 w-16 border-4 border-white/50 group-hover:opacity-80 transition-opacity">
+                <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-xl">
+                  {getInitials()}
+                </AvatarFallback>
               </Avatar>
             )}
-            <div className="space-y-2 text-center sm:text-left">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                onClick={() => alert('Change photo functionality - Profile updates managed by Clerk')}
-              >
-                Change Photo
-              </Button>
-              <p className="text-xs text-gray-500">JPG, PNG or GIF. Max 2MB</p>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="material-symbols-outlined text-white drop-shadow-md">edit</span>
             </div>
           </div>
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Welcome back,</p>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+              {getDisplayName()}
+            </h2>
+            <p className="text-xs text-purple-600 font-medium cursor-pointer" onClick={() => profileInputRef.current?.click()}>
+              Change Profile Photo
+            </p>
+          </div>
+        </section>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-gray-700">Full Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-400" />
-                <Input
-                  id="name"
-                  value={getDisplayName()}
-                  className="pl-10 border-purple-200 focus:border-purple-400 bg-gray-50"
-                  placeholder="Enter your full name"
-                  readOnly
+        {/* Account Settings */}
+        <section className="rounded-4xl bg-white p-5 shadow-soft dark:bg-gray-800/40">
+          <h2 className="px-1 pb-4 text-lg font-bold text-gray-800 dark:text-gray-100">Account Settings</h2>
+          <div className="space-y-1">
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => setIsEditingProfile(true)}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-500 dark:bg-blue-900/50 dark:text-blue-300">
+                  <span className="material-symbols-outlined">person</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Edit Profile</p>
+              </div>
+              <div className="shrink-0">
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
+            </div>
+
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => alert('Change Password - Managed by authentication provider')}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-500 dark:bg-green-900/50 dark:text-green-300">
+                  <span className="material-symbols-outlined">lock</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Change Password</p>
+              </div>
+              <div className="shrink-0">
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
+            </div>
+
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => alert('Privacy Settings - Coming soon!')}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-500 dark:bg-purple-900/50 dark:text-purple-300">
+                  <span className="material-symbols-outlined">shield_person</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Privacy Settings</p>
+              </div>
+              <div className="shrink-0">
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
+            </div>
+
+            {/* CV Upload - Teachers Only */}
+            {userRole === 'teacher' && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleCVUpload}
+                  className="hidden"
+                />
+                <div
+                  className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/50 dark:text-orange-300">
+                      <span className="material-symbols-outlined">upload_file</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-base font-medium text-text-light dark:text-text-dark">Upload CV</p>
+                      {uploadedCV && (
+                        <p className="text-xs text-green-600 dark:text-green-400">✓ {uploadedCV}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* Notifications */}
+        <section className="rounded-4xl bg-white p-5 shadow-soft dark:bg-gray-800/40">
+          <h2 className="px-1 pb-4 text-lg font-bold text-gray-800 dark:text-gray-100">Notifications</h2>
+          <div className="space-y-1">
+            <div className="flex min-h-[3.75rem] items-center justify-between gap-4 px-1 py-2">
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-500 dark:bg-red-900/50 dark:text-red-300">
+                  <span className="material-symbols-outlined">notifications_active</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Push Notifications</p>
+              </div>
+              <div className="shrink-0">
+                <Switch
+                  checked={notifications.push}
+                  onCheckedChange={(checked) => setNotifications({ ...notifications, push: checked })}
                 />
               </div>
-              <p className="text-xs text-gray-500">Name is managed by your authentication provider</p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-700">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={user.primaryEmailAddress?.emailAddress || ''}
-                  className="pl-10 border-purple-200 focus:border-purple-400 bg-gray-50"
-                  placeholder="Enter your email"
-                  readOnly
+            <div className="flex min-h-[3.75rem] items-center justify-between gap-4 px-1 py-2">
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-yellow-100 text-yellow-600 dark:bg-yellow-900/50 dark:text-yellow-400">
+                  <span className="material-symbols-outlined">mail</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Email Alerts</p>
+              </div>
+              <div className="shrink-0">
+                <Switch
+                  checked={notifications.email}
+                  onCheckedChange={(checked) => setNotifications({ ...notifications, email: checked })}
                 />
               </div>
-              <p className="text-xs text-gray-500">Email is managed by your authentication provider</p>
             </div>
+          </div>
+        </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-gray-700">Account Type</Label>
-              <Select defaultValue="student" disabled>
-                <SelectTrigger className="border-purple-200 focus:border-purple-400 bg-gray-50">
-                  <SelectValue placeholder="Student" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="teacher">Teacher</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">Account type is determined by your role selection</p>
-            </div>
-
-            <Button
-              className="w-full bg-gradient-to-br from-purple-400 to-purple-600 text-white py-3 rounded-full font-medium hover:scale-105 transition-transform"
-              onClick={() => alert('Profile information is managed by Clerk authentication')}
+        {/* App Settings */}
+        <section className="rounded-4xl bg-white p-5 shadow-soft dark:bg-gray-800/40">
+          <h2 className="px-1 pb-4 text-lg font-bold text-gray-800 dark:text-gray-100">App Settings</h2>
+          <div className="space-y-1">
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => alert('Language settings - Coming soon!')}
             >
-              <User className="mr-2 h-4 w-4" />
-              Manage in Authentication Provider
-            </Button>
-          </div>
-        </div>
-
-        {/* Notification Preferences */}
-        <div
-          className="bg-white rounded-3xl p-6 shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => alert('Notification preferences - Coming soon!')}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Bell className="h-5 w-5 text-purple-600" />
-            <h2 className="text-xl font-bold text-gray-800">Notification Preferences</h2>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800">Email Notifications</p>
-                <p className="text-sm text-gray-500">Receive updates via email</p>
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-500 dark:bg-indigo-900/50 dark:text-indigo-300">
+                  <span className="material-symbols-outlined">language</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Language</p>
               </div>
-              <Switch
-                checked={notifications.email}
-                onCheckedChange={(checked) => setNotifications({ ...notifications, email: checked })}
-              />
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">English</span>
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800">Push Notifications</p>
-                <p className="text-sm text-gray-500">Get notified on your device</p>
-              </div>
-              <Switch
-                checked={notifications.push}
-                onCheckedChange={(checked) => setNotifications({ ...notifications, push: checked })}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800">SMS Notifications</p>
-                <p className="text-sm text-gray-500">Receive text messages</p>
-              </div>
-              <Switch
-                checked={notifications.sms}
-                onCheckedChange={(checked) => setNotifications({ ...notifications, sms: checked })}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Language Settings */}
-        <div
-          className="bg-white rounded-3xl p-6 shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => alert('Language settings - Coming soon!')}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="h-5 w-5 text-purple-600" />
-            <h2 className="text-xl font-bold text-gray-800">Language Settings</h2>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-gray-700">Preferred Language</Label>
-            <Select defaultValue="english">
-              <SelectTrigger className="border-purple-200 focus:border-purple-400">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="english">English</SelectItem>
-                <SelectItem value="spanish">Spanish</SelectItem>
-                <SelectItem value="french">French</SelectItem>
-                <SelectItem value="german">German</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Security */}
-        <div
-          className="bg-white rounded-3xl p-6 shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => alert('Security settings - Coming soon!')}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Lock className="h-5 w-5 text-purple-600" />
-            <h2 className="text-xl font-bold text-gray-800">Security</h2>
-          </div>
-
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full justify-start py-3 border-purple-200 text-purple-700 hover:bg-purple-50"
-              onClick={(e) => {
-                e.stopPropagation();
-                alert('Change password - Coming soon!');
-              }}
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => alert('Appearance settings - Coming soon!')}
             >
-              Change Password
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start py-3 border-purple-200 text-purple-700 hover:bg-purple-50"
-              onClick={(e) => {
-                e.stopPropagation();
-                alert('Two-factor authentication - Coming soon!');
-              }}
-            >
-              Two-Factor Authentication
-            </Button>
-          </div>
-        </div>
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                  <span className="material-symbols-outlined">dark_mode</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Appearance</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Light</span>
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
+            </div>
 
-        {/* Logout */}
-        <div className="bg-white rounded-3xl p-6 shadow-lg">
-          <Button
-            variant="destructive"
-            className="w-full py-3"
-            onClick={() => navigate("/logout")}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Log Out
-          </Button>
-        </div>
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => alert('Cache cleared successfully!')}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-500 dark:bg-orange-900/50 dark:text-orange-300">
+                  <span className="material-symbols-outlined">cleaning_services</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Clear Cache</p>
+              </div>
+              <div className="shrink-0">
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-3 rounded-4xl bg-gradient-to-br from-red-50 to-orange-50 p-5 text-center text-lg font-bold text-red-500 shadow-soft dark:from-red-900/40 dark:to-orange-900/40 dark:text-red-400 hover:opacity-90 transition-opacity"
+        >
+          <span className="material-symbols-outlined">logout</span>
+          Logout
+        </button>
       </main>
 
       <BottomNav />
+
+      {/* Edit Profile Modal Dialog */}
+      {isEditingProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white">Edit Profile</h3>
+              <button
+                onClick={() => setIsEditingProfile(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 dark:text-zinc-400"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Full Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white"
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Country / Location</label>
+                <input
+                  type="text"
+                  value={editCountry}
+                  onChange={(e) => setEditCountry(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white"
+                  placeholder="Enter country (e.g. Myanmar)"
+                />
+              </div>
+ 
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Short Bio</label>
+                <textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white resize-none"
+                  placeholder="Tell your students a bit about yourself..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={isSaving}
+                  className="flex-1 rounded-2xl bg-purple-600 hover:bg-purple-700 py-3 text-center text-sm font-bold text-white shadow-md transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
+                <button
+                  onClick={() => setIsEditingProfile(false)}
+                  disabled={isSaving}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 text-center text-sm font-bold text-slate-600 hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

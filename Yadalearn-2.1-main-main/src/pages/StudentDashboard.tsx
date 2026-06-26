@@ -1,217 +1,297 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Clock, CirclePlay, TrendingUp, Users, BookOpen, Video, FileText, Lightbulb, Calendar as CalendarIcon, Home, Search, Calendar, User } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { BottomNav } from '@/components/BottomNav';
-import { StatCard } from '@/components/StatCard';
-import { Carousel3D } from '@/components/Carousel3D';
 import { TeacherProfileModal } from '@/components/ProfileModals';
-import { mockQuery, mockStore } from '@/data/mockData';
 import type { Teacher } from '@/types/schema';
+import { JoinClassModal } from '@/features/student/quick-actions/JoinClassModal';
+import { BookClassModal } from '@/features/student/quick-actions/BookClassModal';
+import { AIStudyBuddyModal } from '@/features/student/quick-actions/AIStudyBuddyModal';
+import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsModal';
+import { ProgressModal } from '@/features/student/quick-actions/ProgressModal';
+import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
+import { useDashboardData } from '@/hooks/useDashboardData';
+
+import { useAuth } from '@/contexts/AuthContext';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // use custom AuthContext hook
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { currentUser } = mockStore;
-  const { topTeachers, upcomingClasses } = mockQuery;
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [showJoinCTA, setShowJoinCTA] = useState(false); // Only show when a real class is active
+  const { topTeachers, upcomingClasses, loading } = useDashboardData();
+
+  const userId = user?.id;
+  const userName = user?.fullName || user?.firstName || 'Student';
+
 
   const handleTeacherClick = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
     setIsModalOpen(true);
   };
 
-  const carouselItems = topTeachers.map(t => ({
-    id: t.id,
-    name: t.name,
-    role: t.role,
-    avatar: t.avatar
-  }));
+
 
   return (
-    <div className="min-h-screen gradient-lavender pb-24">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-white/20 px-4 py-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="mb-2 text-3xl font-bold text-gray-800">
-                Welcome back, {currentUser.name.split(' ')[0]}! 👋
-              </h1>
-              <p className="text-base text-gray-600">Let's continue your learning journey</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors">
-                <Bell className="w-5 h-5 text-gray-700" />
-              </button>
-              <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
-                <AvatarImage src={currentUser.avatar} />
-                <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-xl">
-                  {currentUser.name.split(' ').map(n => n[0]).join('')}
+    <div className="min-h-screen bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 pb-24 safe-bottom">
+        {/* Header */}
+        <header className="flex justify-between items-center mb-8">
+          <div>
+            <p className="text-base text-subtext-light dark:text-subtext-dark mb-1">Welcome back, Student</p>
+            <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
+              Hi, {userName}
+            </h1>
+          </div>
+          <div className="flex items-center -space-x-3">
+            {topTeachers.slice(0, 2).map((teacher, idx) => (
+              <Avatar key={idx} className="w-10 h-10 border-2 border-background-light dark:border-background-dark">
+                <AvatarImage src={teacher.avatar} alt={teacher.name} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                  {teacher.name.split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
+            ))}
+            {topTeachers.length > 2 && (
+              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
+                <span className="text-sm font-semibold text-slate-600">+{topTeachers.length - 2}</span>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Dynamic CTA: Join Next Class */}
+        {showJoinCTA && (
+          <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-between relative overflow-hidden">
+              {/* Glossy overlay */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium animate-pulse">Starting Soon</span>
+                  <span className="text-sm opacity-90">Starts in 12 mins</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-1">Advanced Spanish Conversation</h2>
+                <p className="text-indigo-100 flex items-center gap-2 text-sm">
+                  <Avatar className="w-6 h-6 border border-white/50">
+                    <AvatarImage src="https://i.pravatar.cc/150?u=garcia" />
+                    <AvatarFallback>MG</AvatarFallback>
+                  </Avatar>
+                  with Mrs. Garcia
+                </p>
+              </div>
+
+              <Button
+                size="lg"
+                onClick={() => setActiveModal('join-class')}
+                className="relative z-10 bg-white text-indigo-700 hover:bg-gray-100 font-bold shadow-md h-12 px-6 rounded-xl"
+              >
+                <span className="material-symbols-outlined mr-2">videocam</span>
+                Join Now
+              </Button>
             </div>
           </div>
+        )}
 
-          {/* Stats Overview */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <StatCard 
-              icon={TrendingUp}
-              label="Performance"
-              value={`${currentUser.performance}%`}
-              iconColor="text-blue-600"
-              iconBgColor="bg-blue-100"
-            />
-            <StatCard 
-              icon={CirclePlay}
-              label="Sessions"
-              value={currentUser.sessionsCompleted}
-              iconColor="text-green-600"
-              iconBgColor="bg-green-100"
-            />
-            <StatCard 
-              icon={Users}
-              label="Interviews"
-              value={currentUser.interviewsCompleted}
-              iconColor="text-purple-600"
-              iconBgColor="bg-purple-100"
-            />
-            <StatCard 
-              icon={Clock}
-              label="Hours"
-              value={`${currentUser.totalHours}h`}
-              iconColor="text-orange-600"
-              iconBgColor="bg-orange-100"
-            />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        {/* Progress Card */}
+        {/* Progress Section */}
         <section className="mb-8">
-          <Card className="gradient-yellow-card border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12 border-4 border-white">
-                    <AvatarImage src={currentUser.avatar} />
-                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white font-bold">
-                      {currentUser.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-bold text-base">{currentUser.name}</p>
-                    <p className="text-sm text-gray-700">Learning Spanish & Mathematics</p>
-                  </div>
-                </div>
-                <TrendingUp className="w-6 h-6 text-gray-700" />
+          <div
+            className="bg-gradient-to-br from-blue-100 to-purple-100 p-6 rounded-3xl shadow-soft text-[#5B4A9F] relative overflow-hidden transition-transform duration-300 ease-out"
+            style={{ transformStyle: 'preserve-3d' }}
+            onMouseMove={(e) => {
+              const card = e.currentTarget;
+              const rect = card.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              const rotateX = ((y - centerY) / centerY) * -10;
+              const rotateY = ((x - centerX) / centerX) * 10;
+              card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+            }}
+          >
+            <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/20 rounded-full"></div>
+            <div className="absolute bottom-4 -left-12 w-28 h-28 bg-white/10 rounded-full"></div>
+            <div className="flex justify-between items-start mb-4 z-10 relative">
+              <div>
+                <h2 className="text-xl font-bold">Your Progress</h2>
+                <p className="text-sm opacity-80">This Month</p>
               </div>
-              <div className="mb-2">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm text-gray-700">Course Progress</span>
-                  <span className="text-sm font-bold text-gray-800">{currentUser.performance}%</span>
-                </div>
-                <div className="w-full h-2 bg-white/50 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
-                    style={{ width: `${currentUser.performance}%` }}
+              <button className="w-8 h-8 flex items-center justify-center bg-white/40 rounded-full">
+                <span className="material-symbols-outlined text-lg">more_horiz</span>
+              </button>
+            </div>
+            <div className="flex items-center justify-between z-10 relative">
+              <div className="relative w-28 h-28">
+                <svg className="w-full h-full" style={{ transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
+                  <path
+                    className="text-white/30"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
                   />
+                  <path
+                    className="text-white"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeDasharray="0, 100"
+                    strokeLinecap="round"
+                    strokeWidth="3"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-white">0%</span>
+                  <span className="text-xs opacity-90">Completed</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-600 mt-3">My Teacher: Maria Garcia</p>
-            </CardContent>
-          </Card>
+              <div className="text-right space-y-4">
+                <div>
+                  <p className="text-base font-medium">Completed</p>
+                  <p className="text-sm opacity-80">0 tasks</p>
+                </div>
+                <div>
+                  <p className="text-base font-medium">Pending</p>
+                  <p className="text-sm opacity-80">0 tasks</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Quick Actions */}
         <section className="mb-8">
-          <h2 className="mb-4 text-2xl font-bold text-gray-800">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            {[
-              { icon: Clock, label: 'Manage Time', color: 'bg-blue-100 text-blue-600' },
-              { icon: CalendarIcon, label: 'Book a Class', color: 'bg-yellow-100 text-yellow-600' },
-              { icon: FileText, label: 'Revision Notes', color: 'bg-green-100 text-green-600' },
-              { icon: BookOpen, label: 'Flashcards', color: 'bg-pink-100 text-pink-600' },
-              { icon: Video, label: 'Video Meeting', color: 'bg-purple-100 text-purple-600' },
-              { icon: Lightbulb, label: 'AI Study Buddy', color: 'bg-orange-100 text-orange-600' },
-            ].map((action, idx) => (
-              <button
-                key={idx}
-                className="group rounded-2xl border-2 border-white bg-white p-6 text-center transition-all hover:border-purple-300 hover:shadow-lg"
-              >
-                <div className="mb-3 flex justify-center">
-                  <div className={`rounded-full ${action.color} p-4 transition-transform group-hover:scale-110`}>
-                    <action.icon className="h-6 w-6" />
-                  </div>
-                </div>
-                <p className="font-medium text-sm text-gray-700">{action.label}</p>
-              </button>
-            ))}
+          <h2 className="text-xl font-bold mb-4 text-text-light dark:text-text-dark">Quick Actions</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('progress')}
+            >
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-blue-500 dark:text-blue-400">monitoring</span>
+              </div>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Progress</p>
+            </div>
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('book-class')}
+            >
+              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/40 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-yellow-600 dark:text-yellow-400">event</span>
+              </div>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Book Class</p>
+            </div>
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('assignments')}
+            >
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-green-500 dark:text-green-400">assignment</span>
+              </div>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Assignments</p>
+            </div>
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('message')}
+            >
+              <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/40 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-pink-500 dark:text-pink-400">mail</span>
+              </div>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Message</p>
+            </div>
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('join-class')}
+            >
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-purple-500 dark:text-purple-400">videocam</span>
+              </div>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Join Class</p>
+            </div>
+
+            <div
+              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+              onClick={() => setActiveModal('ai-buddy')}
+            >
+              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/40 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-orange-500 dark:text-orange-400">psychology</span>
+              </div>
+              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">AI Buddy</p>
+            </div>
           </div>
         </section>
 
         {/* Upcoming Classes */}
-        <section className="mb-8">
+        <section>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">Upcoming Classes</h2>
-            <button className="text-sm font-medium text-purple-600 hover:text-purple-700">
-              View All
-            </button>
+            <h2 className="text-xl font-bold text-text-light dark:text-text-dark">Upcoming Classes</h2>
+            <a className="text-sm font-medium text-indigo-500 dark:text-indigo-400" href="#">View All</a>
           </div>
           <div className="space-y-4">
-            {upcomingClasses.map((classItem) => (
-              <Card key={classItem.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold">
-                        {classItem.teacherInitials}
+            {upcomingClasses.length > 0 ? (
+              upcomingClasses.slice(0, 2).map((classItem, idx) => (
+                <div key={classItem.id} className="bg-white dark:bg-zinc-800 px-5 py-6 rounded-4xl flex items-center justify-between shadow-soft-float">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center">
+                        <span className="material-symbols-outlined text-3xl text-indigo-500 dark:text-indigo-400">
+                          edit_document
+                        </span>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-800">{classItem.title}</h3>
-                        <p className="text-sm text-gray-600">{classItem.teacher}</p>
-                        <p className="text-xs text-gray-500">{classItem.time}</p>
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-indigo-400 rounded-full border-2 border-white dark:border-zinc-800 flex items-center justify-center shadow-sm">
+                        <span className="material-symbols-outlined text-white text-xs" style={{ fontVariationSettings: "'wght' 700" }}>
+                          hourglass_top
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge className="bg-green-100 text-green-700 hover:bg-green-200">
-                        {classItem.day}
-                      </Badge>
-                      <Button size="sm" className="bg-black hover:bg-gray-900 text-white rounded-full">
-                        Join
-                      </Button>
+                    <div>
+                      <p className="font-semibold text-base text-text-light dark:text-text-dark">
+                        {classItem.title}
+                      </p>
+                      <p className="text-sm text-subtext-light dark:text-subtext-dark">
+                        {classItem.day ? `Schedule: ${classItem.day}` : 'Scheduled'}
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <span className="material-symbols-outlined text-subtext-light dark:text-subtext-dark cursor-pointer">more_vert</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 text-gray-500 bg-white dark:bg-zinc-800 rounded-3xl border border-gray-100 dark:border-zinc-800 shadow-sm font-medium">
+                No upcoming classes scheduled.
+              </div>
+            )}
           </div>
         </section>
-
-        {/* Top Teachers Carousel */}
-        <section className="mb-8">
-          <Carousel3D
-            items={carouselItems}
-            title="TOP TEACHERS"
-            subtitle="Discover our expert educators"
-            onItemClick={(item) => {
-              const teacher = topTeachers.find(t => t.id === item.id);
-              if (teacher) handleTeacherClick(teacher);
-            }}
-          />
-        </section>
-      </main>
+      </div>
 
       <BottomNav />
-      <TeacherProfileModal 
+      <TeacherProfileModal
         teacher={selectedTeacher}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {/* Quick Action Modals */}
+      <JoinClassModal isOpen={activeModal === 'join-class'} onClose={() => setActiveModal(null)} className="Advanced Spanish Conversation" />
+      <BookClassModal isOpen={activeModal === 'book-class'} onClose={() => setActiveModal(null)} />
+      <AIStudyBuddyModal isOpen={activeModal === 'ai-buddy'} onClose={() => setActiveModal(null)} />
+      <AssignmentsModal isOpen={activeModal === 'assignments'} onClose={() => setActiveModal(null)} />
+      <ProgressModal isOpen={activeModal === 'progress'} onClose={() => setActiveModal(null)} />
+      <MessageTeacherModal isOpen={activeModal === 'message'} onClose={() => setActiveModal(null)} />
     </div>
   );
 };

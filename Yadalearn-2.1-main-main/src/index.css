@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,32 +12,64 @@ Inspired by modern learning applications with soft pastel palette
 
 @layer base {
   :root {
-    /* Base - Soft purple/lavender gradient background */
-    --background: 280 50% 95%; /* #E8D9F5 - Soft lavender */
-    --foreground: 0 0% 10%;  /* #1A1A1A - Near black for text */
+    /* Teacher Dashboard Gradient Colors */
+    --peach-start: #FFD8CC;
+    --peach-end: #FFC8B4;
+    --mint-start: #D4F9F5;
+    --mint-end: #C4F1EB;
+    --lavender-start: #E6DFF6;
+    --lavender-end: #D8CEF2;
+    --sky-start: #D1EEFC;
+    --sky-end: #C2E6FA;
 
-    --card: 0 0% 100%; /* White cards */
+    /* Student Dashboard Gradient Colors */
+    --lavender-purple-start: #E9E4F9;
+    --lavender-purple-end: #E0DAF5;
+    --yellow-orange-start: #FEF3D7;
+    --yellow-orange-end: #FDEBC8;
+
+    /* Student Quick Action Theme Colors */
+    --student-primary: #30e86e;
+    --student-bg-dark: #112116;
+    --student-surface-dark: #1a2c20;
+
+    /* Base - Soft purple/lavender gradient background */
+    --background: 280 50% 95%;
+    /* #E8D9F5 - Soft lavender */
+    --foreground: 0 0% 10%;
+    /* #1A1A1A - Near black for text */
+
+    --card: 0 0% 100%;
+    /* White cards */
     --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
     /* Primary Accent (Black buttons) */
-    --primary: 0 0% 10%; /* #1A1A1A - Black */
-    --primary-foreground: 0 0% 100%; /* White text */
+    --primary: 0 0% 10%;
+    /* #1A1A1A - Black */
+    --primary-foreground: 0 0% 100%;
+    /* White text */
 
     /* Secondary & Other Accents - Pastel colors */
-    --secondary: 45 100% 77%; /* #FFE8A3 - Pastel Yellow */
+    --secondary: 45 100% 77%;
+    /* #FFE8A3 - Pastel Yellow */
     --secondary-foreground: 0 0% 10%;
 
-    --accent: 260 60% 75%; /* #C9B4E8 - Pastel Purple */
+    --accent: 260 60% 75%;
+    /* #C9B4E8 - Pastel Purple */
     --accent-foreground: 0 0% 10%;
-    
+
     /* Additional Accents for cards and highlights */
-    --accent-pink: 340 100% 92%; /* #FFD4E8 - Pastel Pink */
-    --accent-blue: 210 100% 92%; /* #D4E8FF - Pastel Blue */
-    --accent-green: 150 70% 85%; /* #B8F4D4 - Pastel Green */
-    --accent-teal: 170 50% 60%; /* #4A9B8E - Teal for course cards */
+    --accent-pink: 340 100% 92%;
+    /* #FFD4E8 - Pastel Pink */
+    --accent-blue: 210 100% 92%;
+    /* #D4E8FF - Pastel Blue */
+    --accent-green: 150 70% 85%;
+    /* #B8F4D4 - Pastel Green */
+    --accent-teal: 170 50% 60%;
+    /* #4A9B8E - Teal for course cards */
 
     /* Functional Colors */
     --muted: 280 30% 92%;
@@ -42,14 +77,16 @@ Inspired by modern learning applications with soft pastel palette
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    
+
     /* Borders and inputs */
     --border: 280 20% 88%;
     --input: 280 20% 88%;
-    --ring: 260 60% 75%; /* Purple for focus rings */
+    --ring: 260 60% 75%;
+    /* Purple for focus rings */
 
     /* Component Styling */
-    --radius: 1rem; /* 16px - rounded corners */
+    --radius: 1rem;
+    /* 16px - rounded corners */
   }
 
   .dark {
@@ -61,12 +98,24 @@ Inspired by modern learning applications with soft pastel palette
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
-  h1 { @apply text-3xl font-bold; }
-  h2 { @apply text-xl font-bold; }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    @apply text-3xl font-extrabold;
+  }
+
+  h2 {
+    @apply text-xl font-bold;
+  }
 }
 
 /* Additional gradient definitions for backgrounds */
@@ -151,9 +200,10 @@ Inspired by modern learning applications with soft pastel palette
   transform-style: preserve-3d;
   transition: transform 0.4s ease, box-shadow 0.4s ease;
 }
+
 .card-3d:hover {
   transform: perspective(1000px) rotateY(var(--rotate-y, 0)) rotateX(var(--rotate-x, 0)) scale3d(1.05, 1.05, 1.05);
-  box-shadow: 0px 10px 30px -5px rgba(0,0,0,0.1);
+  box-shadow: 0px 10px 30px -5px rgba(0, 0, 0, 0.1);
 }
 
 /* =============================================
@@ -168,31 +218,78 @@ Inspired by modern learning applications with soft pastel palette
   }
 
   body {
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     line-height: 1.6;
-    font-size: 1rem; /* Scales with html font-size */
+    font-size: 1rem;
+    /* Scales with html font-size */
   }
 }
 
 /* Fluid Typography Scale Classes */
-.text-fluid-xs { font-size: clamp(0.75rem, 1.8vw, 0.875rem); }
-.text-fluid-sm { font-size: clamp(0.875rem, 2vw, 1rem); }
-.text-fluid-base { font-size: clamp(1rem, 2.2vw, 1.125rem); }
-.text-fluid-lg { font-size: clamp(1.125rem, 2.5vw, 1.25rem); }
-.text-fluid-xl { font-size: clamp(1.25rem, 3vw, 1.5rem); }
-.text-fluid-2xl { font-size: clamp(1.5rem, 4vw, 2rem); }
-.text-fluid-3xl { font-size: clamp(1.875rem, 5vw, 2.5rem); }
-.text-fluid-4xl { font-size: clamp(2.25rem, 6vw, 3rem); }
-.text-fluid-5xl { font-size: clamp(3rem, 8vw, 4rem); }
+.text-fluid-xs {
+  font-size: clamp(0.75rem, 1.8vw, 0.875rem);
+}
+
+.text-fluid-sm {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+}
+
+.text-fluid-base {
+  font-size: clamp(1rem, 2.2vw, 1.125rem);
+}
+
+.text-fluid-lg {
+  font-size: clamp(1.125rem, 2.5vw, 1.25rem);
+}
+
+.text-fluid-xl {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+}
+
+.text-fluid-2xl {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+.text-fluid-3xl {
+  font-size: clamp(1.875rem, 5vw, 2.5rem);
+}
+
+.text-fluid-4xl {
+  font-size: clamp(2.25rem, 6vw, 3rem);
+}
+
+.text-fluid-5xl {
+  font-size: clamp(3rem, 8vw, 4rem);
+}
 
 /* Responsive Spacing System */
-.space-fluid-xs { margin: clamp(0.25rem, 1vw, 0.5rem); }
-.space-fluid-sm { margin: clamp(0.5rem, 1.5vw, 0.75rem); }
-.space-fluid-md { margin: clamp(0.75rem, 2vw, 1rem); }
-.space-fluid-lg { margin: clamp(1rem, 2.5vw, 1.5rem); }
-.space-fluid-xl { margin: clamp(1.5rem, 3vw, 2rem); }
-.space-fluid-2xl { margin: clamp(2rem, 4vw, 3rem); }
-.space-fluid-3xl { margin: clamp(3rem, 5vw, 4rem); }
+.space-fluid-xs {
+  margin: clamp(0.25rem, 1vw, 0.5rem);
+}
+
+.space-fluid-sm {
+  margin: clamp(0.5rem, 1.5vw, 0.75rem);
+}
+
+.space-fluid-md {
+  margin: clamp(0.75rem, 2vw, 1rem);
+}
+
+.space-fluid-lg {
+  margin: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.space-fluid-xl {
+  margin: clamp(1.5rem, 3vw, 2rem);
+}
+
+.space-fluid-2xl {
+  margin: clamp(2rem, 4vw, 3rem);
+}
+
+.space-fluid-3xl {
+  margin: clamp(3rem, 5vw, 4rem);
+}
 
 /* Responsive Container System */
 .container-fluid {
@@ -268,36 +365,79 @@ Inspired by modern learning applications with soft pastel palette
 }
 
 /* Responsive Icon Sizing */
-.icon-fluid-sm { width: clamp(1rem, 2vw, 1.25rem); height: clamp(1rem, 2vw, 1.25rem); }
-.icon-fluid-md { width: clamp(1.5rem, 3vw, 2rem); height: clamp(1.5rem, 3vw, 2rem); }
-.icon-fluid-lg { width: clamp(2rem, 4vw, 2.5rem); height: clamp(2rem, 4vw, 2.5rem); }
-.icon-fluid-xl { width: clamp(2.5rem, 5vw, 3rem); height: clamp(2.5rem, 5vw, 3rem); }
+.icon-fluid-sm {
+  width: clamp(1rem, 2vw, 1.25rem);
+  height: clamp(1rem, 2vw, 1.25rem);
+}
+
+.icon-fluid-md {
+  width: clamp(1.5rem, 3vw, 2rem);
+  height: clamp(1.5rem, 3vw, 2rem);
+}
+
+.icon-fluid-lg {
+  width: clamp(2rem, 4vw, 2.5rem);
+  height: clamp(2rem, 4vw, 2.5rem);
+}
+
+.icon-fluid-xl {
+  width: clamp(2.5rem, 5vw, 3rem);
+  height: clamp(2.5rem, 5vw, 3rem);
+}
 
 /* Responsive Breakpoint Utilities */
 @media (max-width: 640px) {
-  .sm\:text-fluid-sm { font-size: clamp(0.875rem, 3vw, 1rem); }
-  .sm\:space-fluid-sm { margin: clamp(0.5rem, 2vw, 0.75rem); }
-  .sm\:container-fluid { padding-left: 1rem; padding-right: 1rem; }
+  .sm\:text-fluid-sm {
+    font-size: clamp(0.875rem, 3vw, 1rem);
+  }
+
+  .sm\:space-fluid-sm {
+    margin: clamp(0.5rem, 2vw, 0.75rem);
+  }
+
+  .sm\:container-fluid {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }
 
 @media (min-width: 641px) and (max-width: 768px) {
-  .md\:text-fluid-md { font-size: clamp(1rem, 2.5vw, 1.125rem); }
-  .md\:space-fluid-md { margin: clamp(0.75rem, 2.5vw, 1rem); }
+  .md\:text-fluid-md {
+    font-size: clamp(1rem, 2.5vw, 1.125rem);
+  }
+
+  .md\:space-fluid-md {
+    margin: clamp(0.75rem, 2.5vw, 1rem);
+  }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-  .lg\:text-fluid-lg { font-size: clamp(1.125rem, 2.8vw, 1.25rem); }
-  .lg\:space-fluid-lg { margin: clamp(1rem, 3vw, 1.5rem); }
+  .lg\:text-fluid-lg {
+    font-size: clamp(1.125rem, 2.8vw, 1.25rem);
+  }
+
+  .lg\:space-fluid-lg {
+    margin: clamp(1rem, 3vw, 1.5rem);
+  }
 }
 
 @media (min-width: 1025px) {
-  .xl\:text-fluid-xl { font-size: clamp(1.25rem, 3vw, 1.5rem); }
-  .xl\:space-fluid-xl { margin: clamp(1.5rem, 3.5vw, 2rem); }
-  .xl\:container-fluid { max-width: 1400px; }
+  .xl\:text-fluid-xl {
+    font-size: clamp(1.25rem, 3vw, 1.5rem);
+  }
+
+  .xl\:space-fluid-xl {
+    margin: clamp(1.5rem, 3.5vw, 2rem);
+  }
+
+  .xl\:container-fluid {
+    max-width: 1400px;
+  }
 }
 
 /* Responsive Animation System */
 @media (prefers-reduced-motion: reduce) {
+
   .transition-smooth,
   .card-3d,
   * {
@@ -309,6 +449,7 @@ Inspired by modern learning applications with soft pastel palette
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
+
   .gradient-lavender,
   .gradient-purple-card,
   .gradient-teal-card,
@@ -328,27 +469,69 @@ Inspired by modern learning applications with soft pastel palette
 
 /* Enhanced Fluid Typography Scale */
 @media (max-width: 480px) {
-  .text-fluid-display { font-size: clamp(2.5rem, 8vw, 3.5rem); }
-  .text-fluid-heading { font-size: clamp(1.75rem, 6vw, 2.25rem); }
-  .text-fluid-subheading { font-size: clamp(1.25rem, 4vw, 1.75rem); }
-  .text-fluid-body { font-size: clamp(1rem, 3.5vw, 1.125rem); }
-  .text-fluid-caption { font-size: clamp(0.875rem, 3vw, 1rem); }
+  .text-fluid-display {
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
+  }
+
+  .text-fluid-heading {
+    font-size: clamp(1.75rem, 6vw, 2.25rem);
+  }
+
+  .text-fluid-subheading {
+    font-size: clamp(1.25rem, 4vw, 1.75rem);
+  }
+
+  .text-fluid-body {
+    font-size: clamp(1rem, 3.5vw, 1.125rem);
+  }
+
+  .text-fluid-caption {
+    font-size: clamp(0.875rem, 3vw, 1rem);
+  }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {
-  .text-fluid-display { font-size: clamp(3rem, 7vw, 4rem); }
-  .text-fluid-heading { font-size: clamp(2rem, 5.5vw, 2.5rem); }
-  .text-fluid-subheading { font-size: clamp(1.5rem, 4.5vw, 2rem); }
-  .text-fluid-body { font-size: clamp(1.125rem, 3.8vw, 1.25rem); }
-  .text-fluid-caption { font-size: clamp(1rem, 3.2vw, 1.125rem); }
+  .text-fluid-display {
+    font-size: clamp(3rem, 7vw, 4rem);
+  }
+
+  .text-fluid-heading {
+    font-size: clamp(2rem, 5.5vw, 2.5rem);
+  }
+
+  .text-fluid-subheading {
+    font-size: clamp(1.5rem, 4.5vw, 2rem);
+  }
+
+  .text-fluid-body {
+    font-size: clamp(1.125rem, 3.8vw, 1.25rem);
+  }
+
+  .text-fluid-caption {
+    font-size: clamp(1rem, 3.2vw, 1.125rem);
+  }
 }
 
 @media (min-width: 769px) {
-  .text-fluid-display { font-size: clamp(3.5rem, 6vw, 5rem); }
-  .text-fluid-heading { font-size: clamp(2.25rem, 4.5vw, 3rem); }
-  .text-fluid-subheading { font-size: clamp(1.75rem, 3.5vw, 2.25rem); }
-  .text-fluid-body { font-size: clamp(1.25rem, 2.5vw, 1.5rem); }
-  .text-fluid-caption { font-size: clamp(1.125rem, 2.2vw, 1.25rem); }
+  .text-fluid-display {
+    font-size: clamp(3.5rem, 6vw, 5rem);
+  }
+
+  .text-fluid-heading {
+    font-size: clamp(2.25rem, 4.5vw, 3rem);
+  }
+
+  .text-fluid-subheading {
+    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+  }
+
+  .text-fluid-body {
+    font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  }
+
+  .text-fluid-caption {
+    font-size: clamp(1.125rem, 2.2vw, 1.25rem);
+  }
 }
 
 /* Enhanced 3D Card Effects */
@@ -546,7 +729,8 @@ Inspired by modern learning applications with soft pastel palette
 @media (max-width: 640px) {
   .mobile-full {
     min-height: 100vh;
-    min-height: 100svh; /* Safe viewport height */
+    min-height: 100svh;
+    /* Safe viewport height */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -572,6 +756,7 @@ Inspired by modern learning applications with soft pastel palette
     opacity: 0;
     transform: translate3d(0, 40px, 0);
   }
+
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
@@ -583,6 +768,7 @@ Inspired by modern learning applications with soft pastel palette
     opacity: 0;
     transform: scale3d(0.8, 0.8, 0.8);
   }
+
   to {
     opacity: 1;
     transform: scale3d(1, 1, 1);
@@ -590,8 +776,13 @@ Inspired by modern learning applications with soft pastel palette
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .animate-fade-in-up {
@@ -615,7 +806,10 @@ Inspired by modern learning applications with soft pastel palette
 
 /* Print styles */
 @media print {
-  .no-print { display: none !important; }
+  .no-print {
+    display: none !important;
+  }
+
   .text-fluid-xs,
   .text-fluid-sm,
   .text-fluid-base,

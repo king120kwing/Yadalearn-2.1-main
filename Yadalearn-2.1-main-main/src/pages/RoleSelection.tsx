@@ -26,9 +26,10 @@ const RoleSelection = () => {
 
   const handleRoleSelect = (role: 'student' | 'teacher') => {
     setSelectedRole(role);
+    // Zoom and fade animation before navigation
     setTimeout(() => {
       navigate('/onboarding', { state: { role: role } });
-    }, 300);
+    }, 800); // Increased delay for zoom animation
   };
 
   return (
@@ -62,12 +63,12 @@ const RoleSelection = () => {
 
               {/* Student Role - Enhanced 3D */}
               <div
-                className={`transition-all duration-700 ease-out ${
-                  studentVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
-                }`}
+                className={`transition-all duration-700 ease-out ${studentVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
+                  }`}
               >
                 <div
-                  className={`role-card-3d group cursor-pointer relative`}
+                  className={`role-card-3d group cursor-pointer relative transition-all duration-800 ${selectedRole === 'student' ? 'animate-zoom-in-fade-out' : ''
+                    }`}
                   onClick={() => handleRoleSelect('student')}
                   onMouseMove={(e) => {
                     const card = e.currentTarget;
@@ -88,11 +89,10 @@ const RoleSelection = () => {
                   <div className="relative">
                     {/* Complex shadow effect for student */}
                     <div
-                      className={`transition-all duration-300 ${
-                        selectedRole === 'student'
-                          ? 'opacity-100 scale-110'
-                          : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
-                      }`}
+                      className={`transition-all duration-300 ${selectedRole === 'student'
+                        ? 'opacity-100 scale-110'
+                        : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
+                        }`}
                       style={{
                         width: '300px',
                         height: '400px',
@@ -162,11 +162,11 @@ const RoleSelection = () => {
                       {/* Student Avatar */}
                       <div className="relative mx-auto mb-6 h-32 w-32">
                         <div className="h-full w-full rounded-full border-4 border-white bg-gradient-to-br from-purple-200 to-purple-300 shadow-lg">
-                        <img
-                          src="/images/download (9).png"
-                          alt="Student"
-                          className="h-full w-full rounded-full object-cover"
-                        />
+                          <img
+                            src="/images/download (9).png"
+                            alt="Student"
+                            className="h-full w-full rounded-full object-cover"
+                          />
                         </div>
                       </div>
 
@@ -180,12 +180,12 @@ const RoleSelection = () => {
 
               {/* Teacher Role - Enhanced 3D */}
               <div
-                className={`transition-all duration-700 ease-out delay-200 ${
-                  teacherVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
-                }`}
+                className={`transition-all duration-700 ease-out delay-200 ${teacherVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
+                  }`}
               >
                 <div
-                  className={`role-card-3d group cursor-pointer relative`}
+                  className={`role-card-3d group cursor-pointer relative transition-all duration-800 ${selectedRole === 'teacher' ? 'animate-zoom-in-fade-out' : ''
+                    }`}
                   onClick={() => handleRoleSelect('teacher')}
                   onMouseMove={(e) => {
                     const card = e.currentTarget;
@@ -206,11 +206,10 @@ const RoleSelection = () => {
                   <div className="relative">
                     {/* Complex shadow effect for teacher */}
                     <div
-                      className={`transition-all duration-300 ${
-                        selectedRole === 'teacher'
-                          ? 'opacity-100 scale-110'
-                          : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
-                      }`}
+                      className={`transition-all duration-300 ${selectedRole === 'teacher'
+                        ? 'opacity-100 scale-110'
+                        : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
+                        }`}
                       style={{
                         width: '300px',
                         height: '400px',
@@ -306,16 +305,14 @@ const RoleSelection = () => {
             {/* Header - Mobile */}
             <div className="space-y-4">
               <h1
-                className={`text-4xl font-bold text-gray-800 transition-all duration-700 ease-out ${
-                  titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                }`}
+                className={`text-4xl font-bold text-gray-800 transition-all duration-700 ease-out ${titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                  }`}
               >
                 Welcome to YadaLearn
               </h1>
               <p
-                className={`text-lg text-gray-600 transition-all duration-700 ease-out delay-200 ${
-                  titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                }`}
+                className={`text-lg text-gray-600 transition-all duration-700 ease-out delay-200 ${titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                  }`}
               >
                 Choose your role to get started
               </p>
@@ -323,24 +320,21 @@ const RoleSelection = () => {
 
             {/* Student Role - Mobile */}
             <div
-              className={`transition-all duration-700 ease-out ${
-                studentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
+              className={`transition-all duration-700 ease-out ${studentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
             >
               <div
-                className={`group cursor-pointer transition-all duration-300 ${
-                  selectedRole === 'student' ? 'scale-105' : 'hover:scale-105'
-                }`}
+                className={`group cursor-pointer transition-all duration-300 ${selectedRole === 'student' ? 'animate-zoom-in-fade-out' : 'hover:scale-105'
+                  }`}
                 onClick={() => handleRoleSelect('student')}
               >
                 <div className="relative">
                   {/* Mobile shadow effect for student */}
                   <div
-                    className={`transition-all duration-300 ${
-                      selectedRole === 'student'
-                        ? 'opacity-100 scale-110'
-                        : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
-                    }`}
+                    className={`transition-all duration-300 ${selectedRole === 'student'
+                      ? 'opacity-100 scale-110'
+                      : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
+                      }`}
                     style={{
                       width: '280px',
                       height: '360px',
@@ -429,24 +423,21 @@ const RoleSelection = () => {
 
             {/* Teacher Role - Mobile */}
             <div
-              className={`transition-all duration-700 ease-out delay-200 ${
-                teacherVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
+              className={`transition-all duration-700 ease-out delay-200 ${teacherVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
             >
               <div
-                className={`group cursor-pointer transition-all duration-300 ${
-                  selectedRole === 'teacher' ? 'scale-105' : 'hover:scale-105'
-                }`}
+                className={`group cursor-pointer transition-all duration-300 ${selectedRole === 'teacher' ? 'animate-zoom-in-fade-out' : 'hover:scale-105'
+                  }`}
                 onClick={() => handleRoleSelect('teacher')}
               >
                 <div className="relative">
                   {/* Mobile shadow effect for teacher */}
                   <div
-                    className={`transition-all duration-300 ${
-                      selectedRole === 'teacher'
-                        ? 'opacity-100 scale-110'
-                        : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
-                    }`}
+                    className={`transition-all duration-300 ${selectedRole === 'teacher'
+                      ? 'opacity-100 scale-110'
+                      : 'opacity-0 group-hover:opacity-50 group-hover:scale-105'
+                      }`}
                     style={{
                       width: '280px',
                       height: '360px',
@@ -517,11 +508,11 @@ const RoleSelection = () => {
                     {/* Teacher Avatar */}
                     <div className="relative mx-auto mb-4 h-24 w-24">
                       <div className="h-full w-full rounded-full border-4 border-white bg-gradient-to-br from-blue-200 to-teal-300 shadow-lg">
-                          <img
-                            src="/teacher-role.png"
-                            alt="Teacher"
-                            className="h-full w-full rounded-full object-cover"
-                          />
+                        <img
+                          src="/teacher-role.png"
+                          alt="Teacher"
+                          className="h-full w-full rounded-full object-cover"
+                        />
                       </div>
                     </div>
 

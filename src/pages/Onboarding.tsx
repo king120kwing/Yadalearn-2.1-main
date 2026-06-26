@@ -23,7 +23,7 @@ const Onboarding = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUserRole, user, refreshUser } = useAuth();
+  const { setUserRole, setOnboardingCompleted, user, refreshUser } = useAuth();
   const role = location.state?.role || 'student';
 
   useEffect(() => {
@@ -73,7 +73,22 @@ const Onboarding = () => {
       localStorage.setItem('yadalearn-user-role', role);
       localStorage.setItem('yadalearn-lang', language);
       localStorage.setItem('yadalearn-onboarding-answers', JSON.stringify(answers));
+
+      // Extract selected subjects
+      const selectedSubjectsList: string[] = [];
+      if (role === 'student') {
+        if (answers.studyPath === 'Languages') {
+          if (answers.selectedLanguages) selectedSubjectsList.push(...answers.selectedLanguages);
+        } else if (answers.studyPath === 'IGCSE') {
+          if (answers.selectedSubjects) selectedSubjectsList.push(...answers.selectedSubjects);
+        }
+      } else { // teacher
+        if (answers.languageSpecialization) selectedSubjectsList.push(...answers.languageSpecialization);
+        if (answers.subjectSpecialization) selectedSubjectsList.push(...answers.subjectSpecialization);
+      }
+
       setUserRole?.(role);
+      setOnboardingCompleted?.(true, selectedSubjectsList, answers, role);
       refreshUser?.();
 
       const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : '/student-dashboard';
@@ -224,15 +239,21 @@ const Onboarding = () => {
     }
     if (answers.studyPath === 'IGCSE') {
       if (currentStep === 2) {
-        const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Economics', 'Business', 'CS'];
+        const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Economics', 'Business', 'Computer Science'];
         return (
           <div className="space-y-6">
             <Illustration><UndrawScience primaryColor='#9333ea' height='200px' /></Illustration>
-            <div className="text-center mb-6"><h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Choose subject</h2><p className="text-sm text-gray-600">Focus subject</p></div>
+            <div className="text-center mb-6"><h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Choose subjects</h2><p className="text-sm text-gray-600">Select one or more subjects</p></div>
             <div className="grid grid-cols-2 gap-3">
-              {subjects.map(subject => (
-                <div key={subject} className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 text-center ${answers.subjectChoice === subject ? 'border-blue-400 bg-blue-50 font-semibold text-blue-900 shadow-sm' : 'border-gray-100 bg-white text-gray-600 hover:border-blue-200'}`} onClick={() => handleAnswer('subjectChoice', subject, true)}>{subject}</div>
-              ))}
+              {subjects.map(subject => {
+                const isSelected = answers.selectedSubjects?.includes(subject) || false;
+                return (
+                  <div key={subject} className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 text-center ${isSelected ? 'border-blue-400 bg-blue-50 font-semibold text-blue-900 shadow-sm' : 'border-gray-100 bg-white text-gray-600 hover:border-blue-200'}`} onClick={() => {
+                    const current = answers.selectedSubjects || [];
+                    handleAnswer('selectedSubjects', isSelected ? current.filter((s: string) => s !== subject) : [...current, subject]);
+                  }}>{subject}</div>
+                );
+              })}
             </div>
           </div>
         );
@@ -345,7 +366,7 @@ const Onboarding = () => {
                 return (
                   <div key={lang} className={`p-3 border-2 rounded-xl text-center cursor-pointer transition-all duration-200 ${isSelected ? 'bg-purple-50 border-purple-400 font-semibold text-purple-900' : 'bg-white border-gray-100 text-gray-600 hover:border-purple-200'}`} onClick={() => {
                     const current = answers.languageSpecialization || [];
-                    handleAnswer('languageSpecialization', isSelected ? current.filter((l: string) => l !== lang) : [...current, lang], true);
+                    handleAnswer('languageSpecialization', isSelected ? current.filter((l: string) => l !== lang) : [...current, lang]);
                   }}>{lang}</div>
                 )
               })}
@@ -439,7 +460,7 @@ const Onboarding = () => {
     if (showIGCSEPath) {
       const effectiveStep = (isDualPath && currentStep > 9) ? currentStep - 7 : currentStep;
       if (effectiveStep === 3) {
-        const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English Language', 'English Literature', 'History', 'Geography', 'Economics', 'Business Studies', 'Computer Science'];
+        const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Economics', 'Business', 'Computer Science'];
         return (
           <div className="space-y-6">
             <Illustration><UndrawScience primaryColor='#9333ea' height='200px' /></Illustration>
@@ -449,7 +470,7 @@ const Onboarding = () => {
                 const isSelected = answers.subjectSpecialization?.includes(subject) || false;
                 return (<div key={subject} className={`p-2 border-2 rounded-xl text-center cursor-pointer transition-all duration-200 text-sm ${isSelected ? 'bg-blue-50 border-blue-400 font-semibold text-blue-900' : 'bg-white border-gray-100 text-gray-600 hover:border-blue-200'}`} onClick={() => {
                   const current = answers.subjectSpecialization || [];
-                  handleAnswer('subjectSpecialization', isSelected ? current.filter((s: string) => s !== subject) : [...current, subject], true);
+                  handleAnswer('subjectSpecialization', isSelected ? current.filter((s: string) => s !== subject) : [...current, subject]);
                 }}>{subject}</div>)
               })}
             </div>
@@ -554,6 +575,7 @@ const Onboarding = () => {
               // Update showNext logic for Dual Path
               const getShowNext = () => {
                 if (role === 'student' && answers.studyPath === 'Languages' && currentStep === 2 && answers.selectedLanguages?.length > 0) return true;
+                if (role === 'student' && answers.studyPath === 'IGCSE' && currentStep === 2 && answers.selectedSubjects?.length > 0) return true;
                 if (role === 'teacher' && currentStep === 2 && answers.teachingFocus?.length > 0) return true; // Focus
                 if (role === 'teacher' && answers.teachingFocus?.includes('Languages')) {
                   if (currentStep === 3 && answers.languageSpecialization?.length > 0) return true;

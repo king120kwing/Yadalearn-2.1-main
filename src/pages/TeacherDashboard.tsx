@@ -1,15 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { SessionStatus } from '@/types/enums';
 import type { Student } from '@/types/schema';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeacherDashboardData } from '@/hooks/useTeacherDashboardData';
+import { removeImageBackground } from '@/utils/imageProcessor';
 import { seedDatabase } from '@/utils/seedData'; // Import seed utility
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload } from 'lucide-react';
+import { 
+  Play, 
+  Calendar as CalendarIcon, 
+  Edit3, 
+  Users, 
+  Megaphone, 
+  Upload, 
+  MoreHorizontal, 
+  ChevronRight, 
+  Home, 
+  Settings as SettingsIcon, 
+  Bell 
+} from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
 import { StudentProfileModal } from '@/components/ProfileModals';
 import {
@@ -23,15 +37,139 @@ import {
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoaded, userRole } = useAuth();
-  const { teacherSchedule, topStudents, stats, loading } = useTeacherDashboardData(); // Use the hook
+  const { user, isLoaded, userRole, logout } = useAuth();
+  const { teacherSchedule, topStudents, stats, pendingBookings, loading } = useTeacherDashboardData(); // Use the hook
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
-  // Use real stats if available, else standard mocks for UI structure
-  const studentProgress = { completedTasks: 45, pendingTasks: 12 };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const savedUser = localStorage.getItem('yadalearn-user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    const userId = user?.id || parsedUser?.id;
+
+    if (!userId) {
+      alert("User not identified. Please try logging in again.");
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        const processedImage = await removeImageBackground(base64String);
+        const { error } = await supabase
+          .from('profiles')
+          .update({ avatar_url: processedImage })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('Error saving image:', error);
+          alert('Failed to save image: ' + error.message);
+        } else {
+          // Update cached user locally to prevent reload flickering and empty placeholder
+          const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
+          savedUser.imageUrl = processedImage;
+          localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error('Error uploading:', err);
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApproveBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'confirmed' })
+        .eq('id', bookingId);
+      if (error) throw error;
+      window.location.reload();
+    } catch (err) {
+      console.error('Error approving booking:', err);
+      alert('Failed to approve booking request.');
+    }
+  };
+
+  const handleRejectBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'rejected' })
+        .eq('id', bookingId);
+      if (error) throw error;
+      window.location.reload();
+    } catch (err) {
+      console.error('Error rejecting booking:', err);
+      alert('Failed to reject booking request.');
+    }
+  };
+
+  // Helper to generate calendar days for the current month with full date strings
+  const getCalendarDays = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const prevMonthTotalDays = new Date(year, month, 0).getDate();
+    
+    const days: { date: number; isCurrentMonth: boolean; isToday: boolean; dateStr: string }[] = [];
+    
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = prevMonthTotalDays - i;
+      const m = month === 0 ? 11 : month - 1;
+      const y = month === 0 ? year - 1 : year;
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({ date: d, isCurrentMonth: false, isToday: false, dateStr });
+    }
+    for (let i = 1; i <= totalDays; i++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({ date: i, isCurrentMonth: true, isToday: i === now.getDate(), dateStr });
+    }
+    const remaining = days.length % 7;
+    if (remaining > 0) {
+      for (let i = 1; i <= (7 - remaining); i++) {
+        const m = month === 11 ? 0 : month + 1;
+        const y = month === 11 ? year + 1 : year;
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        days.push({ date: i, isCurrentMonth: false, isToday: false, dateStr });
+      }
+    }
+    return days;
+  };
+
+  // Use real stats from the database
+  const studentProgress = {
+    completedTasks: (stats as any).completedTasks || 0,
+    pendingTasks: (stats as any).pendingTasks || 0
+  };
 
   // ALL hooks must be called before any conditional logic
   useEffect(() => {
@@ -99,216 +237,416 @@ const TeacherDashboard = () => {
     setIsModalOpen(true);
   };
 
-  // Calculate progress percentage
   const totalTasks = studentProgress.completedTasks + studentProgress.pendingTasks;
   const progressPercentage = Math.round((studentProgress.completedTasks / totalTasks) * 100);
   const strokeDasharray = `${progressPercentage}, 100`;
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 pb-24 safe-bottom">
-        {/* Header */}
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <p className="text-base text-subtext-light dark:text-subtext-dark mb-1">Welcome back, Teacher</p>
-            <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
-              Hi, {currentUser?.firstName || (currentUser?.name ? currentUser.name.split(' ')[0] : 'Teacher')}
-            </h1>
+    <div className="flex min-h-screen bg-white dark:bg-zinc-950 font-sans text-slate-800 dark:text-slate-200 w-full relative overflow-x-hidden">
 
-            {/* Seed Button for Teachers */}
-            {teacherSchedule.length === 0 && (
-              <Button
-                onClick={() => seedDatabase(currentUser.id, 'teacher')}
-                variant="outline"
-                className="mt-2 text-xs border-dashed border-indigo-500 text-indigo-500 hover:bg-indigo-50"
+      {/* Sidebar on desktop */}
+      <aside className="hidden md:flex flex-col justify-between w-64 p-8 border-r border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10">
+        <div className="flex flex-col gap-10">
+          <div className="flex items-center gap-3 px-2">
+            <img src="/logo (2).png" alt="YadaLearn Logo" className="w-9 h-9 object-contain rounded-xl" />
+            <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
+          </div>
+          
+          <nav className="flex flex-col gap-1.5">
+            <button
+              onClick={() => navigate('/teacher-dashboard')}
+              className="flex items-center gap-3.5 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-2xl font-bold transition-all text-left w-full"
+            >
+              <Home className="h-5 w-5" />
+              <span>Home</span>
+            </button>
+            <button
+              onClick={() => navigate('/teacher-students')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <Users className="h-5 w-5" />
+              <span>Students</span>
+            </button>
+            <button
+              onClick={() => navigate('/teacher-calendar')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <CalendarIcon className="h-5 w-5" />
+              <span>Calendar</span>
+            </button>
+          </nav>
+        </div>
+        
+        {/* Bottom actions matching reference image */}
+        <div className="flex flex-col gap-4">
+
+
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <SettingsIcon className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+          <button
+            onClick={logout}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={currentUser?.avatarUrl || currentUser?.imageUrl} />
+              <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
+                {currentUser?.name ? currentUser.name.split(' ').map((n: string) => n[0]).join('') : 'T'}
+              </AvatarFallback>
+            </Avatar>
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 md:pb-10 max-w-7xl w-full mx-auto bg-transparent overflow-x-hidden">
+
+        {/* Hidden File Input for Portrait Upload */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageUpload}
+          accept="image/*"
+          className="hidden"
+        />
+
+        {/* Hero Section (No Card Wrapper) */}
+        <div className="relative flex flex-col md:flex-row items-center md:items-start justify-start gap-12 mt-4 md:mt-0 mb-4 pt-4 w-full z-10">
+
+          {/* Portrait Image Area (Interactive / Uploadable) */}
+          <div className="relative shrink-0 md:-mb-[135px] z-0">
+            {/* Soft, organic localized peach/apricot glow behind the portrait (circular aura, no clipping) */}
+            <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(255,158,125,0.38)_0%,rgba(255,195,160,0.2)_40%,transparent_75%)] blur-[50px] pointer-events-none -z-10" />
+            {currentUser?.imageUrl ? (
+              <div className="relative group cursor-pointer" onClick={handleImageClick}>
+                <img
+                  src={currentUser.imageUrl}
+                  alt="Teacher Portrait"
+                  className="w-72 h-[380px] md:w-[360px] md:h-[430px] object-contain object-bottom select-none drop-shadow-2xl transition-all duration-300 group-hover:opacity-95 dark:mix-blend-normal"
+                />
+                {/* Floating Edit Badge */}
+                <div className="absolute bottom-2 right-2 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105">
+                  <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={handleImageClick}
+                className="w-72 h-[380px] md:w-[360px] md:h-[430px] rounded-[2rem] border-2 border-dashed border-slate-350 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm"
               >
-                <span className="material-symbols-outlined text-sm mr-1">database</span>
-                Initialize Teacher Data
-              </Button>
+                <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
+                  <span className="material-symbols-outlined text-2xl">upload</span>
+                </div>
+                <div className="text-center px-4">
+                  <p className="text-xs font-bold text-slate-655 dark:text-zinc-300">Upload Portrait</p>
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Transparent PNG</p>
+                </div>
+              </div>
+            )}
+            {uploading && (
+              <div className="absolute inset-0 bg-white/60 dark:bg-zinc-950/60 rounded-[2rem] backdrop-blur-sm flex items-center justify-center z-30">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              </div>
             )}
           </div>
-          <div className="flex items-center -space-x-3">
-            {topStudents.slice(0, 2).map((student, idx) => (
-              <Avatar key={idx} className="w-10 h-10 border-2 border-background-light dark:border-background-dark">
-                <AvatarImage src={student.avatar} alt={student.name} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
-                  {student.name.split(' ').map((n: string) => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
-              <span className="text-sm font-semibold text-slate-600">+{Math.max(0, stats.totalStudents - 2)}</span>
-            </div>
-          </div>
-        </header>
 
-        {/* Progress Section */}
-        <section className="mb-8">
-          <div
-            className="bg-gradient-to-br from-[var(--peach-start)] to-[var(--peach-end)] p-6 rounded-3xl shadow-soft text-[#A66041] relative overflow-hidden transition-transform duration-300 ease-out"
-            style={{ transformStyle: 'preserve-3d' }}
-            onMouseMove={(e) => {
-              const card = e.currentTarget;
-              const rect = card.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
-              const centerX = rect.width / 2;
-              const centerY = rect.height / 2;
-              const rotateX = ((y - centerY) / centerY) * -10;
-              const rotateY = ((x - centerX) / centerX) * 10;
-              card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-            }}
-          >
-            <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/20 rounded-full"></div>
-            <div className="absolute bottom-4 -left-12 w-28 h-28 bg-white/10 rounded-full"></div>
-            <div className="flex justify-between items-start mb-4 z-10 relative">
-              <div>
-                <h2 className="text-xl font-bold">Progress</h2>
-                <p className="text-sm opacity-80">This Month</p>
+          <div className="flex-1 text-center md:text-left pt-6">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">
+              {currentUser?.name || 'Anya Sharma'}
+            </h1>
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Welcome Back,</p>
+            
+            {currentUser?.bio && (
+              <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400 mt-2 mb-6 max-w-md italic leading-relaxed border-l-2 border-purple-500/35 pl-3 text-left">
+                "{currentUser.bio}"
+              </p>
+            )}
+            
+            {/* Profile Stats List */}
+            <div className="flex flex-col gap-2.5 max-w-xs mx-auto md:mx-0 mt-6">
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-600 dark:text-slate-350 font-semibold">Active Courses:</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.upcomingClasses ?? 0}</span>
               </div>
-              <button className="w-8 h-8 flex items-center justify-center bg-white/40 rounded-full">
-                <span className="material-symbols-outlined text-lg">more_horiz</span>
-              </button>
-            </div>
-            <div className="flex items-center justify-between z-10 relative">
-              <div className="relative w-28 h-28">
-                <svg className="w-full h-full" style={{ transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
-                  <path
-                    className="text-white/30"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                  />
-                  <path
-                    className="text-white"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeDasharray={strokeDasharray}
-                    strokeLinecap="round"
-                    strokeWidth="3"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-white">{progressPercentage}%</span>
-                  <span className="text-xs opacity-90">Completed</span>
-                </div>
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-600 dark:text-slate-355 font-semibold">Registered Students:</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.totalStudents ?? 0}</span>
               </div>
-              <div className="text-right space-y-4">
-                <div>
-                  <p className="text-base font-medium">Completed</p>
-                  <p className="text-sm opacity-80">{studentProgress.completedTasks} tasks</p>
-                </div>
-                <div>
-                  <p className="text-base font-medium">Pending</p>
-                  <p className="text-sm opacity-80">{studentProgress.pendingTasks} tasks</p>
-                </div>
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-600 dark:text-slate-355 font-semibold">Avg. Course Rating:</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100">{(stats.avgRating ?? 4.8).toFixed(1)}</span>
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* Quick Actions */}
-        <section className="mb-8">
-          <h2 className="text-xl font-bold mb-4 text-text-light dark:text-text-dark">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5">
-            <div
-              className="bg-gradient-to-br from-emerald-400 to-emerald-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('start-class')}
-            >
-              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>videocam</span>
-              </div>
-              <p className="text-base font-semibold">Start Class</p>
-            </div>
-            <div
-              className="bg-gradient-to-br from-blue-400 to-blue-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('create-session')}
-            >
-              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>calendar_add_on</span>
-              </div>
-              <p className="text-base font-semibold">Create Session</p>
-            </div>
-            <div
-              className="bg-gradient-to-br from-purple-400 to-purple-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('review-submissions')}
-            >
-              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>fact_check</span>
-              </div>
-              <p className="text-base font-semibold">Review</p>
-            </div>
-            <div
-              className="bg-gradient-to-br from-orange-400 to-orange-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('student-overview')}
-            >
-              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>groups</span>
-              </div>
-              <p className="text-base font-semibold">Students</p>
-            </div>
-            <div
-              className="bg-gradient-to-br from-pink-400 to-pink-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('announcement')}
-            >
-              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>campaign</span>
-              </div>
-              <p className="text-base font-semibold">Announce</p>
-            </div>
-            <div
-              className="bg-gradient-to-br from-teal-400 to-teal-500 p-5 rounded-3xl flex flex-col justify-between shadow-soft text-white h-32 cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => setActiveModal('upload-materials')}
-            >
-              <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>upload_file</span>
-              </div>
-              <p className="text-base font-semibold">Upload</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Today's Schedule */}
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-text-light dark:text-text-dark">Today's Schedule</h2>
-            <a className="text-sm font-medium text-indigo-500 dark:text-indigo-400" href="#">View All</a>
-          </div>
-          <div className="space-y-4">
-            {teacherSchedule.slice(0, 2).map((session) => (
-              <div key={session.id} className="bg-white dark:bg-zinc-800 p-4 rounded-3xl flex items-center justify-between shadow-soft">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className={`w-14 h-14 ${session.status === SessionStatus.CONFIRMED ? 'bg-indigo-100 dark:bg-indigo-900/40' : 'bg-blue-100 dark:bg-blue-900/40'} rounded-2xl flex items-center justify-center`}>
-                      <span className={`material-symbols-outlined text-3xl ${session.status === SessionStatus.CONFIRMED ? 'text-indigo-500 dark:text-indigo-400' : 'text-blue-500 dark:text-blue-400'}`} style={{ fontVariationSettings: "'FILL' 1, 'wght' 300" }}>
-                        campaign
-                      </span>
-                    </div>
-                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${session.status === SessionStatus.CONFIRMED ? 'bg-green-400' : 'bg-orange-400'} rounded-full border-2 border-white dark:border-zinc-800 flex items-center justify-center shadow-sm`}>
-                      <span className="material-symbols-outlined text-white text-xs" style={{ fontVariationSettings: "'wght' 700" }}>
-                        {session.status === SessionStatus.CONFIRMED ? 'done' : 'priority_high'}
-                      </span>
-                    </div>
+        {/* Pending Booking Requests Alert Banner */}
+        {pendingBookings && pendingBookings.length > 0 && (
+          <div className="mb-10 space-y-4">
+            {pendingBookings.map((booking: any) => (
+              <div key={booking.id} className="relative overflow-hidden bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-transparent border border-purple-500/20 dark:border-purple-800/30 p-5 md:p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-5 backdrop-blur-xl shadow-lg transition-all animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
+                <div className="flex items-center gap-4 text-left w-full md:w-auto">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0 shadow-sm border border-purple-200/30">
+                    <span className="material-symbols-outlined text-2xl font-bold animate-pulse">notifications_active</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-base text-text-light dark:text-text-dark">{session.title}</p>
-                    <p className="text-sm text-subtext-light dark:text-subtext-dark">{session.time}</p>
+                    <h3 className="font-extrabold text-sm text-slate-800 dark:text-white tracking-tight">New Booking & Registration Request!</h3>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                      <span className="font-bold text-slate-850 dark:text-slate-200">{booking.student?.full_name || 'A Student'}</span> wants to register and book a session for <span className="font-bold text-slate-850 dark:text-slate-200">{booking.subject}</span> on <span className="font-bold text-slate-850 dark:text-slate-200">{booking.date}</span> at <span className="font-bold text-slate-850 dark:text-slate-200">{booking.time}</span>.
+                    </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-subtext-light dark:text-subtext-dark cursor-pointer">more_vert</span>
+                <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end z-10">
+                  <Button
+                    onClick={() => handleRejectBooking(booking.id)}
+                    variant="outline"
+                    className="border-red-500/30 text-red-650 hover:bg-red-50 dark:border-red-900/20 dark:text-red-400 dark:hover:bg-red-950/20 px-5 py-2.5 rounded-full font-bold text-xs shadow-sm cursor-pointer"
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    onClick={() => handleApproveBooking(booking.id)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-full font-bold text-xs shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                  >
+                    Approve & Register
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
-        </section>
+        )}
+
+        {/* Action Grid & Planning */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-10 z-20 relative">
+          {/* Quick Actions Panel */}
+          <div className="lg:col-span-3 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 z-10 relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Quick Actions</h2>
+              <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div
+                onClick={() => setActiveModal('start-class')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Play className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Start Class</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('create-session')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <CalendarIcon className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Create Session</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('review-submissions')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Edit3 className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Review Assignments</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('student-overview')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Students</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('announcement')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Megaphone className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Announcements</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('upload-materials')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Upload className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Upload Materials</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar & Planning Panel */}
+          <div className="lg:col-span-2 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex flex-col z-10 relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Calendar & Planning</h2>
+              <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-between items-start">
+              {/* Calendar Widget */}
+              <div className="w-full sm:w-1/2 max-w-[200px] shrink-0">
+                <div className="grid grid-cols-7 gap-y-1 gap-x-1 text-center">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                    <span key={idx} className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase h-6 flex items-center justify-center">{day}</span>
+                  ))}
+                  {getCalendarDays().map((d, idx) => {
+                    const isSelected = d.dateStr === selectedDateStr;
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedDateStr(d.dateStr)}
+                        className="flex items-center justify-center h-7 w-7 mx-auto cursor-pointer transition-all hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full"
+                      >
+                        <span className={
+                          isSelected
+                            ? "bg-slate-800 text-white dark:bg-white dark:text-slate-950 font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                            : d.isToday
+                              ? "border border-slate-400 text-slate-800 dark:border-white dark:text-white font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                              : d.isCurrentMonth
+                                ? "text-slate-750 dark:text-zinc-100 font-semibold text-xs"
+                                : "text-slate-350 dark:text-zinc-650 font-medium text-[10px]"
+                        }>
+                          {d.date}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Schedule and Events */}
+              <div className="flex-1 w-full space-y-4">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Daily Schedule & Planning</p>
+                  
+                  {(() => {
+                    const filtered = teacherSchedule.filter((session: any) => session.date === selectedDateStr);
+                    if (filtered.length > 0) {
+                      return filtered.slice(0, 3).map((session, idx) => {
+                        const colors = [
+                          { bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+                          { bg: 'bg-blue-50 dark:bg-blue-500/10 border-blue-250 dark:border-blue-500/30', border: 'border-blue-500', text: 'text-blue-700 dark:text-blue-400' },
+                          { bg: 'bg-purple-50 dark:bg-purple-500/10 border-purple-250 dark:border-purple-500/30', border: 'border-purple-500', text: 'text-purple-700 dark:text-purple-400' }
+                        ];
+                        const style = colors[idx % colors.length];
+                        return (
+                          <div key={session.id} className={`flex items-center gap-3 p-2.5 ${style.bg} border-l-4 ${style.border} rounded-r-xl border border-y-slate-100 border-r-slate-100 dark:border-y-transparent dark:border-r-transparent`}>
+                            <span className={`font-bold text-[10px] ${style.text} whitespace-nowrap`}>{session.time}</span>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate">{session.title}</span>
+                          </div>
+                        );
+                      });
+                    } else {
+                      return (
+                        <div className="flex flex-col items-center justify-center p-4 bg-white/30 dark:bg-zinc-800/10 border border-dashed border-slate-200 dark:border-zinc-700/20 rounded-2xl">
+                          <CalendarIcon className="h-5 w-5 text-slate-400 dark:text-zinc-500 mb-1" />
+                          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">No Scheduled Plans</p>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+
+                <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
+                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
+                  <p className="text-xs font-bold">Session Prep: Advanced Maths</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Registered Students Table */}
+        <div className="bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 mb-10 z-10 relative">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Registered Students</h2>
+            <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200/50 dark:border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  <th className="pb-3 font-semibold">Student</th>
+                  <th className="pb-3 font-semibold">Enrolled Subjects</th>
+                  <th className="pb-3 font-semibold">Last Activity</th>
+                  <th className="pb-3 font-semibold">Registration Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {topStudents.length > 0 ? (
+                  topStudents.map((student) => (
+                    <tr key={student.id} className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors">
+                      <td className="py-3.5 flex items-center gap-3 font-bold text-slate-800 dark:text-white text-sm">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={student.avatar} />
+                          <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                            {student.name.split(' ').map((n: string) => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{student.name}</span>
+                      </td>
+                      <td className="py-3.5 text-slate-700 dark:text-slate-200 text-xs font-bold">
+                        {student.learningSubjects && student.learningSubjects.length > 0
+                          ? student.learningSubjects[0] + ' Subjects'
+                          : 'English Subjects'}
+                      </td>
+                      <td className="py-3.5 text-slate-600 dark:text-slate-350 text-xs font-medium">
+                        {student.lastActive || 'Active now'}
+                      </td>
+                      <td className="py-3.5">
+                        <span className={`inline-block px-3 py-1 text-[10px] font-bold rounded-full ${
+                          student.sessionsCompleted > 5
+                            ? 'bg-slate-150 text-slate-600 dark:bg-white/10 dark:text-slate-350'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-250 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-transparent'
+                        }`}>
+                          {student.sessionsCompleted > 5 ? 'Graduated' : 'Active'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 dark:text-zinc-400 font-semibold text-xs">
+                      No registered students found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <div className="md:hidden">
+        <BottomNav />
       </div>
 
-      {/* Bottom Navigation */}
-      <BottomNav />
       <StudentProfileModal
         student={selectedStudent}
         isOpen={isModalOpen}

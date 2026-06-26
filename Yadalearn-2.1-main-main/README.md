@@ -1,90 +1,109 @@
-# Welcome to your Lovable project
+# YadaLearn - Learn Together
 
-## Project info
+A collaborative learning platform connecting students and teachers for personalized education.
 
-**URL**: https://lovable.dev/projects/3c32592f-218b-43ae-abc5-c85b13860f57
+## Features
 
-## How can I edit this code?
+- **Student Dashboard**: Track your courses, assignments, and progress
+- **Teacher Dashboard**: Manage classes, students, and schedules
+- **Real-time Sessions**: Connect with teachers through video sessions
+- **Progress Tracking**: Monitor learning progress with visual charts
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 with TypeScript
+- **Styling**: Tailwind CSS with custom design system
+- **Icons**: Material Symbols Outlined & Lucide React
+- **Authentication**: Clerk
+- **Routing**: React Router v6
+- **Build Tool**: Vite
+- **Charts**: Recharts
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3c32592f-218b-43ae-abc5-c85b13860f57) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ and npm
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone the repository:
+```bash
+git clone <your-repo-url>
+cd yadalearn
+```
 
-Follow these steps:
+2. Install dependencies:
+```bash
+npm install
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Set up environment variables:
+Create a `.env` file in the root directory with:
+```
+VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key_here
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+4. Start the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at `http://localhost:8080`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Available Scripts
 
-**Use GitHub Codespaces**
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Project Structure
 
-## What technologies are used for this project?
+```
+src/
+├── components/     # Reusable UI components
+├── contexts/       # React contexts (Auth, etc.)
+├── data/          # Mock data and constants
+├── pages/         # Page components
+├── types/         # TypeScript type definitions
+└── main.tsx       # Application entry point
+```
 
-This project is built with:
+## Design System
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The app uses a custom design system with:
+- **Poppins** font family
+- Gradient backgrounds (peach, mint, lavender, sky)
+- Material Symbols icons
+- Rounded corners (3xl, 4xl)
+- Soft shadows for depth
 
-## MCP Integration (Figma & Dribbble)
+## Deployment
 
-This project supports Model Context Protocol (MCP) integration with Figma and Dribbble for design-to-code workflows.
+### Build for Production
 
-**Quick Setup:**
-1. See [MCP_SETUP.md](./MCP_SETUP.md) for detailed instructions
-2. Get your Figma Personal Access Token from [Figma Settings](https://www.figma.com/settings)
-3. Configure MCP in Cursor settings (see `.cursor/mcp-config.json` for reference)
+```bash
+npm run build
+```
 
-**Features:**
-- Extract design specs from Figma files
-- Generate React components from Figma designs
-- Access design system variables and tokens
-- Get design inspiration from Dribbble
+The build output will be in the `dist` directory.
 
-For complete setup instructions, see [MCP_SETUP.md](./MCP_SETUP.md)
+### Deploy to Netlify
 
-## How can I deploy this project?
+1. Connect your repository to Netlify
+2. Set build command: `npm run build`
+3. Set publish directory: `dist`
+4. Add environment variables in Netlify dashboard
 
-Simply open [Lovable](https://lovable.dev/projects/3c32592f-218b-43ae-abc5-c85b13860f57) and click on Share -> Publish.
+## Contributing
 
-## Can I connect a custom domain to my Lovable project?
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-Yes, you can!
+## License
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This project is private and proprietary.

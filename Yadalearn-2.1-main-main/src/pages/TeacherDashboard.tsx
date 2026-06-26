@@ -1,45 +1,191 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Users, Calendar, Upload, Video, Clock, BookOpen, Settings, Star, DollarSign, Play } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { SessionStatus } from '@/types/enums';
+import type { Student } from '@/types/schema';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTeacherDashboardData } from '@/hooks/useTeacherDashboardData';
+import { removeImageBackground } from '@/utils/imageProcessor';
+import { seedDatabase } from '@/utils/seedData'; // Import seed utility
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  Play, 
+  Calendar as CalendarIcon, 
+  Edit3, 
+  Users, 
+  Megaphone, 
+  Upload, 
+  MoreHorizontal, 
+  ChevronRight, 
+  Home, 
+  Settings as SettingsIcon, 
+  Bell 
+} from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
-import { StatCard } from '@/components/StatCard';
-import { Carousel3D } from '@/components/Carousel3D';
 import { StudentProfileModal } from '@/components/ProfileModals';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { mockQuery, mockRootProps } from '@/data/mockData';
-import { SessionStatus } from '@/types/enums';
-import type { Student } from '@/types/schema';
-import { useAuth } from '@/contexts/AuthContext';
+import {
+  StartClassModal,
+  CreateSessionModal,
+  ReviewSubmissionsModal,
+  StudentOverviewModal,
+  QuickAnnouncementModal,
+  UploadMaterialsModal
+} from '@/features/teacher/quick-actions';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoaded, userRole } = useAuth();
+  const { user, isLoaded, userRole, logout } = useAuth();
+  const { teacherSchedule, topStudents, stats, pendingBookings, loading } = useTeacherDashboardData(); // Use the hook
+
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const { topStudents, teacherSchedule } = mockQuery;
-  const { teacherStats, studentProgress } = mockRootProps;
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const savedUser = localStorage.getItem('yadalearn-user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    const userId = user?.id || parsedUser?.id;
+
+    if (!userId) {
+      alert("User not identified. Please try logging in again.");
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        const processedImage = await removeImageBackground(base64String);
+        const { error } = await supabase
+          .from('profiles')
+          .update({ avatar_url: processedImage })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('Error saving image:', error);
+          alert('Failed to save image: ' + error.message);
+        } else {
+          // Update cached user locally to prevent reload flickering and empty placeholder
+          const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
+          savedUser.imageUrl = processedImage;
+          localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error('Error uploading:', err);
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApproveBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'confirmed' })
+        .eq('id', bookingId);
+      if (error) throw error;
+      window.location.reload();
+    } catch (err) {
+      console.error('Error approving booking:', err);
+      alert('Failed to approve booking request.');
+    }
+  };
+
+  const handleRejectBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'rejected' })
+        .eq('id', bookingId);
+      if (error) throw error;
+      window.location.reload();
+    } catch (err) {
+      console.error('Error rejecting booking:', err);
+      alert('Failed to reject booking request.');
+    }
+  };
+
+  // Helper to generate calendar days for the current month with full date strings
+  const getCalendarDays = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const prevMonthTotalDays = new Date(year, month, 0).getDate();
+    
+    const days: { date: number; isCurrentMonth: boolean; isToday: boolean; dateStr: string }[] = [];
+    
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = prevMonthTotalDays - i;
+      const m = month === 0 ? 11 : month - 1;
+      const y = month === 0 ? year - 1 : year;
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({ date: d, isCurrentMonth: false, isToday: false, dateStr });
+    }
+    for (let i = 1; i <= totalDays; i++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({ date: i, isCurrentMonth: true, isToday: i === now.getDate(), dateStr });
+    }
+    const remaining = days.length % 7;
+    if (remaining > 0) {
+      for (let i = 1; i <= (7 - remaining); i++) {
+        const m = month === 11 ? 0 : month + 1;
+        const y = month === 11 ? year + 1 : year;
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        days.push({ date: i, isCurrentMonth: false, isToday: false, dateStr });
+      }
+    }
+    return days;
+  };
+
+  // Use real stats from the database
+  const studentProgress = {
+    completedTasks: (stats as any).completedTasks || 0,
+    pendingTasks: (stats as any).pendingTasks || 0
+  };
 
   // ALL hooks must be called before any conditional logic
   useEffect(() => {
     if (isLoaded) {
-      // Check both userRole from context and localStorage as fallback
       const savedRole = localStorage.getItem('yadalearn-user-role');
       const savedUser = localStorage.getItem('yadalearn-user');
       const isTeacher = userRole === 'teacher' || savedRole === 'teacher';
       const hasUser = user || savedUser;
-      
+
       if (!hasUser || !isTeacher) {
         navigate('/role-selection');
       }
     }
   }, [user, isLoaded, userRole, navigate]);
 
-  // Listen for custom events from BottomNav - must be called unconditionally
+  // Listen for custom events from BottomNav
   useEffect(() => {
     const handleOpenStudentsModal = () => setActiveModal('students');
     const handleOpenClassModal = () => setActiveModal('class');
@@ -57,7 +203,6 @@ const TeacherDashboard = () => {
   }, []);
 
   // Compute derived values after all hooks are called
-  // Check both userRole from context and localStorage as fallback
   const savedRole = localStorage.getItem('yadalearn-user-role');
   const savedUser = localStorage.getItem('yadalearn-user');
   const isTeacher = userRole === 'teacher' || savedRole === 'teacher';
@@ -79,9 +224,9 @@ const TeacherDashboard = () => {
   }
 
   // Show loading state after hooks are called
-  if (!isReady) {
+  if (!isReady || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 flex items-center justify-center">
+      <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
       </div>
     );
@@ -92,298 +237,449 @@ const TeacherDashboard = () => {
     setIsModalOpen(true);
   };
 
-  const carouselItems = topStudents.map(s => ({
-    id: s.id,
-    name: s.name,
-    role: `${s.performance}% Performance`,
-    avatar: s.avatar
-  }));
+  const totalTasks = studentProgress.completedTasks + studentProgress.pendingTasks;
+  const progressPercentage = Math.round((studentProgress.completedTasks / totalTasks) * 100);
+  const strokeDasharray = `${progressPercentage}, 100`;
 
-  const progressData = [
-    { name: 'Completed', value: studentProgress.completedTasks, color: '#C9B4E8' },
-    { name: 'Pending', value: studentProgress.pendingTasks, color: '#E5E7EB' }
-  ];
-
-  // All hooks are now called at the top of the component
-  // No more conditional hook calls
-
-  // 4) Main render (hooks remain in same order every render)
   return (
-    <div className="min-h-screen gradient-lavender pb-24">
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        {/* Welcome Back Card - Responsive Design */}
-        <section className="mb-8">
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-0 shadow-lg">
-            <CardContent className="p-4 sm:p-6 lg:p-8">
-              <div className="flex flex-col lg:flex-row items-center justify-between gap-4 lg:gap-6">
-                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
-                  {/* Profile Picture - Responsive sizing */}
-                  <Avatar className="h-16 w-16 sm:h-20 sm:w-20 border-4 border-white shadow-lg">
-                    <AvatarImage src={currentUser?.imageUrl || "/teacher-avatar.jpg"} />
-                    <AvatarFallback className="bg-gradient-to-br from-teal-500 to-blue-500 text-white text-xl sm:text-2xl">
-                      {currentUser?.firstName?.[0] || currentUser?.name?.[0] || 'T'}{currentUser?.lastName?.[0] || ''}
-                    </AvatarFallback>
-                  </Avatar>
+    <div className="flex min-h-screen bg-white dark:bg-zinc-950 font-sans text-slate-800 dark:text-slate-200 w-full relative overflow-x-hidden">
 
-                  <div className="space-fluid-md">
-                    <h1 className="text-fluid-2xl sm:text-fluid-3xl font-bold text-gray-800 mb-2">
-                      Welcome back, {currentUser?.firstName || currentUser?.name || 'Teacher'}! 👋
-                    </h1>
-                    <p className="text-fluid-base sm:text-fluid-lg text-gray-600 mb-3">
-                      Mathematics Teacher
-                    </p>
+      {/* Sidebar on desktop */}
+      <aside className="hidden md:flex flex-col justify-between w-64 p-8 border-r border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10">
+        <div className="flex flex-col gap-10">
+          <div className="flex items-center gap-3 px-2">
+            <img src="/logo (2).png" alt="YadaLearn Logo" className="w-9 h-9 object-contain rounded-xl" />
+            <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
+          </div>
+          
+          <nav className="flex flex-col gap-1.5">
+            <button
+              onClick={() => navigate('/teacher-dashboard')}
+              className="flex items-center gap-3.5 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-2xl font-bold transition-all text-left w-full"
+            >
+              <Home className="h-5 w-5" />
+              <span>Home</span>
+            </button>
+            <button
+              onClick={() => navigate('/teacher-students')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <Users className="h-5 w-5" />
+              <span>Students</span>
+            </button>
+            <button
+              onClick={() => navigate('/teacher-calendar')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <CalendarIcon className="h-5 w-5" />
+              <span>Calendar</span>
+            </button>
+          </nav>
+        </div>
+        
+        {/* Bottom actions matching reference image */}
+        <div className="flex flex-col gap-4">
 
-                    {/* Rating and Stats - Responsive layout */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6">
-                      <div className="flex items-center gap-2">
-                        <div className="flex">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star key={star} className="w-4 h-4 sm:w-5 sm:h-5 fill-yellow-400 text-yellow-400" />
-                          ))}
-                        </div>
-                        <span className="font-bold text-gray-800 text-sm sm:text-base">4.9</span>
-                      </div>
 
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-                        <span className="font-bold text-gray-800 text-sm sm:text-base">$2,450</span>
-                        <span className="text-xs sm:text-sm text-gray-600">This Month</span>
-                      </div>
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <SettingsIcon className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+          <button
+            onClick={logout}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={currentUser?.avatarUrl || currentUser?.imageUrl} />
+              <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
+                {currentUser?.name ? currentUser.name.split(' ').map((n: string) => n[0]).join('') : 'T'}
+              </AvatarFallback>
+            </Avatar>
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
 
-                      <div className="flex items-center gap-2">
-                        <Play className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                        <span className="font-bold text-gray-800 text-sm sm:text-base">35</span>
-                        <span className="text-xs sm:text-sm text-gray-600">sessions completed</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {/* Main Content */}
+      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 md:pb-10 max-w-7xl w-full mx-auto bg-transparent overflow-x-hidden">
 
-                {/* Profile Pictures - Top Right - Responsive */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12 border-2 border-white shadow-md">
-                    <AvatarImage src={currentUser?.imageUrl || "/teacher-avatar.jpg"} />
-                    <AvatarFallback className="bg-gradient-to-br from-teal-500 to-blue-500 text-white text-sm sm:text-base">
-                      {currentUser?.firstName?.[0] || currentUser?.name?.[0] || 'T'}{currentUser?.lastName?.[0] || ''}
-                    </AvatarFallback>
-                  </Avatar>
-                  <button
-                    onClick={() => navigate('/settings')}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
-                  >
-                    <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-                  </button>
+        {/* Hidden File Input for Portrait Upload */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageUpload}
+          accept="image/*"
+          className="hidden"
+        />
+
+        {/* Hero Section (No Card Wrapper) */}
+        <div className="relative flex flex-col md:flex-row items-center md:items-start justify-start gap-12 mt-4 md:mt-0 mb-4 pt-4 w-full z-10">
+
+          {/* Portrait Image Area (Interactive / Uploadable) */}
+          <div className="relative shrink-0 md:-mb-[135px] z-0">
+            {/* Soft, organic localized peach/apricot glow behind the portrait (circular aura, no clipping) */}
+            <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(255,158,125,0.38)_0%,rgba(255,195,160,0.2)_40%,transparent_75%)] blur-[50px] pointer-events-none -z-10" />
+            {currentUser?.imageUrl ? (
+              <div className="relative group cursor-pointer" onClick={handleImageClick}>
+                <img
+                  src={currentUser.imageUrl}
+                  alt="Teacher Portrait"
+                  className="w-72 h-[380px] md:w-[360px] md:h-[430px] object-contain object-bottom select-none drop-shadow-2xl transition-all duration-300 group-hover:opacity-95 dark:mix-blend-normal"
+                />
+                {/* Floating Edit Badge */}
+                <div className="absolute bottom-2 right-2 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105">
+                  <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Quick Actions Section - Responsive Grid */}
-        <section className="mb-8">
-          <h2 className="mb-6 text-fluid-xl sm:text-fluid-2xl font-bold text-gray-800">Quick Actions</h2>
-          <div className="grid-fluid-2">
-            {/* My Students */}
-            <Card
-              className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group card-fluid"
-              onClick={() => setActiveModal('students')}
-            >
-              <CardContent className="p-4 sm:p-6 text-center">
-                <div className="mb-3 sm:mb-4 flex justify-center">
-                  <div className="rounded-full bg-blue-100 p-3 sm:p-4 transition-transform group-hover:scale-110">
-                    <Users className="icon-fluid-md text-blue-600" />
-                  </div>
+            ) : (
+              <div
+                onClick={handleImageClick}
+                className="w-72 h-[380px] md:w-[360px] md:h-[430px] rounded-[2rem] border-2 border-dashed border-slate-350 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm"
+              >
+                <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
+                  <span className="material-symbols-outlined text-2xl">upload</span>
                 </div>
-                <h3 className="font-bold text-fluid-base sm:text-fluid-lg text-gray-800 mb-2">My Students</h3>
-                <p className="text-fluid-sm text-gray-600 mb-0">View and manage your students</p>
-              </CardContent>
-            </Card>
-
-            {/* Start Class */}
-            <Card
-              className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group card-fluid"
-              onClick={() => setActiveModal('class')}
-            >
-              <CardContent className="p-4 sm:p-6 text-center">
-                <div className="mb-3 sm:mb-4 flex justify-center">
-                  <div className="rounded-full bg-green-100 p-3 sm:p-4 transition-transform group-hover:scale-110">
-                    <Video className="icon-fluid-md text-green-600" />
-                  </div>
+                <div className="text-center px-4">
+                  <p className="text-xs font-bold text-slate-655 dark:text-zinc-300">Upload Portrait</p>
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Transparent PNG</p>
                 </div>
-                <h3 className="font-bold text-fluid-base sm:text-fluid-lg text-gray-800 mb-2">Start Class</h3>
-                <p className="text-fluid-sm text-gray-600 mb-0">Generate class link & QR code</p>
-              </CardContent>
-            </Card>
-
-            {/* Schedule */}
-            <Card
-              className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group card-fluid"
-              onClick={() => setActiveModal('schedule')}
-            >
-              <CardContent className="p-4 sm:p-6 text-center">
-                <div className="mb-3 sm:mb-4 flex justify-center">
-                  <div className="rounded-full bg-purple-100 p-3 sm:p-4 transition-transform group-hover:scale-110">
-                    <Calendar className="icon-fluid-md text-purple-600" />
-                  </div>
-                </div>
-                <h3 className="font-bold text-fluid-base sm:text-fluid-lg text-gray-800 mb-2">Schedule</h3>
-                <p className="text-fluid-sm text-gray-600 mb-0">Manage your availability</p>
-              </CardContent>
-            </Card>
-
-            {/* Earnings */}
-            <Card
-              className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group card-fluid"
-              onClick={() => setActiveModal('earnings')}
-            >
-              <CardContent className="p-4 sm:p-6 text-center">
-                <div className="mb-3 sm:mb-4 flex justify-center">
-                  <div className="rounded-full bg-orange-100 p-3 sm:p-4 transition-transform group-hover:scale-110">
-                    <DollarSign className="icon-fluid-md text-orange-600" />
-                  </div>
-                </div>
-                <h3 className="font-bold text-fluid-base sm:text-fluid-lg text-gray-800 mb-2">Earnings</h3>
-                <p className="text-fluid-sm text-gray-600 mb-0">View financial summary</p>
-              </CardContent>
-            </Card>
+              </div>
+            )}
+            {uploading && (
+              <div className="absolute inset-0 bg-white/60 dark:bg-zinc-950/60 rounded-[2rem] backdrop-blur-sm flex items-center justify-center z-30">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              </div>
+            )}
           </div>
-        </section>
 
-        {/* Today's Schedule */}
-        <section className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">Today's Schedule</h2>
-            <button className="text-sm font-medium text-purple-600 hover:text-purple-700">
-              View All
-            </button>
+          <div className="flex-1 text-center md:text-left pt-6">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">
+              {currentUser?.name || 'Anya Sharma'}
+            </h1>
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Welcome Back,</p>
+            
+            {currentUser?.bio && (
+              <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400 mt-2 mb-6 max-w-md italic leading-relaxed border-l-2 border-purple-500/35 pl-3 text-left">
+                "{currentUser.bio}"
+              </p>
+            )}
+            
+            {/* Profile Stats List */}
+            <div className="flex flex-col gap-2.5 max-w-xs mx-auto md:mx-0 mt-6">
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-600 dark:text-slate-350 font-semibold">Active Courses:</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.upcomingClasses ?? 0}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-600 dark:text-slate-355 font-semibold">Registered Students:</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.totalStudents ?? 0}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-slate-600 dark:text-slate-355 font-semibold">Avg. Course Rating:</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100">{(stats.avgRating ?? 4.8).toFixed(1)}</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-4">
-            {teacherSchedule.map((session) => (
-              <Card key={session.id} className="bg-white border-0 shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-teal-400 flex items-center justify-center text-white font-bold">
-                        {session.studentInitials}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-800">{session.title}</h3>
-                        <p className="text-sm text-gray-600">{session.student}</p>
-                        <p className="text-xs text-gray-500">{session.time}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge className={
-                        session.status === SessionStatus.CONFIRMED
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                      }>
-                        {session.status === SessionStatus.CONFIRMED ? 'Confirmed' : 'Pending Approval'}
-                      </Badge>
-                      <Button size="sm" className="bg-black hover:bg-gray-900 text-white rounded-full">
-                        Join
-                      </Button>
-                    </div>
+        </div>
+
+        {/* Pending Booking Requests Alert Banner */}
+        {pendingBookings && pendingBookings.length > 0 && (
+          <div className="mb-10 space-y-4">
+            {pendingBookings.map((booking: any) => (
+              <div key={booking.id} className="relative overflow-hidden bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-transparent border border-purple-500/20 dark:border-purple-800/30 p-5 md:p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-5 backdrop-blur-xl shadow-lg transition-all animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
+                <div className="flex items-center gap-4 text-left w-full md:w-auto">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0 shadow-sm border border-purple-200/30">
+                    <span className="material-symbols-outlined text-2xl font-bold animate-pulse">notifications_active</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-800 dark:text-white tracking-tight">New Booking & Registration Request!</h3>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                      <span className="font-bold text-slate-850 dark:text-slate-200">{booking.student?.full_name || 'A Student'}</span> wants to register and book a session for <span className="font-bold text-slate-850 dark:text-slate-200">{booking.subject}</span> on <span className="font-bold text-slate-850 dark:text-slate-200">{booking.date}</span> at <span className="font-bold text-slate-850 dark:text-slate-200">{booking.time}</span>.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end z-10">
+                  <Button
+                    onClick={() => handleRejectBooking(booking.id)}
+                    variant="outline"
+                    className="border-red-500/30 text-red-650 hover:bg-red-50 dark:border-red-900/20 dark:text-red-400 dark:hover:bg-red-950/20 px-5 py-2.5 rounded-full font-bold text-xs shadow-sm cursor-pointer"
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    onClick={() => handleApproveBooking(booking.id)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-full font-bold text-xs shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                  >
+                    Approve & Register
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
-        </section>
+        )}
 
-        {/* Data and Progress Section */}
-        <section className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Student Progress Pie Chart */}
-            <Card className="bg-white border-0 shadow-lg">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Student Progress</h3>
-                <div className="relative">
-                  <ResponsiveContainer width={200} height={200}>
-                    <PieChart>
-                      <Pie
-                        data={progressData}
-                        cx={100}
-                        cy={100}
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {progressData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-800">{studentProgress.avgProgress}%</p>
-                      <p className="text-xs text-gray-600">Avg. Progress</p>
-                    </div>
-                  </div>
+        {/* Action Grid & Planning */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-10 z-20 relative">
+          {/* Quick Actions Panel */}
+          <div className="lg:col-span-3 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 z-10 relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Quick Actions</h2>
+              <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div
+                onClick={() => setActiveModal('start-class')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Play className="h-5 w-5 text-purple-650 dark:text-purple-400" />
                 </div>
-              </CardContent>
-            </Card>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Start Class</p>
+              </div>
 
-            {/* Active Students / Completed Sessions */}
-            <Card className="bg-white border-0 shadow-lg">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">This Week</h3>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Active Students</p>
-                    <p className="text-3xl font-bold text-gray-800">{teacherStats.totalStudents}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Sessions Completed</p>
-                    <p className="text-3xl font-bold text-gray-800">{teacherStats.completed}</p>
-                  </div>
+              <div
+                onClick={() => setActiveModal('create-session')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <CalendarIcon className="h-5 w-5 text-purple-650 dark:text-purple-400" />
                 </div>
-              </CardContent>
-            </Card>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Create Session</p>
+              </div>
 
-            {/* Average Rating */}
-            <Card className="bg-white border-0 shadow-lg">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Average Rating</h3>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    ))}
-                  </div>
-                  <span className="text-2xl font-bold text-gray-800">{teacherStats.rating.toFixed(1)}</span>
+              <div
+                onClick={() => setActiveModal('review-submissions')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Edit3 className="h-5 w-5 text-purple-650 dark:text-purple-400" />
                 </div>
-                <p className="text-sm text-gray-600">Based on student feedback</p>
-              </CardContent>
-            </Card>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Review Assignments</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('student-overview')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Students</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('announcement')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Megaphone className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Announcements</p>
+              </div>
+
+              <div
+                onClick={() => setActiveModal('upload-materials')}
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Upload className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                </div>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Upload Materials</p>
+              </div>
+            </div>
           </div>
-        </section>
 
-        {/* Top Students Carousel */}
-        <section className="mb-8">
-          <Carousel3D
-            items={carouselItems}
-            title="TOP STUDENTS"
-            subtitle="Meet our exceptional learners"
-            onItemClick={(item) => {
-              const student = topStudents.find(s => s.id === item.id);
-              if (student) handleStudentClick(student);
-            }}
-          />
-        </section>
+          {/* Calendar & Planning Panel */}
+          <div className="lg:col-span-2 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex flex-col z-10 relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Calendar & Planning</h2>
+              <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-between items-start">
+              {/* Calendar Widget */}
+              <div className="w-full sm:w-1/2 max-w-[200px] shrink-0">
+                <div className="grid grid-cols-7 gap-y-1 gap-x-1 text-center">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                    <span key={idx} className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase h-6 flex items-center justify-center">{day}</span>
+                  ))}
+                  {getCalendarDays().map((d, idx) => {
+                    const isSelected = d.dateStr === selectedDateStr;
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedDateStr(d.dateStr)}
+                        className="flex items-center justify-center h-7 w-7 mx-auto cursor-pointer transition-all hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full"
+                      >
+                        <span className={
+                          isSelected
+                            ? "bg-slate-800 text-white dark:bg-white dark:text-slate-950 font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                            : d.isToday
+                              ? "border border-slate-400 text-slate-800 dark:border-white dark:text-white font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                              : d.isCurrentMonth
+                                ? "text-slate-750 dark:text-zinc-100 font-semibold text-xs"
+                                : "text-slate-350 dark:text-zinc-650 font-medium text-[10px]"
+                        }>
+                          {d.date}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Schedule and Events */}
+              <div className="flex-1 w-full space-y-4">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Daily Schedule & Planning</p>
+                  
+                  {(() => {
+                    const filtered = teacherSchedule.filter((session: any) => session.date === selectedDateStr);
+                    if (filtered.length > 0) {
+                      return filtered.slice(0, 3).map((session, idx) => {
+                        const colors = [
+                          { bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+                          { bg: 'bg-blue-50 dark:bg-blue-500/10 border-blue-250 dark:border-blue-500/30', border: 'border-blue-500', text: 'text-blue-700 dark:text-blue-400' },
+                          { bg: 'bg-purple-50 dark:bg-purple-500/10 border-purple-250 dark:border-purple-500/30', border: 'border-purple-500', text: 'text-purple-700 dark:text-purple-400' }
+                        ];
+                        const style = colors[idx % colors.length];
+                        return (
+                          <div key={session.id} className={`flex items-center gap-3 p-2.5 ${style.bg} border-l-4 ${style.border} rounded-r-xl border border-y-slate-100 border-r-slate-100 dark:border-y-transparent dark:border-r-transparent`}>
+                            <span className={`font-bold text-[10px] ${style.text} whitespace-nowrap`}>{session.time}</span>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate">{session.title}</span>
+                          </div>
+                        );
+                      });
+                    } else {
+                      return (
+                        <div className="flex flex-col items-center justify-center p-4 bg-white/30 dark:bg-zinc-800/10 border border-dashed border-slate-200 dark:border-zinc-700/20 rounded-2xl">
+                          <CalendarIcon className="h-5 w-5 text-slate-400 dark:text-zinc-500 mb-1" />
+                          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">No Scheduled Plans</p>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+
+                <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
+                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
+                  <p className="text-xs font-bold">Session Prep: Advanced Maths</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Registered Students Table */}
+        <div className="bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 mb-10 z-10 relative">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Registered Students</h2>
+            <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200/50 dark:border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  <th className="pb-3 font-semibold">Student</th>
+                  <th className="pb-3 font-semibold">Enrolled Subjects</th>
+                  <th className="pb-3 font-semibold">Last Activity</th>
+                  <th className="pb-3 font-semibold">Registration Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {topStudents.length > 0 ? (
+                  topStudents.map((student) => (
+                    <tr key={student.id} className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors">
+                      <td className="py-3.5 flex items-center gap-3 font-bold text-slate-800 dark:text-white text-sm">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={student.avatar} />
+                          <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                            {student.name.split(' ').map((n: string) => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{student.name}</span>
+                      </td>
+                      <td className="py-3.5 text-slate-700 dark:text-slate-200 text-xs font-bold">
+                        {student.learningSubjects && student.learningSubjects.length > 0
+                          ? student.learningSubjects[0] + ' Subjects'
+                          : 'English Subjects'}
+                      </td>
+                      <td className="py-3.5 text-slate-600 dark:text-slate-350 text-xs font-medium">
+                        {student.lastActive || 'Active now'}
+                      </td>
+                      <td className="py-3.5">
+                        <span className={`inline-block px-3 py-1 text-[10px] font-bold rounded-full ${
+                          student.sessionsCompleted > 5
+                            ? 'bg-slate-150 text-slate-600 dark:bg-white/10 dark:text-slate-350'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-250 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-transparent'
+                        }`}>
+                          {student.sessionsCompleted > 5 ? 'Graduated' : 'Active'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 dark:text-zinc-400 font-semibold text-xs">
+                      No registered students found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </main>
 
-      {/* Bottom Navigation Bar */}
-      <BottomNav />
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
+
       <StudentProfileModal
         student={selectedStudent}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
 
-      {/* My Students Modal - Enhanced with Assignment Management */}
+      {/* Teacher Quick Action Modals */}
+      <StartClassModal
+        isOpen={activeModal === 'start-class'}
+        onClose={() => setActiveModal(null)}
+      />
+      <CreateSessionModal
+        isOpen={activeModal === 'create-session'}
+        onClose={() => setActiveModal(null)}
+      />
+      <ReviewSubmissionsModal
+        isOpen={activeModal === 'review-submissions'}
+        onClose={() => setActiveModal(null)}
+      />
+      <StudentOverviewModal
+        isOpen={activeModal === 'student-overview'}
+        onClose={() => setActiveModal(null)}
+      />
+      <QuickAnnouncementModal
+        isOpen={activeModal === 'announcement'}
+        onClose={() => setActiveModal(null)}
+      />
+      <UploadMaterialsModal
+        isOpen={activeModal === 'upload-materials'}
+        onClose={() => setActiveModal(null)}
+      />
+
+      {/* Legacy Modals (kept from original implementation) */}
       {activeModal === 'students' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-4xl bg-white max-h-[90vh] overflow-hidden">
@@ -402,7 +698,6 @@ const TeacherDashboard = () => {
               <div className="p-6 space-y-4">
                 {topStudents.slice(0, 8).map((student) => (
                   <div key={student.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
-                    {/* Student Header */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-12 w-12">
@@ -429,7 +724,6 @@ const TeacherDashboard = () => {
                       </Button>
                     </div>
 
-                    {/* Assignments Section */}
                     <div className="bg-white rounded-md p-3 mb-3">
                       <h4 className="font-semibold text-sm text-gray-800 mb-2">Current Assignments</h4>
                       <div className="space-y-2">
@@ -441,14 +735,9 @@ const TeacherDashboard = () => {
                           <span className="text-gray-700">Algebra Practice Set</span>
                           <Badge className="bg-green-100 text-green-700 text-xs">Completed</Badge>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-700">Geometry Quiz Review</span>
-                          <Badge className="bg-red-100 text-red-700 text-xs">Overdue</Badge>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Upload Materials Section */}
                     <div className="bg-white rounded-md p-3">
                       <h4 className="font-semibold text-sm text-gray-800 mb-2">Study Materials</h4>
                       <div className="flex gap-2">
@@ -477,7 +766,7 @@ const TeacherDashboard = () => {
                           variant="outline"
                           className="text-xs"
                           onClick={() => {
-                            alert(`📚 Recent uploads for ${student.name}:\n• Algebra Formulas.pdf\n• Geometry Cheat Sheet.docx\n• Practice Problems Set 3.pdf`);
+                            alert(`📚 Recent uploads for ${student.name}:\\n• Algebra Formulas.pdf\\n• Geometry Cheat Sheet.docx\\n• Practice Problems Set 3.pdf`);
                           }}
                         >
                           View Materials
@@ -492,7 +781,6 @@ const TeacherDashboard = () => {
         </div>
       )}
 
-      {/* Start Class Modal */}
       {activeModal === 'class' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md bg-white">
@@ -517,11 +805,11 @@ const TeacherDashboard = () => {
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg"
                   onClick={() => {
-                    alert('🎥 Class Link Generated!\n\nLink: https://yadalearn.com/class/abc123\n\nStudents can join using this link.');
+                    alert('🎥 Class Link Generated!\\n\\nLink: https://yadalearn.com/class/abc123\\n\\nStudents can join using this link.');
                     setActiveModal(null);
                   }}
                 >
-                  <Video className="w-5 h-5 mr-2" />
+                  <span className="material-symbols-outlined mr-2">videocam</span>
                   Generate Class Link
                 </Button>
 
@@ -529,11 +817,11 @@ const TeacherDashboard = () => {
                   variant="outline"
                   className="w-full border-2 border-gray-300 hover:border-gray-400 py-3 rounded-lg"
                   onClick={() => {
-                    alert('📱 QR Code Generated!\n\nQR Code displayed for students to scan and join the class.');
+                    alert('📱 QR Code Generated!\\n\\nQR Code displayed for students to scan and join the class.');
                     setActiveModal(null);
                   }}
                 >
-                  <Upload className="w-5 h-5 mr-2" />
+                  <span className="material-symbols-outlined mr-2">qr_code_2</span>
                   Generate QR Code
                 </Button>
               </div>
@@ -546,7 +834,6 @@ const TeacherDashboard = () => {
         </div>
       )}
 
-      {/* Schedule Modal */}
       {activeModal === 'schedule' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl bg-white">
@@ -615,7 +902,6 @@ const TeacherDashboard = () => {
         </div>
       )}
 
-      {/* Earnings Modal */}
       {activeModal === 'earnings' && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl bg-white">
