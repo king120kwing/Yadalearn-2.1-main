@@ -82,6 +82,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const initialCheckCompletedRef = useRef(false);
 
   useEffect(() => {
+    console.log('DEBUG: window.location.href =', window.location.href);
+    console.log('DEBUG: VITE_SUPABASE_URL =', import.meta.env.VITE_SUPABASE_URL);
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (key) {
+      console.log('DEBUG: VITE_SUPABASE_ANON_KEY =', key.substring(0, 15) + '...' + key.substring(key.length - 15));
+    } else {
+      console.log('DEBUG: VITE_SUPABASE_ANON_KEY is missing');
+    }
+
     // Check for OAuth redirect errors in hash or query parameters
     const hash = window.location.hash;
     const search = window.location.search;
