@@ -97,16 +97,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const hasHashToken = window.location.hash.includes('access_token=') || window.location.href.includes('access_token=');
     let isProcessingOAuth = hasHashToken;
 
-    console.log('AuthContext: Triggering direct diagnostic fetch test...');
-    fetch('https://yxqezrvgvfwdgrlwczea.supabase.co/rest/v1/', {
-      headers: { 
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-      }
-    })
-      .then(res => console.log('AuthContext: Direct diagnostic fetch test succeeded with status:', res.status))
-      .catch(err => console.error('AuthContext: Direct diagnostic fetch test failed:', err));
-
     // Check active session on mount
     console.log('AuthContext: getSession started on mount');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
