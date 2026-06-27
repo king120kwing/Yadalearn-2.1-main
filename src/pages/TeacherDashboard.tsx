@@ -373,24 +373,24 @@ const TeacherDashboard = () => {
                 <img
                   src={currentUser.imageUrl}
                   alt="Teacher Portrait"
-                  className="w-72 h-[380px] md:w-[360px] md:h-[430px] object-contain object-bottom select-none drop-shadow-2xl transition-all duration-300 group-hover:opacity-95 dark:mix-blend-normal"
+                  className="w-64 h-80 md:w-72 md:h-96 object-cover rounded-[2rem] select-none border border-slate-100 dark:border-zinc-800 shadow-md transition-all duration-300 group-hover:opacity-95 hover:scale-[1.01]"
                 />
                 {/* Floating Edit Badge */}
-                <div className="absolute bottom-2 right-2 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105">
+                <div className="absolute bottom-2 right-2 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-10">
                   <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
                 </div>
               </div>
             ) : (
               <div
                 onClick={handleImageClick}
-                className="w-72 h-[380px] md:w-[360px] md:h-[430px] rounded-[2rem] border-2 border-dashed border-slate-350 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm"
+                className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border-2 border-dashed border-slate-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm"
               >
                 <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
                   <span className="material-symbols-outlined text-2xl">upload</span>
                 </div>
                 <div className="text-center px-4">
-                  <p className="text-xs font-bold text-slate-655 dark:text-zinc-300">Upload Portrait</p>
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Transparent PNG</p>
+                  <p className="text-xs font-bold text-slate-600 dark:text-zinc-300">Upload Portrait</p>
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Professional Photo</p>
                 </div>
               </div>
             )}
