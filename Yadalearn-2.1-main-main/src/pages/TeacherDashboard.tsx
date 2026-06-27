@@ -369,14 +369,17 @@ const TeacherDashboard = () => {
             {/* Soft, organic localized peach/apricot glow behind the portrait (circular aura, no clipping) */}
             <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(255,158,125,0.38)_0%,rgba(255,195,160,0.2)_40%,transparent_75%)] blur-[50px] pointer-events-none -z-10" />
             {currentUser?.imageUrl ? (
-              <div className="relative group cursor-pointer" onClick={handleImageClick}>
+              <div 
+                className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] bg-white/20 dark:bg-zinc-900/20 backdrop-blur-xl border border-white/30 dark:border-zinc-800/40 p-4 shadow-xl flex items-center justify-center relative group cursor-pointer" 
+                onClick={handleImageClick}
+              >
                 <img
                   src={currentUser.imageUrl}
                   alt="Teacher Portrait"
-                  className="w-64 h-80 md:w-72 md:h-96 object-cover rounded-[2rem] select-none border border-slate-100 dark:border-zinc-800 shadow-md transition-all duration-300 group-hover:opacity-95 hover:scale-[1.01]"
+                  className="w-full h-full object-cover rounded-[1.5rem] select-none shadow-sm transition-all duration-300 group-hover:scale-[1.01]"
                 />
                 {/* Floating Edit Badge */}
-                <div className="absolute bottom-2 right-2 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-10">
+                <div className="absolute bottom-6 right-6 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-10">
                   <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
                 </div>
               </div>
