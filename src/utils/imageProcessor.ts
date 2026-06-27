@@ -43,67 +43,42 @@ export function removeImageBackground(base64Str: string): Promise<string> {
       const imgData = ctx.getImageData(0, 0, width, height);
       const data = imgData.data;
       
-      // Sample the corner pixels to find the background color
+      // Sample the top-left and top-right corner pixels to find the background color
       const corners = [
         { r: data[0], g: data[1], b: data[2] }, // Top-Left
-        { r: data[(width - 1) * 4], g: data[(width - 1) * 4 + 1], b: data[(width - 1) * 4 + 2] }, // Top-Right
-        { r: data[(height - 1) * width * 4], g: data[(height - 1) * width * 4 + 1], b: data[(height - 1) * width * 4 + 2] }, // Bottom-Left
-        { r: data[((height - 1) * width + width - 1) * 4], g: data[((height - 1) * width + width - 1) * 4 + 1], b: data[((height - 1) * width + width - 1) * 4 + 2] } // Bottom-Right
+        { r: data[(width - 1) * 4], g: data[(width - 1) * 4 + 1], b: data[(width - 1) * 4 + 2] } // Top-Right
       ];
 
-      const colorBins: { [key: string]: { r: number; g: number; b: number; count: number } } = {};
-      let bgR = 255;
-      let bgG = 255;
-      let bgB = 255;
-      let maxCount = 0;
+      // Average the corner colors
+      const bgR = Math.round((corners[0].r + corners[1].r) / 2);
+      const bgG = Math.round((corners[0].g + corners[1].g) / 2);
+      const bgB = Math.round((corners[0].b + corners[1].b) / 2);
 
-      corners.forEach(c => {
-        const rBin = Math.round(c.r / 15) * 15;
-        const gBin = Math.round(c.g / 15) * 15;
-        const bBin = Math.round(c.b / 15) * 15;
-        const key = `${rBin},${gBin},${bBin}`;
-        
-        if (!colorBins[key]) {
-          colorBins[key] = { r: c.r, g: c.g, b: c.b, count: 0 };
-        }
-        colorBins[key].count++;
-        
-        if (colorBins[key].count > maxCount) {
-          maxCount = colorBins[key].count;
-          bgR = colorBins[key].r;
-          bgG = colorBins[key].g;
-          bgB = colorBins[key].b;
-        }
-      });
-
-      // BFS flood fill starting from all border pixels
+      // BFS flood fill starting ONLY from the top edge and top 30% of side borders
       const visited = new Uint8Array(width * height);
       const queue: number[] = [];
       
       const isBgColor = (r: number, g: number, b: number) => {
         // If it's near-white (general background)
-        if (r > 240 && g > 240 && b > 240) return true;
+        if (r > 235 && g > 235 && b > 235) return true;
         // Check distance to corner background color
         const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
-        return dist < 50; // 50 is a solid threshold to capture solid backgrounds and gradients
+        return dist < 48; // 48 is a balanced threshold for compression gradients
       };
 
-      // Initialize queue with all border pixels
+      // Initialize queue with top edge
       for (let x = 0; x < width; x++) {
-        // Top border
         queue.push(x, 0);
         visited[x] = 1;
-        // Bottom border
-        const idxBottom = (height - 1) * width + x;
-        queue.push(x, height - 1);
-        visited[idxBottom] = 1;
       }
-      for (let y = 1; y < height - 1; y++) {
-        // Left border
+      // Initialize queue with top 30% of left and right edges
+      const sideLimit = Math.floor(height * 0.3);
+      for (let y = 1; y < sideLimit; y++) {
+        // Left edge
         const idxLeft = y * width;
         queue.push(0, y);
         visited[idxLeft] = 1;
-        // Right border
+        // Right edge
         const idxRight = y * width + (width - 1);
         queue.push(width - 1, y);
         visited[idxRight] = 1;
@@ -138,6 +113,38 @@ export function removeImageBackground(base64Str: string): Promise<string> {
                 queue.push(nx, ny);
               }
             }
+          }
+        }
+      }
+
+      // Edge feathering pass to prevent pixelated/jagged edges
+      const tempAlpha = new Uint8Array(width * height);
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = (y * width + x) * 4;
+          if (data[idx + 3] > 0) {
+            // Check 4-neighbors opacity
+            const n1 = data[(y * width + (x + 1)) * 4 + 3];
+            const n2 = data[(y * width + (x - 1)) * 4 + 3];
+            const n3 = data[((y + 1) * width + x) * 4 + 3];
+            const n4 = data[((y - 1) * width + x) * 4 + 3];
+            
+            if (n1 === 0 || n2 === 0 || n3 === 0 || n4 === 0) {
+              tempAlpha[y * width + x] = 110; // 43% opacity for soft boundary
+            } else {
+              tempAlpha[y * width + x] = 255;
+            }
+          }
+        }
+      }
+      
+      // Apply smoothed alpha values back to pixels
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const nIdx = y * width + x;
+          const idx = nIdx * 4;
+          if (data[idx + 3] > 0) {
+            data[idx + 3] = tempAlpha[nIdx];
           }
         }
       }
