@@ -13,9 +13,23 @@ export function removeImageBackground(base64Str: string): Promise<string> {
     const img = new Image();
     img.src = base64Str;
     img.onload = () => {
+      // Resize to max 200x200 for profile avatar
+      const maxDim = 200;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = width;
+      canvas.height = height;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) {
@@ -23,8 +37,8 @@ export function removeImageBackground(base64Str: string): Promise<string> {
         return;
       }
       
-      // Draw the image onto the canvas
-      ctx.drawImage(img, 0, 0);
+      // Draw the image scaled to the new canvas size
+      ctx.drawImage(img, 0, 0, width, height);
       
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
