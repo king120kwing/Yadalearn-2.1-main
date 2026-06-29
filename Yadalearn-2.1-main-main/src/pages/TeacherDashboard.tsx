@@ -40,35 +40,35 @@ const TeacherDashboard = () => {
   const { user, isLoaded, userRole, logout, refreshUser } = useAuth();
   const { teacherSchedule, topStudents, stats, pendingBookings, loading } = useTeacherDashboardData(); // Use the hook
 
+  const parseDateTime = (dateStr: string, timeStr: string) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return new Date(0);
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+
+      const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+      let hours = 0;
+      let minutes = 0;
+      if (match) {
+        hours = parseInt(match[1], 10);
+        minutes = parseInt(match[2], 10);
+        const ampm = match[3].toUpperCase();
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+      }
+      return new Date(year, month, day, hours, minutes);
+    } catch (e) {
+      return new Date(0);
+    }
+  };
+
   // Find the next upcoming/active event based on the current actual time
   const getNextUpcomingEvent = (schedule: any[]) => {
     if (!schedule || schedule.length === 0) return null;
     const now = new Date();
     
-    const parseDateTime = (dateStr: string, timeStr: string) => {
-      try {
-        const parts = dateStr.split('-');
-        if (parts.length !== 3) return new Date(0);
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const day = parseInt(parts[2], 10);
-
-        const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
-        let hours = 0;
-        let minutes = 0;
-        if (match) {
-          hours = parseInt(match[1], 10);
-          minutes = parseInt(match[2], 10);
-          const ampm = match[3].toUpperCase();
-          if (ampm === 'PM' && hours < 12) hours += 12;
-          if (ampm === 'AM' && hours === 12) hours = 0;
-        }
-        return new Date(year, month, day, hours, minutes);
-      } catch (e) {
-        return new Date(0);
-      }
-    };
-
     const upcoming = schedule.filter((event: any) => {
       const start = parseDateTime(event.date, event.time);
       const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour duration
@@ -647,22 +647,42 @@ const TeacherDashboard = () => {
                 {/* Schedule and Events */}
                 <div className="flex-1 w-full space-y-4">
                   <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Daily Schedule & Planning</p>
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-550 uppercase tracking-wider">Daily Schedule & Planning</p>
                     
                     {(() => {
                       const filtered = teacherSchedule.filter((session: any) => session.date === selectedDateStr);
+                      const now = new Date();
+                      
                       if (filtered.length > 0) {
-                        return filtered.slice(0, 3).map((session, idx) => {
-                          const colors = [
-                            { bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
-                            { bg: 'bg-blue-50 dark:bg-blue-500/10 border-blue-250 dark:border-blue-500/30', border: 'border-blue-500', text: 'text-blue-700 dark:text-blue-400' },
-                            { bg: 'bg-purple-50 dark:bg-purple-500/10 border-purple-250 dark:border-purple-500/30', border: 'border-purple-500', text: 'text-purple-700 dark:text-purple-400' }
-                          ];
-                          const style = colors[idx % colors.length];
+                        return filtered.map((session) => {
+                          const sessionTime = parseDateTime(session.date, session.time);
+                          const hasPassed = sessionTime < now;
+                          const isNext = nextEvent && session.id === nextEvent.id;
+                          
+                          if (hasPassed) {
+                            return (
+                              <div key={session.id} className="flex items-center gap-3 p-2.5 bg-slate-50/50 dark:bg-zinc-800/10 border-l-4 border-slate-300 rounded-r-xl border border-y-slate-100/50 border-r-slate-100/50 dark:border-y-transparent dark:border-r-transparent opacity-60">
+                                <span className="font-bold text-[10px] text-slate-400 dark:text-zinc-500 whitespace-nowrap line-through">{session.time}</span>
+                                <span className="text-xs font-semibold text-slate-555 dark:text-zinc-400 truncate line-through flex-1">{session.title}</span>
+                                <span className="material-symbols-outlined text-xs text-slate-400 shrink-0">check_circle</span>
+                              </div>
+                            );
+                          }
+                          
+                          if (isNext) {
+                            return (
+                              <div key={session.id} className="flex items-center gap-3 p-2.5 bg-purple-50/80 dark:bg-purple-950/20 border-l-4 border-purple-500 rounded-r-xl border border-y-purple-100 dark:border-y-transparent ring-2 ring-purple-500/20 ring-offset-1 dark:ring-offset-zinc-900 shadow-sm transition-all hover:scale-[1.01]">
+                                <span className="font-bold text-[10px] text-purple-650 dark:text-purple-400 whitespace-nowrap">{session.time}</span>
+                                <span className="text-xs font-bold text-slate-850 dark:text-white truncate flex-1">{session.title}</span>
+                                <span className="bg-purple-500 text-white text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full tracking-wider animate-pulse shrink-0">Next Up</span>
+                              </div>
+                            );
+                          }
+                          
                           return (
-                            <div key={session.id} className={`flex items-center gap-3 p-2.5 ${style.bg} border-l-4 ${style.border} rounded-r-xl border border-y-slate-100 border-r-slate-100 dark:border-y-transparent dark:border-r-transparent`}>
-                              <span className={`font-bold text-[10px] ${style.text} whitespace-nowrap`}>{session.time}</span>
-                              <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate">{session.title}</span>
+                            <div key={session.id} className="flex items-center gap-3 p-2.5 bg-blue-50/60 dark:bg-blue-950/10 border-l-4 border-blue-500 rounded-r-xl border border-y-blue-100/30 dark:border-y-transparent">
+                              <span className="font-bold text-[10px] text-blue-600 dark:text-blue-400 whitespace-nowrap">{session.time}</span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate flex-1">{session.title}</span>
                             </div>
                           );
                         });
