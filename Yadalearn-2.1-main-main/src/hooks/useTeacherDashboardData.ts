@@ -12,6 +12,7 @@ export function useTeacherDashboardData() {
         earnings: 0,
         totalStudents: 0,
         upcomingClasses: 0,
+        activeCourses: 0,
         completedTasks: 0,
         pendingTasks: 0,
         avgRating: 4.8
@@ -106,7 +107,11 @@ export function useTeacherDashboardData() {
                 const students = Array.from(uniqueStudentsMap.values());
                 setTopStudents(students);
 
-                const uniqueStudentIds = new Set(confirmedBookings.map(b => b.student_id));
+                const uniqueStudentIds = new Set(
+                    confirmedBookings
+                        .map(b => b.student_id)
+                        .filter(id => id !== null && id !== undefined)
+                );
 
                 // Fetch actual ratings from confirmed bookings (from the bookings table)
                 const { data: ratedBookings, error: ratingsError } = await supabase
@@ -125,6 +130,18 @@ export function useTeacherDashboardData() {
                     avgRating = sum / ratedBookings.length;
                 }
 
+                // Fetch actual courses count
+                const { data: teacherCourses, error: coursesError } = await supabase
+                    .from('courses')
+                    .select('id')
+                    .eq('teacher_id', userId);
+
+                if (coursesError) {
+                    console.error('Error fetching courses count:', coursesError);
+                }
+
+                const activeCoursesCount = teacherCourses ? teacherCourses.length : 0;
+
                 // Fetch monthly fee from teacher_profiles table
                 const { data: tp } = await supabase
                     .from('teacher_profiles')
@@ -138,6 +155,7 @@ export function useTeacherDashboardData() {
                     earnings: uniqueStudentIds.size * monthlyRate, // Monthly subscription gap calculation
                     totalStudents: uniqueStudentIds.size,
                     upcomingClasses: confirmedBookings.length,
+                    activeCourses: activeCoursesCount,
                     completedTasks: 0,
                     pendingTasks: 0,
                     avgRating: avgRating

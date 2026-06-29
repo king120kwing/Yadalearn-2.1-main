@@ -410,32 +410,83 @@ const TeacherDashboard = () => {
             )}
           </div>
 
-          <div className="flex-1 text-center md:text-left pt-6">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">
-              {currentUser?.name || 'Anya Sharma'}
-            </h1>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Welcome Back,</p>
-            
-            {currentUser?.bio && (
-              <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400 mt-2 mb-6 max-w-md italic leading-relaxed border-l-2 border-purple-500/35 pl-3 text-left">
-                "{currentUser.bio}"
+          <div className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-8 pt-6 w-full text-center md:text-left">
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">
+                {currentUser?.name || 'Anya Sharma'}
+              </h1>
+              <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Welcome Back,</p>
+              
+              {currentUser?.bio && (
+                <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400 mt-2 mb-6 max-w-md italic leading-relaxed border-l-2 border-purple-500/35 pl-3 text-left">
+                  "{currentUser.bio}"
+                </p>
+              )}
+              
+              {/* Profile Stats List */}
+              <div className="flex flex-col gap-2.5 max-w-xs mx-auto md:mx-0 mt-6">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="text-slate-600 dark:text-slate-350 font-semibold">Active Courses:</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.activeCourses ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="text-slate-600 dark:text-slate-355 font-semibold">Registered Students:</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.totalStudents ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="text-slate-600 dark:text-slate-355 font-semibold">Avg. Course Rating:</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-100">{(stats.avgRating ?? 4.8).toFixed(1)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Teacher Daily Rating Progress Widget */}
+            <div className="shrink-0 flex flex-col items-center justify-center p-5 bg-white/45 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 rounded-[2.5rem] shadow-sm z-20 hover:scale-[1.02] transition-transform">
+              {/* Circular Liquid Progress Animation */}
+              <div className="relative w-44 h-44 rounded-full border border-purple-500/35 overflow-hidden flex items-center justify-center bg-purple-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(150,100,255,0.15)] shrink-0">
+                <style>{`
+                  @keyframes wave-rotation-1 {
+                    from { transform: translate(-50%, 0) rotate(0deg); }
+                    to { transform: translate(-50%, 0) rotate(360deg); }
+                  }
+                  @keyframes wave-rotation-2 {
+                    from { transform: translate(-50%, 0) rotate(45deg); }
+                    to { transform: translate(-50%, 0) rotate(405deg); }
+                  }
+                `}</style>
+                
+                {/* Liquid Wave 1 */}
+                <div 
+                  className="absolute bg-gradient-to-t from-purple-500/60 to-pink-500/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
+                  style={{
+                    left: '50%',
+                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 200}%`,
+                    animation: 'wave-rotation-1 12s infinite linear'
+                  }}
+                />
+                
+                {/* Liquid Wave 2 */}
+                <div 
+                  className="absolute bg-gradient-to-t from-purple-650/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
+                  style={{
+                    left: '50%',
+                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 195}%`,
+                    animation: 'wave-rotation-2 9s infinite linear'
+                  }}
+                />
+
+                {/* Rating Percentage Center Value */}
+                <div className="relative z-10 flex flex-col items-center justify-center select-none text-center">
+                  <span className="text-4xl font-black text-slate-800 dark:text-white drop-shadow-sm leading-none">
+                    {Math.round(((stats.avgRating || 0) / 5.0) * 100)}%
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mt-1.5">Rating</span>
+                </div>
+              </div>
+              
+              <p className="text-[10px] font-extrabold text-slate-650 dark:text-zinc-405 mt-3 tracking-wide text-center uppercase">
+                Today's Rating Progress
               </p>
-            )}
-            
-            {/* Profile Stats List */}
-            <div className="flex flex-col gap-2.5 max-w-xs mx-auto md:mx-0 mt-6">
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="text-slate-600 dark:text-slate-350 font-semibold">Active Courses:</span>
-                <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.upcomingClasses ?? 0}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="text-slate-600 dark:text-slate-355 font-semibold">Registered Students:</span>
-                <span className="font-extrabold text-slate-800 dark:text-slate-100">{stats.totalStudents ?? 0}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="text-slate-600 dark:text-slate-355 font-semibold">Avg. Course Rating:</span>
-                <span className="font-extrabold text-slate-800 dark:text-slate-100">{(stats.avgRating ?? 4.8).toFixed(1)}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -551,57 +602,8 @@ const TeacherDashboard = () => {
             </div>
           </div>
 
-          {/* Right Column: Rating Widget & Calendar */}
+          {/* Right Column: Calendar */}
           <div className="lg:col-span-2 flex flex-col gap-8 z-10 relative">
-            
-            {/* Teacher Daily Rating Progress Widget */}
-            <div className="flex flex-col items-center justify-center py-4 w-full relative z-20">
-              {/* Circular Liquid Progress Animation */}
-              <div className="relative w-36 h-36 rounded-full border border-purple-500/30 overflow-hidden flex items-center justify-center bg-purple-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(150,100,255,0.15)] shrink-0">
-                <style>{`
-                  @keyframes wave-rotation-1 {
-                    from { transform: translate(-50%, 0) rotate(0deg); }
-                    to { transform: translate(-50%, 0) rotate(360deg); }
-                  }
-                  @keyframes wave-rotation-2 {
-                    from { transform: translate(-50%, 0) rotate(45deg); }
-                    to { transform: translate(-50%, 0) rotate(405deg); }
-                  }
-                `}</style>
-                
-                {/* Liquid Wave 1 */}
-                <div 
-                  className="absolute bg-gradient-to-t from-purple-500/60 to-pink-500/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
-                  style={{
-                    left: '50%',
-                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 200}%`,
-                    animation: 'wave-rotation-1 12s infinite linear'
-                  }}
-                />
-                
-                {/* Liquid Wave 2 */}
-                <div 
-                  className="absolute bg-gradient-to-t from-purple-650/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
-                  style={{
-                    left: '50%',
-                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 195}%`,
-                    animation: 'wave-rotation-2 9s infinite linear'
-                  }}
-                />
-
-                {/* Rating Percentage Center Value */}
-                <div className="relative z-10 flex flex-col items-center justify-center select-none text-center">
-                  <span className="text-3xl font-black text-slate-800 dark:text-white drop-shadow-sm leading-none">
-                    {Math.round(((stats.avgRating || 0) / 5.0) * 100)}%
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Rating</span>
-                </div>
-              </div>
-              
-              <p className="text-xs font-bold text-slate-650 dark:text-zinc-405 mt-3 tracking-wide text-center">
-                Today's Rating Progress
-              </p>
-            </div>
 
             {/* Calendar & Planning Panel */}
             <div className="flex-1 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex flex-col relative">
