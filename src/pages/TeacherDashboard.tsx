@@ -574,17 +574,17 @@ const TeacherDashboard = () => {
                   className="absolute bg-gradient-to-t from-purple-500/60 to-pink-500/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
                   style={{
                     left: '50%',
-                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 100}%`,
+                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 200}%`,
                     animation: 'wave-rotation-1 12s infinite linear'
                   }}
                 />
                 
                 {/* Liquid Wave 2 */}
                 <div 
-                  className="absolute bg-gradient-to-t from-purple-600/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
+                  className="absolute bg-gradient-to-t from-purple-650/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
                   style={{
                     left: '50%',
-                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 100}%`,
+                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 195}%`,
                     animation: 'wave-rotation-2 9s infinite linear'
                   }}
                 />
