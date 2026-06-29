@@ -13,6 +13,7 @@ import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsMo
 import { ProgressModal } from '@/features/student/quick-actions/ProgressModal';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { supabase } from '@/lib/supabase';
 
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -22,7 +23,13 @@ const StudentDashboard = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const { topTeachers, upcomingClasses, loading } = useDashboardData();
+  const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
+
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+  const [selectedBookingToRate, setSelectedBookingToRate] = useState<any | null>(null);
+  const [ratingValue, setRatingValue] = useState<number>(0);
+  const [ratingHoverValue, setRatingHoverValue] = useState<number>(0);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   const userId = user?.id;
   const userName = user?.fullName || user?.firstName || 'Student';
@@ -62,27 +69,55 @@ const StudentDashboard = () => {
         {/* Header */}
         <header className="flex justify-between items-center mb-8">
           <div>
-            <p className="text-base text-subtext-light dark:text-subtext-dark mb-1">Welcome back, Student</p>
+            <p className="text-base text-subtext-light dark:text-subtext-dark mb-1">Welcome back</p>
             <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
               Hi, {userName}
             </h1>
           </div>
-          <div className="flex items-center -space-x-3">
-            {topTeachers.slice(0, 2).map((teacher, idx) => (
-              <Avatar key={idx} className="w-10 h-10 border-2 border-background-light dark:border-background-dark">
-                <AvatarImage src={teacher.avatar} alt={teacher.name} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
-                  {teacher.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {topTeachers.length > 2 && (
-              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
-                <span className="text-sm font-semibold text-slate-600">+{topTeachers.length - 2}</span>
-              </div>
-            )}
+          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-subtext-light dark:text-subtext-dark font-medium">Student Account</p>
+              <p className="text-sm font-bold text-indigo-650 dark:text-indigo-400">{userName}</p>
+            </div>
+            <Avatar className="w-12 h-12 border-2 border-indigo-500 shadow-md">
+              <AvatarImage src={user?.imageUrl} alt={userName} />
+              <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-sm">
+                {userName.split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </header>
+
+        {/* Unrated Past Classes - Student Rating Call-to-Action */}
+        {unratedClasses && unratedClasses.length > 0 && (
+          <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-zinc-900/40 dark:to-zinc-800/20 rounded-3xl p-5 border border-amber-200/50 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="w-12 h-12 border border-amber-300">
+                  <AvatarImage src={unratedClasses[0].teacherAvatar} />
+                  <AvatarFallback className="bg-amber-100 text-amber-800 font-bold">{unratedClasses[0].teacherName[0]}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-bold text-sm text-amber-900 dark:text-zinc-150">Rate your completed session!</h3>
+                  <p className="text-xs text-amber-700 dark:text-zinc-400 mt-0.5">
+                    How was your <strong>{unratedClasses[0].title}</strong> class with <strong>{unratedClasses[0].teacherName}</strong>?
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  setRatingValue(0);
+                  setRatingHoverValue(0);
+                  setSelectedBookingToRate(unratedClasses[0]);
+                  setIsRatingModalOpen(true);
+                }}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-full shrink-0 shadow-sm transition-transform active:scale-95 cursor-pointer"
+              >
+                Rate Now
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic CTA: Join Next Class */}
         {showJoinCTA && nextClass && (
@@ -308,6 +343,86 @@ const StudentDashboard = () => {
       <AssignmentsModal isOpen={activeModal === 'assignments'} onClose={() => setActiveModal(null)} />
       <ProgressModal isOpen={activeModal === 'progress'} onClose={() => setActiveModal(null)} />
       <MessageTeacherModal isOpen={activeModal === 'message'} onClose={() => setActiveModal(null)} />
+
+      {/* Rate Session Modal */}
+      {isRatingModalOpen && selectedBookingToRate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 max-w-sm w-full border border-gray-150 dark:border-zinc-800 shadow-2xl relative">
+            <button 
+              onClick={() => setIsRatingModalOpen(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 dark:bg-zinc-800 text-gray-500 hover:text-gray-800 dark:hover:text-white"
+            >
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
+            
+            <div className="flex flex-col items-center text-center mt-2">
+              <Avatar className="w-16 h-16 border-2 border-indigo-500 shadow-md mb-3">
+                <AvatarImage src={selectedBookingToRate.teacherAvatar} />
+                <AvatarFallback className="bg-indigo-100 text-indigo-800 font-bold">{selectedBookingToRate.teacherName[0]}</AvatarFallback>
+              </Avatar>
+              <h3 className="font-extrabold text-lg text-slate-800 dark:text-white">Rate your session</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 px-4 leading-relaxed">
+                Please rate your <strong>{selectedBookingToRate.title}</strong> class with <strong>{selectedBookingToRate.teacherName}</strong>.
+              </p>
+              
+              {/* Star Rating Selectors */}
+              <div className="flex items-center gap-2 my-6">
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const isHoveredOrSelected = star <= (ratingHoverValue || ratingValue);
+                  return (
+                    <button
+                      key={star}
+                      onMouseEnter={() => setRatingHoverValue(star)}
+                      onMouseLeave={() => setRatingHoverValue(0)}
+                      onClick={() => setRatingValue(star)}
+                      className="text-3xl focus:outline-none transition-transform hover:scale-125 cursor-pointer"
+                    >
+                      <span className={`material-symbols-outlined ${
+                        isHoveredOrSelected ? 'text-amber-500 font-bold fill-current' : 'text-slate-350 dark:text-zinc-650'
+                      }`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                        star
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                onClick={async () => {
+                  if (ratingValue === 0) {
+                    alert("Please select a rating before submitting!");
+                    return;
+                  }
+                  setIsSubmittingRating(true);
+                  try {
+                    const { error } = await supabase
+                      .from('bookings')
+                      .update({ rating: ratingValue })
+                      .eq('id', selectedBookingToRate.id);
+
+                    if (error) throw error;
+
+                    alert(`Thank you! Your rating of ${ratingValue} stars has been recorded.`);
+                    setIsRatingModalOpen(false);
+                    // Refresh page to load updated database state
+                    window.location.reload();
+                  } catch (e: any) {
+                    console.error("Error submitting rating:", e);
+                    alert("Failed to submit rating: " + e.message);
+                  } finally {
+                    setIsSubmittingRating(false);
+                  }
+                }}
+                disabled={isSubmittingRating || ratingValue === 0}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmittingRating ? "Submitting..." : "Submit Rating"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

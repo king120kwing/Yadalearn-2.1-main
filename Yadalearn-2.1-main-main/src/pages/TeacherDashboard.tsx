@@ -555,18 +555,9 @@ const TeacherDashboard = () => {
           <div className="lg:col-span-2 flex flex-col gap-8 z-10 relative">
             
             {/* Teacher Daily Rating Progress Widget */}
-            <div className="bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex items-center justify-between gap-6 relative">
-              <div className="flex-1">
-                <h3 className="text-base font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">Rating Performance</h3>
-                <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 leading-relaxed mb-3">Today's Rating Progress</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black text-slate-800 dark:text-white">{(stats.avgRating || 4.8).toFixed(1)}</span>
-                  <span className="text-xs text-slate-400 dark:text-zinc-550 font-bold">/ 5.0 target</span>
-                </div>
-              </div>
-
+            <div className="flex flex-col items-center justify-center py-4 w-full relative z-20">
               {/* Circular Liquid Progress Animation */}
-              <div className="relative w-24 h-24 rounded-full border border-purple-500/25 overflow-hidden shrink-0 flex items-center justify-center bg-purple-50/20 dark:bg-zinc-950/30 shadow-inner">
+              <div className="relative w-36 h-36 rounded-full border border-purple-500/30 overflow-hidden flex items-center justify-center bg-purple-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(150,100,255,0.15)] shrink-0">
                 <style>{`
                   @keyframes wave-rotation-1 {
                     from { transform: translate(-50%, 0) rotate(0deg); }
@@ -583,7 +574,7 @@ const TeacherDashboard = () => {
                   className="absolute bg-gradient-to-t from-purple-500/60 to-pink-500/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
                   style={{
                     left: '50%',
-                    bottom: `${((stats.avgRating || 4.8) / 5.0) * 100 - 100}%`,
+                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 100}%`,
                     animation: 'wave-rotation-1 12s infinite linear'
                   }}
                 />
@@ -593,19 +584,23 @@ const TeacherDashboard = () => {
                   className="absolute bg-gradient-to-t from-purple-600/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
                   style={{
                     left: '50%',
-                    bottom: `${((stats.avgRating || 4.8) / 5.0) * 100 - 100}%`,
+                    bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 100}%`,
                     animation: 'wave-rotation-2 9s infinite linear'
                   }}
                 />
 
                 {/* Rating Percentage Center Value */}
                 <div className="relative z-10 flex flex-col items-center justify-center select-none text-center">
-                  <span className="text-lg font-black text-slate-800 dark:text-white drop-shadow-sm leading-none">
-                    {Math.round(((stats.avgRating || 4.8) / 5.0) * 100)}%
+                  <span className="text-3xl font-black text-slate-800 dark:text-white drop-shadow-sm leading-none">
+                    {Math.round(((stats.avgRating || 0) / 5.0) * 100)}%
                   </span>
-                  <span className="text-[8px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mt-0.5">Rating</span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Rating</span>
                 </div>
               </div>
+              
+              <p className="text-xs font-bold text-slate-650 dark:text-zinc-405 mt-3 tracking-wide text-center">
+                Today's Rating Progress
+              </p>
             </div>
 
             {/* Calendar & Planning Panel */}
@@ -685,7 +680,7 @@ const TeacherDashboard = () => {
                   {nextEvent && (
                     <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
                       <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
-                      <p className="text-xs font-bold">Session Prep: {nextEvent.title}</p>
+                      <p className="text-xs font-bold">{nextEvent.title}</p>
                     </div>
                   )}
                 </div>

@@ -108,14 +108,30 @@ export function useTeacherDashboardData() {
 
                 const uniqueStudentIds = new Set(confirmedBookings.map(b => b.student_id));
 
-                // Fetch rating and monthly fee from teacher_profiles table
+                // Fetch actual ratings from confirmed bookings (from the bookings table)
+                const { data: ratedBookings, error: ratingsError } = await supabase
+                    .from('bookings')
+                    .select('rating')
+                    .eq('teacher_id', userId)
+                    .not('rating', 'is', null);
+
+                if (ratingsError) {
+                    console.error('Error fetching student ratings for teacher:', ratingsError);
+                }
+
+                let avgRating = 0;
+                if (ratedBookings && ratedBookings.length > 0) {
+                    const sum = ratedBookings.reduce((acc: number, curr: any) => acc + (curr.rating || 0), 0);
+                    avgRating = sum / ratedBookings.length;
+                }
+
+                // Fetch monthly fee from teacher_profiles table
                 const { data: tp } = await supabase
                     .from('teacher_profiles')
-                    .select('rating, min_rate')
+                    .select('min_rate')
                     .eq('id', userId)
                     .maybeSingle();
 
-                const avgRating = tp?.rating ? Number(tp.rating) : 4.8;
                 const monthlyRate = tp?.min_rate ? Number(tp.min_rate) : 150; // default to $150 if not specified
 
                 setStats({
