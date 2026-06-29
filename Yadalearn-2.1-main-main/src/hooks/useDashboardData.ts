@@ -34,8 +34,19 @@ export function useDashboardData() {
                 // Query teachers that teach subjects overlapping with the student's interested subjects
                 let query = supabase
                     .from('profiles')
-                    .select('*')
-                    .eq('role', 'teacher');
+                    .select(`
+                        id,
+                        full_name,
+                        avatar_url,
+                        subjects,
+                        bio,
+                        teacher_profiles (
+                            rating,
+                            min_rate
+                        )
+                    `)
+                    .eq('role', 'teacher')
+                    .eq('onboarding_completed', true);
 
                 if (currentSubjects.length > 0) {
                     query = query.overlaps('subjects', currentSubjects);
@@ -52,49 +63,64 @@ export function useDashboardData() {
                 if (finalTeachersData.length === 0) {
                     const { data: fallbackTeachers } = await supabase
                         .from('profiles')
-                        .select('*')
+                        .select(`
+                            id,
+                            full_name,
+                            avatar_url,
+                            subjects,
+                            bio,
+                            teacher_profiles (
+                                rating,
+                                min_rate
+                            )
+                        `)
                         .eq('role', 'teacher')
+                        .eq('onboarding_completed', true)
                         .limit(5);
                     finalTeachersData = fallbackTeachers || [];
                 }
 
-                const teachers = finalTeachersData.map((t: any) => ({
-                    id: t.id,
-                    name: t.full_name || 'Unknown Teacher',
-                    avatar: t.avatar_url || 'https://i.pravatar.cc/150',
-                    subject: t.subjects?.join(', ') || 'General',
-                    rating: 5.0,
-                    reviews: 0,
-                    hourlyRate: 0,
-                    bio: 'Experienced teacher.',
-                    isOnline: false
-                }));
+                const teachers = finalTeachersData.map((t: any) => {
+                    const tp = t.teacher_profiles || {};
+                    return {
+                        id: t.id,
+                        name: t.full_name || 'Unknown Teacher',
+                        avatar: t.avatar_url || 'https://i.pravatar.cc/150',
+                        subject: t.subjects?.join(', ') || 'General',
+                        rating: tp.rating ? Number(tp.rating) : 4.8,
+                        reviews: 12,
+                        hourlyRate: tp.min_rate || 150,
+                        bio: t.bio || 'Experienced teacher.',
+                        isOnline: true
+                    };
+                });
 
                 setTopTeachers(teachers);
 
-                // Fetch enrollments and related course details
-                const { data: enrollments, error } = await supabase
-                    .from('enrollments')
+                // Fetch confirmed bookings from database (representing classes scheduled from the calendar)
+                const { data: bookings, error: bookingsError } = await supabase
+                    .from('bookings')
                     .select(`
-                        course:courses (
-                          id,
-                          title,
-                          schedule
-                        )
+                        id,
+                        subject,
+                        date,
+                        time
                     `)
-                    .eq('student_id', userId);
+                    .eq('student_id', userId)
+                    .eq('status', 'confirmed')
+                    .order('date', { ascending: true });
 
-                if (error) {
-                    console.error('Supabase error:', error);
+                if (bookingsError) {
+                    console.error('Error fetching bookings for dashboard:', bookingsError);
                 }
 
-                const classes = enrollments?.map((e: any) => {
+                const classes = bookings?.map((b: any) => {
                     return {
-                        id: e.course.id,
-                        title: e.course.title,
-                        day: e.course.schedule,
-                        time: '',
-                        isQuiz: e.course.title.toLowerCase().includes('quiz')
+                        id: b.id,
+                        title: b.subject,
+                        day: `${b.date} ${b.time}`,
+                        time: b.time,
+                        isQuiz: b.subject.toLowerCase().includes('quiz')
                     };
                 }) || [];
 

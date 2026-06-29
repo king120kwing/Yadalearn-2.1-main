@@ -22,11 +22,31 @@ const StudentDashboard = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [showJoinCTA, setShowJoinCTA] = useState(false); // Only show when a real class is active
   const { topTeachers, upcomingClasses, loading } = useDashboardData();
 
   const userId = user?.id;
   const userName = user?.fullName || user?.firstName || 'Student';
+
+  // Dynamic Join CTA based on authentic calendar bookings starting soon (within 30 minutes)
+  const now = new Date();
+  const nextClass = upcomingClasses.length > 0 ? upcomingClasses[0] : null;
+  
+  let showJoinCTA = false;
+  let timeRemainingStr = "";
+  if (nextClass && nextClass.day) {
+    try {
+      const classTime = new Date(nextClass.day);
+      const diffMs = classTime.getTime() - now.getTime();
+      const diffMins = Math.round(diffMs / 60000);
+      
+      if (diffMins >= -10 && diffMins <= 30) {
+        showJoinCTA = true;
+        timeRemainingStr = diffMins > 0 ? `Starts in ${diffMins} mins` : "Active Now";
+      }
+    } catch (e) {
+      console.error("Error parsing class time:", e);
+    }
+  }
 
 
   const handleTeacherClick = (teacher: Teacher) => {
@@ -65,7 +85,7 @@ const StudentDashboard = () => {
         </header>
 
         {/* Dynamic CTA: Join Next Class */}
-        {showJoinCTA && (
+        {showJoinCTA && nextClass && (
           <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-between relative overflow-hidden">
               {/* Glossy overlay */}
@@ -74,15 +94,11 @@ const StudentDashboard = () => {
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium animate-pulse">Starting Soon</span>
-                  <span className="text-sm opacity-90">Starts in 12 mins</span>
+                  <span className="text-sm opacity-90">{timeRemainingStr}</span>
                 </div>
-                <h2 className="text-2xl font-bold mb-1">Advanced Spanish Conversation</h2>
+                <h2 className="text-2xl font-bold mb-1">{nextClass.title}</h2>
                 <p className="text-indigo-100 flex items-center gap-2 text-sm">
-                  <Avatar className="w-6 h-6 border border-white/50">
-                    <AvatarImage src="https://i.pravatar.cc/150?u=garcia" />
-                    <AvatarFallback>MG</AvatarFallback>
-                  </Avatar>
-                  with Mrs. Garcia
+                  Scheduled for {nextClass.day}
                 </p>
               </div>
 

@@ -182,11 +182,11 @@ const StudentSearch = () => {
                 if (dbTeachers.length > 0) {
                     setTeachers(dbTeachers);
                 } else {
-                    setTeachers(mockTeachers);
+                    setTeachers([]);
                 }
             } catch (err) {
                 console.error("Unexpected error fetching teachers:", err);
-                setTeachers(mockTeachers);
+                setTeachers([]);
             } finally {
                 setLoading(false);
             }
