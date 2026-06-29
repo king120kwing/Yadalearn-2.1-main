@@ -364,30 +364,46 @@ const TeacherDashboard = () => {
         {/* Hero Section (No Card Wrapper) */}
         <div className="relative flex flex-col md:flex-row items-center md:items-start justify-start gap-12 mt-4 md:mt-0 mb-4 pt-4 w-full z-10">
 
-          {/* Portrait Image Area (Interactive / Uploadable) */}
-          <div className="relative shrink-0 md:-mb-[135px] z-10">
-            {/* Soft, organic localized peach/apricot glow behind the portrait (circular aura, no clipping) */}
-            <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] md:w-[520px] md:h-[520px] bg-[radial-gradient(circle,rgba(255,110,60,0.75)_0%,rgba(255,175,120,0.4)_45%,transparent_75%)] blur-[55px] pointer-events-none z-0" />
-            {currentUser?.imageUrl ? (
-              <div 
-                className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm border border-slate-300 dark:border-zinc-700 flex items-center justify-center relative group cursor-pointer overflow-hidden z-10 shadow-sm" 
-                onClick={handleImageClick}
-              >
-                <img
-                  src={currentUser.imageUrl}
-                  alt="Teacher Portrait"
-                  className="w-full h-full object-cover select-none transition-all duration-300 group-hover:scale-[1.01]"
-                />
-                {/* Floating Edit Badge */}
-                <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-20">
-                  <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
-                </div>
-              </div>
-            ) : (
-              <div
-                onClick={handleImageClick}
-                className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border-2 border-dashed border-slate-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm z-10"
-              >
+           {/* Portrait Image Area (Interactive / Uploadable) */}
+           <div className="relative shrink-0 md:-mb-[135px] z-10">
+             {/* Soft, organic localized peach/apricot glow behind the portrait (circular aura, no clipping) */}
+             <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] md:w-[640px] md:h-[640px] bg-[radial-gradient(circle,rgba(255,125,70,0.85)_0%,rgba(255,185,130,0.45)_50%,transparent_75%)] blur-[60px] pointer-events-none z-0" />
+             {currentUser?.imageUrl ? (
+               <div 
+                 className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm border border-slate-350 dark:border-zinc-700 flex items-center justify-center relative group cursor-pointer overflow-hidden z-10 shadow-sm" 
+                 onClick={handleImageClick}
+               >
+                 {/* 1. Blurred and transparent background reflection layer */}
+                 <img
+                   src={currentUser.imageUrl}
+                   alt="Background Reflection"
+                   className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-45 select-none pointer-events-none scale-110 z-0"
+                 />
+                 
+                 {/* 2. Frosted glass glassmorphism overlay */}
+                 <div className="absolute inset-0 bg-white/20 dark:bg-black/25 backdrop-blur-md z-0" />
+                 
+                 {/* 3. Sharp foreground image with soft radial mask to hide rectangular edges */}
+                 <img
+                   src={currentUser.imageUrl}
+                   alt="Teacher Portrait"
+                   className="relative z-10 w-full h-full object-cover select-none transition-all duration-300 group-hover:scale-[1.01]"
+                   style={{
+                     maskImage: 'radial-gradient(circle at center, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 88%)',
+                     WebkitMaskImage: 'radial-gradient(circle at center, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 88%)'
+                   }}
+                 />
+                 
+                 {/* Floating Edit Badge */}
+                 <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-20">
+                   <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
+                 </div>
+               </div>
+             ) : (
+               <div
+                 onClick={handleImageClick}
+                 className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border-2 border-dashed border-slate-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm z-10"
+               >
                 <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
                   <span className="material-symbols-outlined text-2xl">upload</span>
                 </div>

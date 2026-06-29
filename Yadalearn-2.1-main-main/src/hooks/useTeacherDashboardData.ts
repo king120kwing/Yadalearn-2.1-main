@@ -108,17 +108,18 @@ export function useTeacherDashboardData() {
 
                 const uniqueStudentIds = new Set(confirmedBookings.map(b => b.student_id));
 
-                // Fetch rating from teacher_profiles table
+                // Fetch rating and monthly fee from teacher_profiles table
                 const { data: tp } = await supabase
                     .from('teacher_profiles')
-                    .select('rating')
+                    .select('rating, min_rate')
                     .eq('id', userId)
                     .maybeSingle();
 
                 const avgRating = tp?.rating ? Number(tp.rating) : 4.8;
+                const monthlyRate = tp?.min_rate ? Number(tp.min_rate) : 150; // default to $150 if not specified
 
                 setStats({
-                    earnings: confirmedBookings.length * 50,
+                    earnings: uniqueStudentIds.size * monthlyRate, // Monthly subscription gap calculation
                     totalStudents: uniqueStudentIds.size,
                     upcomingClasses: confirmedBookings.length,
                     completedTasks: 0,
