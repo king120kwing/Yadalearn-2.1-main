@@ -75,7 +75,11 @@ export function useTeacherDashboardData() {
                 setPendingBookings(pendingBookingsList);
 
                 // Format Schedule from confirmed bookings returning raw date & time
-                const formattedSchedule = confirmedBookings.map((b: any) => ({
+                // Filter to only display bookings initiated by the teacher
+                const initiatedIds = JSON.parse(localStorage.getItem('initiated_bookings') || '[]');
+                const teacherInitiated = confirmedBookings.filter((b: any) => initiatedIds.includes(b.id));
+
+                const formattedSchedule = teacherInitiated.map((b: any) => ({
                     id: b.id,
                     title: b.subject,
                     date: b.date,
@@ -154,7 +158,7 @@ export function useTeacherDashboardData() {
                 setStats({
                     earnings: uniqueStudentIds.size * monthlyRate, // Monthly subscription gap calculation
                     totalStudents: uniqueStudentIds.size,
-                    upcomingClasses: confirmedBookings.length,
+                    upcomingClasses: teacherInitiated.length,
                     activeCourses: activeCoursesCount,
                     completedTasks: 0,
                     pendingTasks: 0,

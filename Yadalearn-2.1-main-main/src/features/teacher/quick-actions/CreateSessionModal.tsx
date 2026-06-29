@@ -290,7 +290,7 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
 
                                 const sessionDate = getFormattedDate(formData.dateOption);
                                 
-                                const { error } = await supabase
+                                const { data: newBooking, error } = await supabase
                                     .from('bookings')
                                     .insert({
                                         student_id: studentId,
@@ -299,9 +299,17 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                                         date: sessionDate,
                                         time: formData.startTime,
                                         status: 'confirmed'
-                                    });
+                                    })
+                                    .select('id')
+                                    .single();
 
                                 if (error) throw error;
+
+                                if (newBooking) {
+                                    const initiated = JSON.parse(localStorage.getItem('initiated_bookings') || '[]');
+                                    initiated.push(newBooking.id);
+                                    localStorage.setItem('initiated_bookings', JSON.stringify(initiated));
+                                }
 
                                 alert(`✅ Session "${formData.title || formData.subject}" scheduled successfully!`);
                                 onClose();
