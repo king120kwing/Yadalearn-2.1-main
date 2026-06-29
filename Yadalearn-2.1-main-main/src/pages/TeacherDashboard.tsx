@@ -370,18 +370,15 @@ const TeacherDashboard = () => {
             <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] md:w-[640px] md:h-[640px] bg-[radial-gradient(circle,rgba(255,125,70,0.85)_0%,rgba(255,185,130,0.45)_50%,transparent_75%)] blur-[60px] pointer-events-none z-0" />
             {currentUser?.imageUrl ? (
               <div 
-                className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/20 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] flex items-center justify-center relative group cursor-pointer overflow-hidden z-10" 
+                className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-md shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] flex items-center justify-center relative group cursor-pointer overflow-hidden z-10" 
                 onClick={handleImageClick}
               >
-                {/* Image beneath the glass effect */}
+                {/* Photograph processed with blurred background and sharp individual */}
                 <img
                   src={currentUser.imageUrl}
                   alt="Teacher Portrait"
-                  className="absolute inset-0 w-full h-full object-cover select-none transition-all duration-300 group-hover:scale-[1.01]"
+                  className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
                 />
-                
-                {/* Frosted Glass Overlay (15% white opacity, 20px blur, 150% saturation) */}
-                <div className="absolute inset-0 bg-white/[0.15] dark:bg-black/[0.25] backdrop-blur-[20px] saturate-[150%] pointer-events-none" />
                 
                 {/* Floating Edit Badge */}
                 <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-20">
