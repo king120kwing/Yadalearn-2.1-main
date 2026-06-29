@@ -37,7 +37,7 @@ import {
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoaded, userRole, logout } = useAuth();
+  const { user, isLoaded, userRole, logout, refreshUser } = useAuth();
   const { teacherSchedule, topStudents, stats, pendingBookings, loading } = useTeacherDashboardData(); // Use the hook
 
   // Find the next upcoming/active event based on the current actual time
@@ -109,6 +109,7 @@ const TeacherDashboard = () => {
     const userId = user?.id || parsedUser?.id;
 
     if (!userId) {
+      console.error("Upload failed: User not identified.");
       alert("User not identified. Please try logging in again.");
       return;
     }
@@ -125,17 +126,20 @@ const TeacherDashboard = () => {
           .eq('id', userId);
 
         if (error) {
-          console.error('Error saving image:', error);
+          console.error('Error saving image in profiles table:', error);
           alert('Failed to save image: ' + error.message);
         } else {
           // Update cached user locally to prevent reload flickering and empty placeholder
           const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
           savedUser.imageUrl = processedImage;
           localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
-          window.location.reload();
+          
+          // Refresh user context state dynamically without reloading the page!
+          await refreshUser();
         }
       } catch (err) {
-        console.error('Error uploading:', err);
+        console.error('CRITICAL: Image processing/upload failed:', err);
+        alert('Image upload failed: ' + (err as Error).message);
       } finally {
         setUploading(false);
       }
