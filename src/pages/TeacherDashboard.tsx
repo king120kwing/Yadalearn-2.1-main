@@ -551,86 +551,144 @@ const TeacherDashboard = () => {
             </div>
           </div>
 
-          {/* Calendar & Planning Panel */}
-          <div className="lg:col-span-2 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex flex-col z-10 relative">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Calendar & Planning</h2>
-              <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
-                <MoreHorizontal className="h-5 w-5" />
-              </button>
-            </div>
+          {/* Right Column: Rating Widget & Calendar */}
+          <div className="lg:col-span-2 flex flex-col gap-8 z-10 relative">
             
-            <div className="flex flex-col sm:flex-row gap-6 justify-between items-start">
-              {/* Calendar Widget */}
-              <div className="w-full sm:w-1/2 max-w-[200px] shrink-0">
-                <div className="grid grid-cols-7 gap-y-1 gap-x-1 text-center">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
-                    <span key={idx} className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase h-6 flex items-center justify-center">{day}</span>
-                  ))}
-                  {getCalendarDays().map((d, idx) => {
-                    const isSelected = d.dateStr === selectedDateStr;
-                    return (
-                      <div 
-                        key={idx} 
-                        onClick={() => setSelectedDateStr(d.dateStr)}
-                        className="flex items-center justify-center h-7 w-7 mx-auto cursor-pointer transition-all hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full"
-                      >
-                        <span className={
-                          isSelected
-                            ? "bg-slate-800 text-white dark:bg-white dark:text-slate-950 font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
-                            : d.isToday
-                              ? "border border-slate-400 text-slate-800 dark:border-white dark:text-white font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
-                              : d.isCurrentMonth
-                                ? "text-slate-750 dark:text-zinc-100 font-semibold text-xs"
-                                : "text-slate-350 dark:text-zinc-650 font-medium text-[10px]"
-                        }>
-                          {d.date}
-                        </span>
-                      </div>
-                    );
-                  })}
+            {/* Teacher Daily Rating Progress Widget */}
+            <div className="bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 shadow-[-12px_24px_50px_-10px_rgba(255,140,100,0.32),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex items-center justify-between gap-6 relative">
+              <div className="flex-1">
+                <h3 className="text-base font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">Rating Performance</h3>
+                <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 leading-relaxed mb-3">Today's Rating Progress</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-black text-slate-800 dark:text-white">{(stats.avgRating || 4.8).toFixed(1)}</span>
+                  <span className="text-xs text-slate-400 dark:text-zinc-550 font-bold">/ 5.0 target</span>
                 </div>
               </div>
 
-              {/* Schedule and Events */}
-              <div className="flex-1 w-full space-y-4">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Daily Schedule & Planning</p>
-                  
-                  {(() => {
-                    const filtered = teacherSchedule.filter((session: any) => session.date === selectedDateStr);
-                    if (filtered.length > 0) {
-                      return filtered.slice(0, 3).map((session, idx) => {
-                        const colors = [
-                          { bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
-                          { bg: 'bg-blue-50 dark:bg-blue-500/10 border-blue-250 dark:border-blue-500/30', border: 'border-blue-500', text: 'text-blue-700 dark:text-blue-400' },
-                          { bg: 'bg-purple-50 dark:bg-purple-500/10 border-purple-250 dark:border-purple-500/30', border: 'border-purple-500', text: 'text-purple-700 dark:text-purple-400' }
-                        ];
-                        const style = colors[idx % colors.length];
-                        return (
-                          <div key={session.id} className={`flex items-center gap-3 p-2.5 ${style.bg} border-l-4 ${style.border} rounded-r-xl border border-y-slate-100 border-r-slate-100 dark:border-y-transparent dark:border-r-transparent`}>
-                            <span className={`font-bold text-[10px] ${style.text} whitespace-nowrap`}>{session.time}</span>
-                            <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate">{session.title}</span>
-                          </div>
-                        );
-                      });
-                    } else {
+              {/* Circular Liquid Progress Animation */}
+              <div className="relative w-24 h-24 rounded-full border border-purple-500/25 overflow-hidden shrink-0 flex items-center justify-center bg-purple-50/20 dark:bg-zinc-950/30 shadow-inner">
+                <style>{`
+                  @keyframes wave-rotation-1 {
+                    from { transform: translate(-50%, 0) rotate(0deg); }
+                    to { transform: translate(-50%, 0) rotate(360deg); }
+                  }
+                  @keyframes wave-rotation-2 {
+                    from { transform: translate(-50%, 0) rotate(45deg); }
+                    to { transform: translate(-50%, 0) rotate(405deg); }
+                  }
+                `}</style>
+                
+                {/* Liquid Wave 1 */}
+                <div 
+                  className="absolute bg-gradient-to-t from-purple-500/60 to-pink-500/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
+                  style={{
+                    left: '50%',
+                    bottom: `${((stats.avgRating || 4.8) / 5.0) * 100 - 100}%`,
+                    animation: 'wave-rotation-1 12s infinite linear'
+                  }}
+                />
+                
+                {/* Liquid Wave 2 */}
+                <div 
+                  className="absolute bg-gradient-to-t from-purple-600/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
+                  style={{
+                    left: '50%',
+                    bottom: `${((stats.avgRating || 4.8) / 5.0) * 100 - 100}%`,
+                    animation: 'wave-rotation-2 9s infinite linear'
+                  }}
+                />
+
+                {/* Rating Percentage Center Value */}
+                <div className="relative z-10 flex flex-col items-center justify-center select-none text-center">
+                  <span className="text-lg font-black text-slate-800 dark:text-white drop-shadow-sm leading-none">
+                    {Math.round(((stats.avgRating || 4.8) / 5.0) * 100)}%
+                  </span>
+                  <span className="text-[8px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mt-0.5">Rating</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Calendar & Planning Panel */}
+            <div className="flex-1 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 border-t-2 border-t-[#FFBCA0] border-l-2 border-l-[#FFC3A0]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex flex-col relative">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Calendar & Planning</h2>
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-6 justify-between items-start">
+                {/* Calendar Widget */}
+                <div className="w-full sm:w-1/2 max-w-[200px] shrink-0">
+                  <div className="grid grid-cols-7 gap-y-1 gap-x-1 text-center">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                      <span key={idx} className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase h-6 flex items-center justify-center">{day}</span>
+                    ))}
+                    {getCalendarDays().map((d, idx) => {
+                      const isSelected = d.dateStr === selectedDateStr;
                       return (
-                        <div className="flex flex-col items-center justify-center p-4 bg-white/30 dark:bg-zinc-800/10 border border-dashed border-slate-200 dark:border-zinc-700/20 rounded-2xl">
-                          <CalendarIcon className="h-5 w-5 text-slate-400 dark:text-zinc-500 mb-1" />
-                          <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">No Scheduled Plans</p>
+                        <div 
+                          key={idx} 
+                          onClick={() => setSelectedDateStr(d.dateStr)}
+                          className="flex items-center justify-center h-7 w-7 mx-auto cursor-pointer transition-all hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full"
+                        >
+                          <span className={
+                            isSelected
+                              ? "bg-slate-800 text-white dark:bg-white dark:text-slate-950 font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                              : d.isToday
+                                ? "border border-slate-400 text-slate-800 dark:border-white dark:text-white font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                                : d.isCurrentMonth
+                                  ? "text-slate-750 dark:text-zinc-100 font-semibold text-xs"
+                                  : "text-slate-350 dark:text-zinc-650 font-medium text-[10px]"
+                          }>
+                            {d.date}
+                          </span>
                         </div>
                       );
-                    }
-                  })()}
+                    })}
+                  </div>
                 </div>
 
-                {nextEvent && (
-                  <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
-                    <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
-                    <p className="text-xs font-bold">Session Prep: {nextEvent.title}</p>
+                {/* Schedule and Events */}
+                <div className="flex-1 w-full space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Daily Schedule & Planning</p>
+                    
+                    {(() => {
+                      const filtered = teacherSchedule.filter((session: any) => session.date === selectedDateStr);
+                      if (filtered.length > 0) {
+                        return filtered.slice(0, 3).map((session, idx) => {
+                          const colors = [
+                            { bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-250 dark:border-emerald-500/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+                            { bg: 'bg-blue-50 dark:bg-blue-500/10 border-blue-250 dark:border-blue-500/30', border: 'border-blue-500', text: 'text-blue-700 dark:text-blue-400' },
+                            { bg: 'bg-purple-50 dark:bg-purple-500/10 border-purple-250 dark:border-purple-500/30', border: 'border-purple-500', text: 'text-purple-700 dark:text-purple-400' }
+                          ];
+                          const style = colors[idx % colors.length];
+                          return (
+                            <div key={session.id} className={`flex items-center gap-3 p-2.5 ${style.bg} border-l-4 ${style.border} rounded-r-xl border border-y-slate-100 border-r-slate-100 dark:border-y-transparent dark:border-r-transparent`}>
+                              <span className={`font-bold text-[10px] ${style.text} whitespace-nowrap`}>{session.time}</span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate">{session.title}</span>
+                            </div>
+                          );
+                        });
+                      } else {
+                        return (
+                          <div className="flex flex-col items-center justify-center p-4 bg-white/30 dark:bg-zinc-800/10 border border-dashed border-slate-200 dark:border-zinc-700/20 rounded-2xl">
+                            <CalendarIcon className="h-5 w-5 text-slate-400 dark:text-zinc-500 mb-1" />
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">No Scheduled Plans</p>
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
-                )}
+
+                  {nextEvent && (
+                    <div className="p-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white shadow-sm border-l-4 border-purple-300">
+                      <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider mb-0.5">Upcoming Events & Deadlines</p>
+                      <p className="text-xs font-bold">Session Prep: {nextEvent.title}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
