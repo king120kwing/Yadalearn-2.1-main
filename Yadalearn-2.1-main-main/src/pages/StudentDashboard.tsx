@@ -109,12 +109,23 @@ const StudentDashboard = () => {
         <div className="flex flex-col gap-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Avatar className="h-10 w-10 border border-white/40 shadow-md">
-                <AvatarImage src={user?.imageUrl} alt={userName} />
-                <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-xs">
-                  {userName.split(' ').map((n: string) => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative w-10 h-10 select-none">
+                {user?.imageUrl ? (
+                  <img
+                    src={user.imageUrl}
+                    alt={userName}
+                    className="w-full h-full object-cover object-center pointer-events-none"
+                    style={{
+                      maskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)',
+                      WebkitMaskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)'
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+                    <span className="material-symbols-outlined text-sm text-slate-500">person</span>
+                  </div>
+                )}
+              </div>
               <div className="flex flex-col">
                 <span className="font-extrabold text-sm text-[#1C1B19] dark:text-white tracking-tight leading-tight">{userName}</span>
                 <span className="text-[10px] text-slate-500 font-medium">Student</span>
@@ -197,18 +208,29 @@ const StudentDashboard = () => {
           </div>
 
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
-            <Avatar className="w-12 h-12 border-2 border-indigo-500 shadow-md">
-              <AvatarImage src={user?.imageUrl} alt={userName} />
-              <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-sm">
-                {userName.split(' ').map(n => n[0]).join('')}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative w-12 h-12 select-none">
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={userName}
+                  className="w-full h-full object-cover object-center pointer-events-none"
+                  style={{
+                    maskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)',
+                    WebkitMaskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)'
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+                  <span className="material-symbols-outlined text-xl text-slate-500">person</span>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
         {/* Welcome Banner Card with Overlapping Profile Image */}
         <section className="mb-12 mt-8 z-10 relative">
-          <div className="relative bg-gradient-to-r from-[#F2EBE0] to-[#E5ECE5] dark:from-zinc-900/60 dark:to-zinc-800/40 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center shadow-sm overflow-visible">
+          <div className="relative bg-gradient-to-r from-[#F2EBE0]/60 to-[#E5ECE5]/60 dark:from-zinc-900/40 dark:to-zinc-800/20 backdrop-blur-md border border-white/20 dark:border-zinc-800 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center shadow-sm overflow-visible">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-center w-full overflow-visible">
               
               {/* Welcome Text (3 columns) */}
