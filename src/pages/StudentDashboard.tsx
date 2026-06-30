@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Home, Search, Calendar, User, Settings, LogOut } from 'lucide-react';
+import { Home, Search, Calendar, User, Settings, LogOut, Menu } from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
 import { TeacherProfileModal } from '@/components/ProfileModals';
 import type { Teacher } from '@/types/schema';
@@ -20,11 +21,36 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth(); // use custom AuthContext hook
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result as string;
+      try {
+        const { error } = await supabase.auth.updateUser({
+          data: { imageUrl: base64Data }
+        });
+        if (error) throw error;
+        
+        alert("Profile picture updated successfully!");
+        window.location.reload();
+      } catch (error: any) {
+        console.error("Error updating profile photo:", error);
+        alert("Failed to update profile photo: " + error.message);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [selectedBookingToRate, setSelectedBookingToRate] = useState<any | null>(null);
@@ -66,66 +92,83 @@ const StudentDashboard = () => {
 
   return (
     <div className="flex min-h-screen bg-[#FCFAF5] dark:bg-zinc-950 font-sans text-[#1C1B19] dark:text-slate-200 w-full relative overflow-x-hidden">
-      {/* Sidebar on desktop */}
-      <aside className="hidden lg:flex flex-col justify-between w-64 p-8 border-r border-slate-200/50 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10">
-        <div className="flex flex-col gap-10">
-          <div className="flex items-center gap-2.5 px-1">
-            <Avatar className="h-10 w-10 border border-purple-100 shadow-sm">
-              <AvatarImage src={user?.imageUrl} alt={userName} />
-              <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-xs">
-                {userName.split(' ').map((n: string) => n[0]).join('')}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight leading-tight">{userName}</span>
-              <span className="text-[10px] text-slate-400 font-medium">Student</span>
+      
+      {/* Frosted Glass Navigation Drawer Overlay */}
+      {isDrawerOpen && (
+        <div 
+          onClick={() => setIsDrawerOpen(false)} 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity animate-in fade-in duration-200" 
+        />
+      )}
+
+      {/* Frosted Glass Drawer Side Menu */}
+      <aside className={cn(
+        "fixed top-0 left-0 bottom-0 w-80 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-2xl border-r border-white/20 shadow-2xl p-8 flex flex-col justify-between z-50 transition-all duration-300 transform",
+        isDrawerOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="flex flex-col gap-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Avatar className="h-10 w-10 border border-white/40 shadow-md">
+                <AvatarImage src={user?.imageUrl} alt={userName} />
+                <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-xs">
+                  {userName.split(' ').map((n: string) => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-sm text-[#1C1B19] dark:text-white tracking-tight leading-tight">{userName}</span>
+                <span className="text-[10px] text-slate-500 font-medium">Student</span>
+              </div>
             </div>
+            <button 
+              onClick={() => setIsDrawerOpen(false)}
+              className="w-8 h-8 rounded-full bg-white/60 dark:bg-zinc-800/60 border border-slate-200/20 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-zinc-400"
+            >
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
           </div>
-          
-          <nav className="flex flex-col gap-1.5">
-            <button
-              onClick={() => navigate('/student-dashboard')}
-              className="flex items-center gap-3.5 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 text-purple-650 dark:text-purple-400 rounded-2xl font-bold transition-all text-left w-full"
-            >
-              <Home className="h-5 w-5" />
-              <span>Home</span>
-            </button>
-            <button
-              onClick={() => navigate('/student-search')}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <Search className="h-5 w-5" />
-              <span>Search</span>
-            </button>
-            <button
-              onClick={() => navigate('/student-calendar')}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <Calendar className="h-5 w-5" />
-              <span>Calendar</span>
-            </button>
-            <button
-              onClick={() => navigate('/settings')}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <User className="h-5 w-5" />
-              <span>Profile</span>
-            </button>
+
+          <nav className="flex flex-col gap-2">
+            {[
+              { label: 'Home', path: '/student-dashboard', icon: Home },
+              { label: 'Search', path: '/student-search', icon: Search },
+              { label: 'Calendar', path: '/student-calendar', icon: Calendar },
+              { label: 'Profile', path: '/settings', icon: User }
+            ].map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => {
+                    navigate(item.path);
+                    setIsDrawerOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3.5 px-4 py-3 rounded-2xl font-bold transition-all text-left w-full",
+                    isActive
+                      ? "bg-[#5B4A9F]/10 text-[#5B4A9F] dark:text-purple-400 border border-[#5B4A9F]/10"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
-        
-        {/* Bottom actions */}
-        <div className="flex flex-col gap-4">
+
+        <div className="flex flex-col gap-2">
           <button
-            onClick={() => navigate('/settings')}
-            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            onClick={() => { navigate('/settings'); setIsDrawerOpen(false); }}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <Settings className="h-5 w-5" />
             <span>Settings</span>
           </button>
           <button
-            onClick={() => navigate('/logout')}
-            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            onClick={() => { navigate('/logout'); setIsDrawerOpen(false); }}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <LogOut className="h-5 w-5" />
             <span>Logout</span>
@@ -135,110 +178,154 @@ const StudentDashboard = () => {
 
       {/* Main Content Area */}
       <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 lg:pb-10 max-w-7xl w-full mx-auto bg-transparent">
-        {/* Header */}
-        <div className="mb-6">
-          <p className="text-sm font-semibold text-[#8F81D6] mb-1">Welcome back, Student</p>
-          <h1 className="text-4xl font-extrabold text-[#1C1B19] dark:text-white font-serif">
-            Hi, {userName.split(' ')[0]}
-          </h1>
-        </div>
+        
+        {/* Header with Menu Drawer Trigger */}
+        <header className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsDrawerOpen(true)} 
+              className="p-2 rounded-xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-slate-200/40 dark:border-zinc-700/40 text-slate-700 dark:text-zinc-200 shadow-sm hover:scale-105 transition-all"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+            <div>
+              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">Welcome back, Student</p>
+              <h1 className="text-3xl font-extrabold text-[#1C1B19] dark:text-white font-serif leading-tight">
+                Hi, {userName.split(' ')[0]}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
+            <Avatar className="w-12 h-12 border-2 border-indigo-500 shadow-md">
+              <AvatarImage src={user?.imageUrl} alt={userName} />
+              <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-sm">
+                {userName.split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </header>
 
         {/* Welcome Banner Card with Overlapping Profile Image */}
         <section className="mb-12 mt-8 z-10 relative">
-          <div className="relative bg-gradient-to-r from-[#F2EBE0] to-[#E5ECE5] dark:from-zinc-900/60 dark:to-zinc-800/40 rounded-[2.5rem] p-8 md:p-12 min-h-[220px] flex items-center shadow-sm overflow-visible">
-            
-            {/* Welcome Text */}
-            <div className="w-[55%] md:w-[60%] text-left z-10">
-              <h2 className="text-2xl md:text-4xl font-bold text-[#1C1B19] dark:text-zinc-100 font-serif leading-tight">
-                Welcome back to your studies, {userName.split(' ')[0]}!
-              </h2>
-            </div>
+          <div className="relative bg-gradient-to-r from-[#F2EBE0] to-[#E5ECE5] dark:from-zinc-900/60 dark:to-zinc-800/40 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center shadow-sm overflow-visible">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-center w-full overflow-visible">
+              
+              {/* Welcome Text (3 columns) */}
+              <div className="md:col-span-3 text-left z-10 space-y-4">
+                <h2 className="text-2xl md:text-4xl font-bold text-[#1C1B19] dark:text-zinc-100 font-serif leading-tight">
+                  Welcome back to your studies, {userName.split(' ')[0]}!
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
+                  Ready to explore your custom courses, scheduled sessions, and check in with your AI Study Buddy?
+                </p>
+              </div>
 
-            {/* Overlapping Portrait Image in the center/right */}
-            <div className="absolute bottom-0 right-8 md:right-16 w-[40%] md:w-[35%] h-[135%] z-20 overflow-visible origin-bottom translate-y-[0px]">
-              {user?.imageUrl ? (
-                <img
-                  src={user.imageUrl}
-                  alt="Student Portrait"
-                  className="w-full h-full object-cover object-top select-none origin-bottom scale-110 pointer-events-none"
-                  style={{
-                    maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-                    WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-end justify-center">
-                  <span className="material-symbols-outlined text-9xl text-slate-400 dark:text-zinc-700 opacity-60">
-                    person
-                  </span>
+              {/* Overlapping Vignette Portrait (2 columns) */}
+              <div className="md:col-span-2 relative flex justify-center items-end h-[320px] md:h-[360px] -mt-16 md:-mt-24 overflow-visible">
+                <div className="absolute inset-x-0 bottom-0 h-[80%] bg-gradient-to-t from-black/5 to-transparent blur-2xl z-0 rounded-full" />
+                
+                <div className="relative w-64 h-64 md:w-80 md:h-80 select-none overflow-visible z-10 transition-transform duration-300 hover:scale-105">
+                  {user?.imageUrl ? (
+                    <img
+                      src={user.imageUrl}
+                      alt="Student Portrait"
+                      className="w-full h-full object-cover object-center pointer-events-none drop-shadow-[0_15px_30px_rgba(0,0,0,0.2)]"
+                      style={{
+                        maskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)',
+                        WebkitMaskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)'
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30 shadow-md">
+                      <span className="material-symbols-outlined text-7xl text-slate-450 dark:text-zinc-650">
+                        face
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Photo Upload Edit trigger */}
+                  <label className="absolute bottom-6 right-6 w-10 h-10 rounded-full bg-[#5B4A9F] hover:bg-[#4a3b8e] text-white flex items-center justify-center cursor-pointer shadow-lg transition-transform active:scale-95 z-30 hover:scale-110">
+                    <span className="material-symbols-outlined text-lg">photo_camera</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageUpload} 
+                    />
+                  </label>
                 </div>
-              )}
+              </div>
+
             </div>
-            
           </div>
         </section>
 
-        {/* Quick Menu */}
+        {/* Quick Action Card */}
         <section className="mb-12">
-          <div className="flex flex-wrap items-center gap-6 md:gap-10 mt-6 select-none">
-            <div 
-              onClick={() => setActiveModal('progress')}
-              className="flex flex-col items-center gap-2.5 cursor-pointer group"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#E5F6FD] dark:bg-sky-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <span className="material-symbols-outlined text-[#00A3FF] text-2xl">monitoring</span>
+          <div className="bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 dark:border-zinc-800/80 rounded-[2rem] p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-[#1C1B19] dark:text-white mb-6 tracking-tight">Quick Action</h3>
+            
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-6 justify-items-center">
+              <div 
+                onClick={() => setActiveModal('progress')}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <div className="w-14 h-14 rounded-full bg-[#E5F6FD] dark:bg-sky-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <span className="material-symbols-outlined text-[#00A3FF] text-2xl">monitoring</span>
+                </div>
+                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Progress</span>
               </div>
-              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Progress</span>
-            </div>
 
-            <div 
-              onClick={() => setActiveModal('book-class')}
-              className="flex flex-col items-center gap-2.5 cursor-pointer group"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#FFF9E6] dark:bg-amber-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <span className="material-symbols-outlined text-[#FFC700] text-2xl">event</span>
+              <div 
+                onClick={() => setActiveModal('book-class')}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <div className="w-14 h-14 rounded-full bg-[#FFF9E6] dark:bg-amber-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <span className="material-symbols-outlined text-[#FFC700] text-2xl">event</span>
+                </div>
+                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Book Class</span>
               </div>
-              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Book Class</span>
-            </div>
 
-            <div 
-              onClick={() => setActiveModal('assignments')}
-              className="flex flex-col items-center gap-2.5 cursor-pointer group"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#ECFDF3] dark:bg-emerald-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <span className="material-symbols-outlined text-[#12B76A] text-2xl">assignment</span>
+              <div 
+                onClick={() => setActiveModal('assignments')}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <div className="w-14 h-14 rounded-full bg-[#ECFDF3] dark:bg-emerald-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <span className="material-symbols-outlined text-[#12B76A] text-2xl">assignment</span>
+                </div>
+                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Assignments</span>
               </div>
-              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Assignments</span>
-            </div>
 
-            <div 
-              onClick={() => setActiveModal('message')}
-              className="flex flex-col items-center gap-2.5 cursor-pointer group"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#FDF2F8] dark:bg-rose-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <span className="material-symbols-outlined text-[#F43F5E] text-2xl">mail</span>
+              <div 
+                onClick={() => setActiveModal('message')}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <div className="w-14 h-14 rounded-full bg-[#FDF2F8] dark:bg-rose-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <span className="material-symbols-outlined text-[#F43F5E] text-2xl">mail</span>
+                </div>
+                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Messages</span>
               </div>
-              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Messages</span>
-            </div>
 
-            <div 
-              onClick={() => setActiveModal('join-class')}
-              className="flex flex-col items-center gap-2.5 cursor-pointer group"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#F3E8FF] dark:bg-purple-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <span className="material-symbols-outlined text-[#A855F7] text-2xl">videocam</span>
+              <div 
+                onClick={() => setActiveModal('join-class')}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <div className="w-14 h-14 rounded-full bg-[#F3E8FF] dark:bg-purple-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <span className="material-symbols-outlined text-[#A855F7] text-2xl">videocam</span>
+                </div>
+                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Join Class</span>
               </div>
-              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Join Class</span>
-            </div>
 
-            <div 
-              onClick={() => setActiveModal('ai-buddy')}
-              className="flex flex-col items-center gap-2.5 cursor-pointer group"
-            >
-              <div className="w-14 h-14 rounded-full bg-[#FFF7ED] dark:bg-orange-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <span className="material-symbols-outlined text-[#F97316] text-2xl">psychology</span>
+              <div 
+                onClick={() => setActiveModal('ai-buddy')}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
+              >
+                <div className="w-14 h-14 rounded-full bg-[#FFF7ED] dark:bg-orange-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <span className="material-symbols-outlined text-[#F97316] text-2xl">psychology</span>
+                </div>
+                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">AI Buddy</span>
               </div>
-              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">AI Buddy</span>
             </div>
           </div>
         </section>

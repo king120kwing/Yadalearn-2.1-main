@@ -58,7 +58,7 @@ export const BottomNav = () => {
   const navItems = getNavItems(isTeacherDashboard);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-black/95 backdrop-blur-sm z-50 safe-bottom">
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-zinc-800 rounded-3xl py-2 px-6 shadow-lg z-50 flex justify-between items-center md:hidden">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-around px-2 py-3 sm:px-4">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
