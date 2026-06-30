@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Home, Search, Calendar, User, Settings, LogOut } from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
 import { TeacherProfileModal } from '@/components/ProfileModals';
 import type { Teacher } from '@/types/schema';
@@ -64,237 +65,194 @@ const StudentDashboard = () => {
 
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 pb-24 safe-bottom">
-        {/* Header */}
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <p className="text-base text-subtext-light dark:text-subtext-dark mb-1">Welcome back</p>
-            <h1 className="text-2xl font-bold text-text-light dark:text-text-dark">
-              Hi, {userName}
-            </h1>
-          </div>
-          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-subtext-light dark:text-subtext-dark font-medium">Student Account</p>
-              <p className="text-sm font-bold text-indigo-650 dark:text-indigo-400">{userName}</p>
-            </div>
-            <Avatar className="w-12 h-12 border-2 border-indigo-500 shadow-md">
+    <div className="flex min-h-screen bg-[#FCFAF5] dark:bg-zinc-950 font-sans text-[#1C1B19] dark:text-slate-200 w-full relative overflow-x-hidden">
+      {/* Sidebar on desktop */}
+      <aside className="hidden lg:flex flex-col justify-between w-64 p-8 border-r border-slate-200/50 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10">
+        <div className="flex flex-col gap-10">
+          <div className="flex items-center gap-2.5 px-1">
+            <Avatar className="h-10 w-10 border border-purple-100 shadow-sm">
               <AvatarImage src={user?.imageUrl} alt={userName} />
-              <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-sm">
-                {userName.split(' ').map(n => n[0]).join('')}
+              <AvatarFallback className="bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-black text-xs">
+                {userName.split(' ').map((n: string) => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
-          </div>
-        </header>
-
-        {/* Unrated Past Classes - Student Rating Call-to-Action */}
-        {unratedClasses && unratedClasses.length > 0 && (
-          <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-zinc-900/40 dark:to-zinc-800/20 rounded-3xl p-5 border border-amber-200/50 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="w-12 h-12 border border-amber-300">
-                  <AvatarImage src={unratedClasses[0].teacherAvatar} />
-                  <AvatarFallback className="bg-amber-100 text-amber-800 font-bold">{unratedClasses[0].teacherName[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-bold text-sm text-amber-900 dark:text-zinc-150">Rate your completed session!</h3>
-                  <p className="text-xs text-amber-700 dark:text-zinc-400 mt-0.5">
-                    How was your <strong>{unratedClasses[0].title}</strong> class with <strong>{unratedClasses[0].teacherName}</strong>?
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={() => {
-                  setRatingValue(0);
-                  setRatingHoverValue(0);
-                  setSelectedBookingToRate(unratedClasses[0]);
-                  setIsRatingModalOpen(true);
-                }}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-5 py-2.5 rounded-full shrink-0 shadow-sm transition-transform active:scale-95 cursor-pointer"
-              >
-                Rate Now
-              </Button>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight leading-tight">{userName}</span>
+              <span className="text-[10px] text-slate-400 font-medium">Student</span>
             </div>
           </div>
-        )}
-
-        {/* Dynamic CTA: Join Next Class */}
-        {showJoinCTA && nextClass && (
-          <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-between relative overflow-hidden">
-              {/* Glossy overlay */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium animate-pulse">Starting Soon</span>
-                  <span className="text-sm opacity-90">{timeRemainingStr}</span>
-                </div>
-                <h2 className="text-2xl font-bold mb-1">{nextClass.title}</h2>
-                <p className="text-indigo-100 flex items-center gap-2 text-sm">
-                  Scheduled for {nextClass.day}
-                </p>
-              </div>
-
-              <Button
-                size="lg"
-                onClick={() => setActiveModal('join-class')}
-                className="relative z-10 bg-white text-indigo-700 hover:bg-gray-100 font-bold shadow-md h-12 px-6 rounded-xl"
-              >
-                <span className="material-symbols-outlined mr-2">videocam</span>
-                Join Now
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Progress Section */}
-        <section className="mb-8">
-          <div
-            className="bg-gradient-to-br from-blue-100 to-purple-100 p-6 rounded-3xl shadow-soft text-[#5B4A9F] relative overflow-hidden transition-transform duration-300 ease-out"
-            style={{ transformStyle: 'preserve-3d' }}
-            onMouseMove={(e) => {
-              const card = e.currentTarget;
-              const rect = card.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
-              const centerX = rect.width / 2;
-              const centerY = rect.height / 2;
-              const rotateX = ((y - centerY) / centerY) * -10;
-              const rotateY = ((x - centerX) / centerX) * 10;
-              card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-            }}
+          
+          <nav className="flex flex-col gap-1.5">
+            <button
+              onClick={() => navigate('/student-dashboard')}
+              className="flex items-center gap-3.5 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 text-purple-650 dark:text-purple-400 rounded-2xl font-bold transition-all text-left w-full"
+            >
+              <Home className="h-5 w-5" />
+              <span>Home</span>
+            </button>
+            <button
+              onClick={() => navigate('/student-search')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <Search className="h-5 w-5" />
+              <span>Search</span>
+            </button>
+            <button
+              onClick={() => navigate('/student-calendar')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <Calendar className="h-5 w-5" />
+              <span>Calendar</span>
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <User className="h-5 w-5" />
+              <span>Profile</span>
+            </button>
+          </nav>
+        </div>
+        
+        {/* Bottom actions */}
+        <div className="flex flex-col gap-4">
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
           >
-            <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/20 rounded-full"></div>
-            <div className="absolute bottom-4 -left-12 w-28 h-28 bg-white/10 rounded-full"></div>
-            <div className="flex justify-between items-start mb-4 z-10 relative">
-              <div>
-                <h2 className="text-xl font-bold">Your Progress</h2>
-                <p className="text-sm opacity-80">This Month</p>
-              </div>
-              <button className="w-8 h-8 flex items-center justify-center bg-white/40 rounded-full">
-                <span className="material-symbols-outlined text-lg">more_horiz</span>
-              </button>
+            <Settings className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+          <button
+            onClick={() => navigate('/logout')}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 lg:pb-10 max-w-7xl w-full mx-auto bg-transparent">
+        {/* Header */}
+        <div className="mb-6">
+          <p className="text-sm font-semibold text-[#8F81D6] mb-1">Welcome back, Student</p>
+          <h1 className="text-4xl font-extrabold text-[#1C1B19] dark:text-white font-serif">
+            Hi, {userName.split(' ')[0]}
+          </h1>
+        </div>
+
+        {/* Welcome Banner Card with Overlapping Profile Image */}
+        <section className="mb-12 mt-8 z-10 relative">
+          <div className="relative bg-gradient-to-r from-[#F2EBE0] to-[#E5ECE5] dark:from-zinc-900/60 dark:to-zinc-800/40 rounded-[2.5rem] p-8 md:p-12 min-h-[220px] flex items-center shadow-sm overflow-visible">
+            
+            {/* Welcome Text */}
+            <div className="w-[55%] md:w-[60%] text-left z-10">
+              <h2 className="text-2xl md:text-4xl font-bold text-[#1C1B19] dark:text-zinc-100 font-serif leading-tight">
+                Welcome back to your studies, {userName.split(' ')[0]}!
+              </h2>
             </div>
-            <div className="flex items-center justify-between z-10 relative">
-              <div className="relative w-28 h-28">
-                <svg className="w-full h-full" style={{ transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
-                  <path
-                    className="text-white/30"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                  />
-                  <path
-                    className="text-white"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeDasharray="0, 100"
-                    strokeLinecap="round"
-                    strokeWidth="3"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-white">0%</span>
-                  <span className="text-xs opacity-90">Completed</span>
+
+            {/* Overlapping Portrait Image in the center/right */}
+            <div className="absolute bottom-0 right-8 md:right-16 w-[40%] md:w-[35%] h-[135%] z-20 overflow-visible origin-bottom translate-y-[0px]">
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt="Student Portrait"
+                  className="w-full h-full object-cover object-top select-none origin-bottom scale-110 pointer-events-none"
+                  style={{
+                    maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-end justify-center">
+                  <span className="material-symbols-outlined text-9xl text-slate-400 dark:text-zinc-700 opacity-60">
+                    person
+                  </span>
                 </div>
-              </div>
-              <div className="text-right space-y-4">
-                <div>
-                  <p className="text-base font-medium">Completed</p>
-                  <p className="text-sm opacity-80">0 tasks</p>
-                </div>
-                <div>
-                  <p className="text-base font-medium">Pending</p>
-                  <p className="text-sm opacity-80">0 tasks</p>
-                </div>
-              </div>
+              )}
             </div>
+            
           </div>
         </section>
 
-        {/* Quick Actions */}
-        <section className="mb-8">
-          <h2 className="text-xl font-bold mb-4 text-text-light dark:text-text-dark">Quick Actions</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-6 gap-3 sm:gap-4">
-            <div
-              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+        {/* Quick Menu */}
+        <section className="mb-12">
+          <div className="flex flex-wrap items-center gap-6 md:gap-10 mt-6 select-none">
+            <div 
               onClick={() => setActiveModal('progress')}
+              className="flex flex-col items-center gap-2.5 cursor-pointer group"
             >
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-blue-500 dark:text-blue-400">monitoring</span>
+              <div className="w-14 h-14 rounded-full bg-[#E5F6FD] dark:bg-sky-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <span className="material-symbols-outlined text-[#00A3FF] text-2xl">monitoring</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Progress</p>
+              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Progress</span>
             </div>
 
-            <div
-              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+            <div 
               onClick={() => setActiveModal('book-class')}
+              className="flex flex-col items-center gap-2.5 cursor-pointer group"
             >
-              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-yellow-600 dark:text-yellow-400">event</span>
+              <div className="w-14 h-14 rounded-full bg-[#FFF9E6] dark:bg-amber-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <span className="material-symbols-outlined text-[#FFC700] text-2xl">event</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Book Class</p>
+              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Book Class</span>
             </div>
 
-            <div
-              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+            <div 
               onClick={() => setActiveModal('assignments')}
+              className="flex flex-col items-center gap-2.5 cursor-pointer group"
             >
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-green-500 dark:text-green-400">assignment</span>
+              <div className="w-14 h-14 rounded-full bg-[#ECFDF3] dark:bg-emerald-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <span className="material-symbols-outlined text-[#12B76A] text-2xl">assignment</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Assignments</p>
+              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Assignments</span>
             </div>
 
-            <div
-              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+            <div 
               onClick={() => setActiveModal('message')}
+              className="flex flex-col items-center gap-2.5 cursor-pointer group"
             >
-              <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-pink-500 dark:text-pink-400">mail</span>
+              <div className="w-14 h-14 rounded-full bg-[#FDF2F8] dark:bg-rose-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <span className="material-symbols-outlined text-[#F43F5E] text-2xl">mail</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Message</p>
+              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Messages</span>
             </div>
 
-            <div
-              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+            <div 
               onClick={() => setActiveModal('join-class')}
+              className="flex flex-col items-center gap-2.5 cursor-pointer group"
             >
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-purple-500 dark:text-purple-400">videocam</span>
+              <div className="w-14 h-14 rounded-full bg-[#F3E8FF] dark:bg-purple-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <span className="material-symbols-outlined text-[#A855F7] text-2xl">videocam</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">Join Class</p>
+              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">Join Class</span>
             </div>
 
-            <div
-              className="bg-white dark:bg-gray-800/40 p-4 rounded-3xl shadow-soft flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1"
+            <div 
               onClick={() => setActiveModal('ai-buddy')}
+              className="flex flex-col items-center gap-2.5 cursor-pointer group"
             >
-              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/40 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-orange-500 dark:text-orange-400">psychology</span>
+              <div className="w-14 h-14 rounded-full bg-[#FFF7ED] dark:bg-orange-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <span className="material-symbols-outlined text-[#F97316] text-2xl">psychology</span>
               </div>
-              <p className="text-xs font-medium text-center text-text-light dark:text-text-dark">AI Buddy</p>
+              <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-300 tracking-tight">AI Buddy</span>
             </div>
           </div>
         </section>
 
         {/* Upcoming Classes */}
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-text-light dark:text-text-dark">Upcoming Classes</h2>
-            <a className="text-sm font-medium text-indigo-500 dark:text-indigo-400" href="#">View All</a>
-          </div>
-          <div className="space-y-4">
-            {upcomingClasses.length > 0 ? (
-              upcomingClasses.slice(0, 2).map((classItem, idx) => (
-                <div key={classItem.id} className="bg-white dark:bg-zinc-800 px-5 py-6 rounded-4xl flex items-center justify-between shadow-soft-float">
+        {upcomingClasses && upcomingClasses.length > 0 && (
+          <section className="animate-in fade-in duration-300">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-text-light dark:text-text-dark">Upcoming Classes</h2>
+              <a className="text-sm font-medium text-indigo-500 dark:text-indigo-400" href="#">View All</a>
+            </div>
+            <div className="space-y-4">
+              {upcomingClasses.slice(0, 2).map((classItem) => (
+                <div key={classItem.id} className="bg-white dark:bg-zinc-800 px-5 py-6 rounded-3xl flex items-center justify-between shadow-soft">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
                       <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center">
@@ -319,15 +277,11 @@ const StudentDashboard = () => {
                   </div>
                   <span className="material-symbols-outlined text-subtext-light dark:text-subtext-dark cursor-pointer">more_vert</span>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-10 text-gray-500 bg-white dark:bg-zinc-800 rounded-3xl border border-gray-100 dark:border-zinc-800 shadow-sm font-medium">
-                No upcoming classes scheduled.
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
 
       <BottomNav />
       <TeacherProfileModal
