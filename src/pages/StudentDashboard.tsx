@@ -37,11 +37,28 @@ const StudentDashboard = () => {
     reader.onload = async () => {
       const base64Data = reader.result as string;
       try {
-        const { error } = await supabase.auth.updateUser({
-          data: { imageUrl: base64Data }
+        // 1. Update Auth Metadata
+        const { error: authError } = await supabase.auth.updateUser({
+          data: { imageUrl: base64Data, avatar_url: base64Data }
         });
-        if (error) throw error;
+        if (authError) throw authError;
+
+        // 2. Update profiles table in database
+        const { error: dbError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: base64Data })
+          .eq('id', user?.id);
+        if (dbError) throw dbError;
         
+        // 3. Update localStorage user cache immediately
+        const savedUserStr = localStorage.getItem('yadalearn-user');
+        if (savedUserStr) {
+          const parsed = JSON.parse(savedUserStr);
+          parsed.imageUrl = base64Data;
+          parsed.avatar_url = base64Data;
+          localStorage.setItem('yadalearn-user', JSON.stringify(parsed));
+        }
+
         alert("Profile picture updated successfully!");
         window.location.reload();
       } catch (error: any) {
@@ -243,31 +260,31 @@ const StudentDashboard = () => {
                 </p>
               </div>
 
-              {/* Overlapping Vignette Portrait (2 columns) */}
-              <div className="md:col-span-2 relative flex justify-center items-end h-[320px] md:h-[360px] -mt-16 md:-mt-24 overflow-visible">
-                <div className="absolute inset-x-0 bottom-0 h-[80%] bg-gradient-to-t from-black/5 to-transparent blur-2xl z-0 rounded-full" />
+              {/* Overlapping pop-out cut-out portrait (2 columns, no circular crop or confinement frame) */}
+              <div className="md:col-span-2 relative flex justify-center items-end h-[340px] md:h-[380px] -mt-16 md:-mt-24 overflow-visible z-20 pointer-events-auto">
+                <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-[#5B4A9F]/5 to-transparent blur-3xl z-0 rounded-full" />
                 
-                <div className="relative w-64 h-64 md:w-80 md:h-80 select-none overflow-visible z-10 transition-transform duration-300 hover:scale-105">
+                <div className="relative h-full w-auto max-w-[280px] select-none overflow-visible z-10 transition-transform duration-300 hover:scale-[1.03] pointer-events-auto flex items-end">
                   {user?.imageUrl ? (
                     <img
                       src={user.imageUrl}
                       alt="Student Portrait"
-                      className="w-full h-full object-cover object-center pointer-events-none drop-shadow-[0_15px_30px_rgba(0,0,0,0.2)]"
+                      className="h-full w-auto object-contain object-bottom pointer-events-none drop-shadow-[0_15px_30px_rgba(0,0,0,0.18)]"
                       style={{
-                        maskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)',
-                        WebkitMaskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)'
+                        maskImage: 'linear-gradient(to top, transparent 5%, black 22%)',
+                        WebkitMaskImage: 'linear-gradient(to top, transparent 5%, black 22%)'
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30 shadow-md">
+                    <div className="w-48 h-72 md:w-56 md:h-80 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-[2rem] border border-white/30 shadow-md">
                       <span className="material-symbols-outlined text-7xl text-slate-450 dark:text-zinc-650">
                         face
                       </span>
                     </div>
                   )}
 
-                  {/* Photo Upload Edit trigger */}
-                  <label className="absolute bottom-6 right-6 w-10 h-10 rounded-full bg-[#5B4A9F] hover:bg-[#4a3b8e] text-white flex items-center justify-center cursor-pointer shadow-lg transition-transform active:scale-95 z-30 hover:scale-110">
+                  {/* Highly clickable photo upload trigger */}
+                  <label className="absolute bottom-6 right-2 w-10 h-10 rounded-full bg-[#5B4A9F] hover:bg-[#4a3b8e] text-white flex items-center justify-center cursor-pointer shadow-lg transition-transform active:scale-95 z-50 hover:scale-110 pointer-events-auto">
                     <span className="material-symbols-outlined text-lg">photo_camera</span>
                     <input 
                       type="file" 
