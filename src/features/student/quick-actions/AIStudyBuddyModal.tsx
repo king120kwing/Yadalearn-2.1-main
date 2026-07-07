@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AIStudyBuddyModalProps {
     isOpen: boolean;
@@ -8,10 +9,15 @@ interface AIStudyBuddyModalProps {
 
 export const AIStudyBuddyModal = ({ isOpen, onClose }: AIStudyBuddyModalProps) => {
     const [message, setMessage] = useState('');
+    const { user } = useAuth();
+    const userName = user?.name || 'Student';
+    const firstSubject = user?.subjects?.[0] || 'General Studies';
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-md mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+                <DialogTitle className="sr-only">AI Study Buddy - {firstSubject}</DialogTitle>
+                <DialogDescription className="sr-only">Chat with your AI study buddy on {firstSubject} topics.</DialogDescription>
                 {/* Navigation Header */}
                 <header className="shrink-0 flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 z-20">
                     <button
@@ -21,7 +27,7 @@ export const AIStudyBuddyModal = ({ isOpen, onClose }: AIStudyBuddyModalProps) =
                         <span className="material-symbols-outlined text-[24px]">menu</span>
                     </button>
                     <div className="flex flex-col items-center">
-                        <h2 className="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-tight">Biology 101</h2>
+                        <h2 className="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-tight">{firstSubject}</h2>
                         <div className="flex items-center gap-1">
                             <div className="size-2 rounded-full bg-emerald-500 animate-pulse"></div>
                             <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Online</span>
@@ -49,7 +55,7 @@ export const AIStudyBuddyModal = ({ isOpen, onClose }: AIStudyBuddyModalProps) =
                                     <span className="material-symbols-outlined text-white text-lg">smart_toy</span>
                                 </div>
                                 <div className="p-4 rounded-2xl rounded-tl-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 max-w-[85%] shadow-sm">
-                                    <p>Hi Alex! Ready to continue our study on <strong>Cellular Respiration</strong>? I can also quiz you on the last chapter.</p>
+                                    <p>Hi {userName.split(' ')[0]}! Ready to continue our study on <strong>{firstSubject}</strong>? I can also quiz you on the last chapter.</p>
                                 </div>
                             </div>
                         </div>

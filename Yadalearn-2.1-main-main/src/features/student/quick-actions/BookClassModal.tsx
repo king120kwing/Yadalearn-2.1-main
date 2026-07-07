@@ -1,8 +1,11 @@
-import { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Calendar } from '@/components/ui/calendar';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
 
 interface BookClassModalProps {
     isOpen: boolean;
@@ -10,16 +13,43 @@ interface BookClassModalProps {
 }
 
 export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
+    const { user } = useAuth();
+    const userId = user?.id;
+
     const [step, setStep] = useState(1);
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+    const [topics, setTopics] = useState<any[]>([]);
 
-    const topics = [
-        { id: 'math', name: 'Mathematics', teacher: 'Mr. Wilson', avatar: 'https://i.pravatar.cc/150?u=wilson', color: 'from-blue-400 to-cyan-400' },
-        { id: 'sci', name: 'Physics', teacher: 'Ms. Davis', avatar: 'https://i.pravatar.cc/150?u=davis', color: 'from-purple-400 to-pink-400' },
-        { id: 'spa', name: 'Spanish', teacher: 'Mrs. Garcia', avatar: 'https://i.pravatar.cc/150?u=garcia', color: 'from-orange-400 to-red-400' },
-    ];
+    useEffect(() => {
+        if (isOpen) {
+            const fetchTeachers = async () => {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, subjects, avatar_url')
+                    .eq('role', 'teacher')
+                    .eq('onboarding_completed', true);
+                
+                if (error) {
+                    console.error('Error loading teachers:', error);
+                    return;
+                }
+                
+                if (data) {
+                    const mapped = data.map((t: any) => ({
+                        id: t.id,
+                        name: t.subjects?.[0] || 'General Studies',
+                        teacher: t.full_name,
+                        avatar: t.avatar_url || 'https://i.pravatar.cc/150?u=' + t.id,
+                        color: 'from-purple-400 to-indigo-400'
+                    }));
+                    setTopics(mapped);
+                }
+            };
+            fetchTeachers();
+        }
+    }, [isOpen]);
 
     const timeSlots = [
         '09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM', '05:00 PM'
@@ -27,15 +57,43 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
 
     const handleNext = () => setStep(step + 1);
     const handleBack = () => setStep(step - 1);
-    const handleConfirm = () => {
-        alert('Class Booked Successfully! Confirmation sent to your email.');
-        onClose();
-        setStep(1);
+    
+    const handleConfirm = async () => {
+        if (!selectedTopic || !selectedDate || !selectedSlot || !userId) {
+            alert('Please complete all selection steps first.');
+            return;
+        }
+        const topicObj = topics.find(t => t.id === selectedTopic);
+        if (!topicObj) return;
+
+        try {
+            const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+            const { error } = await supabase.from('bookings').insert({
+                student_id: userId,
+                teacher_id: topicObj.id,
+                subject: topicObj.name,
+                date: formattedDate,
+                time: selectedSlot,
+                status: 'confirmed'
+            });
+
+            if (error) throw error;
+
+            alert('Class Booked Successfully! Confirmation has been added to your calendar.');
+            onClose();
+            setStep(1);
+            window.location.reload();
+        } catch (e: any) {
+            console.error("Booking error:", e);
+            alert("Failed to book class: " + e.message);
+        }
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-2xl mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden max-h-[90vh] flex flex-col">
+                <DialogTitle className="sr-only">Book a Class</DialogTitle>
+                <DialogDescription className="sr-only">Schedule a new live video tutoring session with a qualified teacher.</DialogDescription>
                 {/* Header */}
                 <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
                     <div className="flex items-center justify-between mb-4">

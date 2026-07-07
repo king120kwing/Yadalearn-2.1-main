@@ -1,4 +1,5 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProgressModalProps {
     isOpen: boolean;
@@ -6,9 +7,14 @@ interface ProgressModalProps {
 }
 
 export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
+    const { user } = useAuth();
+    const userName = user?.name || 'Student';
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-md mx-auto bg-background-light dark:bg-student-bg-dark text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+                <DialogTitle className="sr-only">Progress Overview</DialogTitle>
+                <DialogDescription className="sr-only">View your academic health check, grades overview, and studying progress stats.</DialogDescription>
                 {/* Top App Bar */}
                 <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-student-bg-dark/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-white/5">
                     <div className="flex items-center gap-3">
@@ -18,7 +24,7 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                         </div>
                         <div>
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Welcome back,</p>
-                            <h2 className="text-sm font-bold leading-tight">Alex Johnson</h2>
+                            <h2 className="text-sm font-bold leading-tight">{userName}</h2>
                         </div>
                     </div>
                     <button

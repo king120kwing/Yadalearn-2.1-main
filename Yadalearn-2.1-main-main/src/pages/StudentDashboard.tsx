@@ -29,6 +29,45 @@ const StudentDashboard = () => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
 
+  const resizeProfileImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(base64Str);
+          return;
+        }
+
+        const targetWidth = 400;
+        const targetHeight = 500;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        // Draw image keeping proportions
+        const imgRatio = img.width / img.height;
+        const targetRatio = targetWidth / targetHeight;
+        let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+        if (imgRatio > targetRatio) {
+          sWidth = img.height * targetRatio;
+          sx = (img.width - sWidth) / 2;
+        } else {
+          sHeight = img.width / targetRatio;
+          sy = (img.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Compact size, high quality
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -37,16 +76,19 @@ const StudentDashboard = () => {
     reader.onload = async () => {
       const base64Data = reader.result as string;
       try {
+        // Resize and compress raw upload to prevent net::ERR_CONNECTION_CLOSED
+        const processedImage = await resizeProfileImage(base64Data);
+
         // 1. Update Auth Metadata
         const { error: authError } = await supabase.auth.updateUser({
-          data: { imageUrl: base64Data, avatar_url: base64Data }
+          data: { imageUrl: processedImage, avatar_url: processedImage }
         });
         if (authError) throw authError;
 
         // 2. Update profiles table in database
         const { error: dbError } = await supabase
           .from('profiles')
-          .update({ avatar_url: base64Data })
+          .update({ avatar_url: processedImage })
           .eq('id', user?.id);
         if (dbError) throw dbError;
         
@@ -54,8 +96,8 @@ const StudentDashboard = () => {
         const savedUserStr = localStorage.getItem('yadalearn-user');
         if (savedUserStr) {
           const parsed = JSON.parse(savedUserStr);
-          parsed.imageUrl = base64Data;
-          parsed.avatar_url = base64Data;
+          parsed.imageUrl = processedImage;
+          parsed.avatar_url = processedImage;
           localStorage.setItem('yadalearn-user', JSON.stringify(parsed));
         }
 
@@ -427,8 +469,12 @@ const StudentDashboard = () => {
         onClose={() => setIsModalOpen(false)}
       />
 
-      {/* Quick Action Modals */}
-      <JoinClassModal isOpen={activeModal === 'join-class'} onClose={() => setActiveModal(null)} className="Advanced Spanish Conversation" />
+      <JoinClassModal 
+        isOpen={activeModal === 'join-class'} 
+        onClose={() => setActiveModal(null)} 
+        className={nextClass ? nextClass.title : 'Spanish Conversation'} 
+        teacherName={nextClass?.teacherName} 
+      />
       <BookClassModal isOpen={activeModal === 'book-class'} onClose={() => setActiveModal(null)} />
       <AIStudyBuddyModal isOpen={activeModal === 'ai-buddy'} onClose={() => setActiveModal(null)} />
       <AssignmentsModal isOpen={activeModal === 'assignments'} onClose={() => setActiveModal(null)} />

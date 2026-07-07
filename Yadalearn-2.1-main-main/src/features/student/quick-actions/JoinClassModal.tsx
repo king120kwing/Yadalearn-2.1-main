@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -7,11 +7,12 @@ interface JoinClassModalProps {
     isOpen: boolean;
     onClose: () => void;
     className: string;
+    teacherName?: string;
 }
 
 type VirtualBackground = 'none' | 'blur' | 'library' | 'space' | 'office';
 
-export const JoinClassModal = ({ isOpen, onClose, className }: JoinClassModalProps) => {
+export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: JoinClassModalProps) => {
     const [micEnabled, setMicEnabled] = useState(true);
     const [cameraEnabled, setCameraEnabled] = useState(true);
     const [selectedBackground, setSelectedBackground] = useState<VirtualBackground>('blur');
@@ -57,6 +58,8 @@ export const JoinClassModal = ({ isOpen, onClose, className }: JoinClassModalPro
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-md mx-auto bg-student-bg-dark text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+                <DialogTitle className="sr-only">Join Class - {className}</DialogTitle>
+                <DialogDescription className="sr-only">Perform a pre-class camera and mic check before entering the classroom.</DialogDescription>
                 {/* Header */}
                 <div className="flex items-center p-4 pb-2 justify-between z-10 shrink-0">
                     <button
@@ -83,7 +86,7 @@ export const JoinClassModal = ({ isOpen, onClose, className }: JoinClassModalPro
                             {className}
                         </h1>
                         <div className="flex items-center gap-2 text-student-primary/80 text-sm font-medium">
-                            <span>Prof. Alan Grant</span>
+                            <span>{teacherName || 'Prof. Alan Grant'}</span>
                             <span className="size-1 rounded-full bg-student-primary/50"></span>
                             <span className="text-student-primary flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[16px] fill-1">timer</span>

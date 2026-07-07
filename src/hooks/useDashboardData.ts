@@ -148,7 +148,8 @@ export function useDashboardData() {
                             title: b.subject,
                             day: `${b.date} ${b.time}`,
                             time: b.time,
-                            isQuiz: b.subject.toLowerCase().includes('quiz')
+                            isQuiz: b.subject.toLowerCase().includes('quiz'),
+                            teacherName: b.teacher?.full_name || 'Teacher'
                         });
                     } else if (b.rating === null) {
                         unratedPast.push({

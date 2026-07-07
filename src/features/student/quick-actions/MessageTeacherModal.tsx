@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { supabase } from '@/lib/supabase';
 
 interface MessageTeacherModalProps {
     isOpen: boolean;
@@ -10,10 +11,30 @@ export const MessageTeacherModal = ({ isOpen, onClose }: MessageTeacherModalProp
     const [priority, setPriority] = useState<'standard' | 'urgent'>('standard');
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
+    const [teachers, setTeachers] = useState<any[]>([]);
+    const [selectedTeacherId, setSelectedTeacherId] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchTeachers = async () => {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, subjects')
+                    .eq('role', 'teacher')
+                    .eq('onboarding_completed', true);
+                if (data) {
+                    setTeachers(data);
+                }
+            };
+            fetchTeachers();
+        }
+    }, [isOpen]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-md mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+                <DialogTitle className="sr-only">New Message</DialogTitle>
+                <DialogDescription className="sr-only">Send a direct message to your teacher.</DialogDescription>
                 {/* Header */}
                 <header className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shrink-0 z-10">
                     <button
@@ -36,12 +57,15 @@ export const MessageTeacherModal = ({ isOpen, onClose }: MessageTeacherModalProp
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-1">To</label>
                             <div className="relative group">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 material-symbols-outlined pointer-events-none">school</span>
-                                <select className="form-select w-full pl-12 pr-10 py-3.5 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none appearance-none transition-shadow cursor-pointer hover:border-gray-400 dark:hover:border-gray-500">
-                                    <option disabled selected value="">Select Teacher</option>
-                                    <option value="mr-smith">Mr. Smith (Mathematics)</option>
-                                    <option value="ms-lee">Ms. Lee (History)</option>
-                                    <option value="dr-garcia">Dr. Garcia (Science)</option>
-                                    <option value="mrs-davis">Mrs. Davis (English)</option>
+                                <select 
+                                    value={selectedTeacherId}
+                                    onChange={(e) => setSelectedTeacherId(e.target.value)}
+                                    className="form-select w-full pl-12 pr-10 py-3.5 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none appearance-none transition-shadow cursor-pointer hover:border-gray-400 dark:hover:border-gray-500"
+                                >
+                                    <option value="" disabled>Select Teacher</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.full_name} ({t.subjects?.join(', ') || 'General'})</option>
+                                    ))}
                                 </select>
                                 {/* Custom chevron */}
                                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none material-symbols-outlined text-xl">expand_more</span>

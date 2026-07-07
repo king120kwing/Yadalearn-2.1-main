@@ -177,6 +177,8 @@ export const AssignmentsModal = ({ isOpen, onClose }: AssignmentsModalProps) => 
             onClose();
         }}>
             <DialogContent className="max-w-md mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+                <DialogTitle className="sr-only">Assignments</DialogTitle>
+                <DialogDescription className="sr-only">Submit, review, and view grades for your enrolled class assignments.</DialogDescription>
 
                 {/* SUBMISSION FORM OVERLAY */}
                 {submittingId ? (
