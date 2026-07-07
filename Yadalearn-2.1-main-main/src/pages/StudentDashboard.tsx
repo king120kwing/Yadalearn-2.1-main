@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -75,8 +75,13 @@ const StudentDashboard = () => {
   const [ratingHoverValue, setRatingHoverValue] = useState<number>(0);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const userId = user?.id;
-  const userName = user?.fullName || user?.firstName || 'Student';
+  const userName = user?.name || user?.firstName || 'Student';
 
   // Dynamic Join CTA based on authentic calendar bookings starting soon (within 30 minutes)
   const now = new Date();
@@ -217,7 +222,7 @@ const StudentDashboard = () => {
               <Menu className="h-6 w-6" />
             </button>
             <div>
-              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">Welcome back, Student</p>
+              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">Welcome back, {userName.split(' ')[0]}</p>
               <h1 className="text-3xl font-extrabold text-[#1C1B19] dark:text-white font-serif leading-tight">
                 Hi, {userName.split(' ')[0]}
               </h1>
@@ -260,39 +265,45 @@ const StudentDashboard = () => {
                 </p>
               </div>
 
-              {/* Overlapping pop-out cut-out portrait (2 columns, no circular crop or confinement frame) */}
-              <div className="md:col-span-2 relative flex justify-center items-end h-[340px] md:h-[380px] -mt-16 md:-mt-24 overflow-visible z-20 pointer-events-auto">
-                <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-[#5B4A9F]/5 to-transparent blur-3xl z-0 rounded-full" />
+              {/* Overlapping pop-out cut-out portrait (2 columns, no circular crop or confinement frame on the image itself) */}
+              <div className="md:col-span-2 relative flex justify-center items-end h-[340px] md:h-[380px] -mt-16 md:-mt-24 overflow-visible z-20">
+                {/* Synchronized soft lavender/apricot gradient glow in the background */}
+                <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(91,74,159,0.14)_0%,rgba(143,129,214,0.06)_50%,transparent_75%)] blur-[45px] pointer-events-none z-0" />
                 
-                <div className="relative h-full w-auto max-w-[280px] select-none overflow-visible z-10 transition-transform duration-300 hover:scale-[1.03] pointer-events-auto flex items-end">
+                <div className="relative w-64 h-64 md:w-72 md:h-72 select-none overflow-visible z-10 transition-transform duration-300 hover:scale-[1.03] flex items-center justify-center">
+                  {/* Refined surrounding glass layer with frosted finish, soft blur, delicate edge highlight and thin border */}
+                  <div className="absolute inset-4 bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md border border-white/20 dark:border-zinc-800/40 rounded-[3rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.04)] z-0" />
+                  
+                  {/* Uploaded Profile Image: Sits on top of the glass, perfectly sharp, detailed, and unaffected by the blur */}
                   {user?.imageUrl ? (
                     <img
                       src={user.imageUrl}
                       alt="Student Portrait"
-                      className="h-full w-auto object-contain object-bottom pointer-events-none drop-shadow-[0_15px_30px_rgba(0,0,0,0.18)]"
-                      style={{
-                        maskImage: 'linear-gradient(to top, transparent 5%, black 22%)',
-                        WebkitMaskImage: 'linear-gradient(to top, transparent 5%, black 22%)'
-                      }}
+                      className="absolute bottom-0 h-[115%] w-auto object-contain object-bottom pointer-events-none drop-shadow-[0_12px_24px_rgba(0,0,0,0.15)] z-10"
                     />
                   ) : (
-                    <div className="w-48 h-72 md:w-56 md:h-80 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-[2rem] border border-white/30 shadow-md">
-                      <span className="material-symbols-outlined text-7xl text-slate-450 dark:text-zinc-650">
+                    <div className="absolute inset-4 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-[3rem] border border-white/30 z-10">
+                      <span className="material-symbols-outlined text-5xl text-slate-455 dark:text-zinc-600">
                         face
                       </span>
                     </div>
                   )}
 
                   {/* Highly clickable photo upload trigger */}
-                  <label className="absolute bottom-6 right-2 w-10 h-10 rounded-full bg-[#5B4A9F] hover:bg-[#4a3b8e] text-white flex items-center justify-center cursor-pointer shadow-lg transition-transform active:scale-95 z-50 hover:scale-110 pointer-events-auto">
+                  <button 
+                    onClick={handleImageClick}
+                    type="button"
+                    className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#5B4A9F] hover:bg-[#4a3b8e] text-white flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110 active:scale-95 z-30"
+                  >
                     <span className="material-symbols-outlined text-lg">photo_camera</span>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handleImageUpload} 
-                    />
-                  </label>
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageUpload} 
+                  />
                 </div>
               </div>
 
@@ -378,7 +389,7 @@ const StudentDashboard = () => {
             </div>
             <div className="space-y-4">
               {upcomingClasses.slice(0, 2).map((classItem) => (
-                <div key={classItem.id} className="bg-white dark:bg-zinc-800 px-5 py-6 rounded-3xl flex items-center justify-between shadow-soft">
+                <div key={classItem.id} className="bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 dark:border-zinc-800/80 rounded-[2rem] px-5 py-6 flex items-center justify-between shadow-sm">
                   <div className="flex items-center space-x-4">
                     <div className="relative">
                       <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center">
