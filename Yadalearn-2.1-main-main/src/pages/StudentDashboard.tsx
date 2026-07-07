@@ -264,9 +264,9 @@ const StudentDashboard = () => {
               <Menu className="h-6 w-6" />
             </button>
             <div>
-              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">Welcome back, {userName.split(' ')[0]}</p>
+              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">Welcome back, {userName}</p>
               <h1 className="text-3xl font-extrabold text-[#1C1B19] dark:text-white font-serif leading-tight">
-                Hi, {userName.split(' ')[0]}
+                Hi, {userName}
               </h1>
             </div>
           </div>
@@ -292,7 +292,7 @@ const StudentDashboard = () => {
           </div>
         </header>
 
-        {/* Welcome Banner Card with Overlapping Profile Image */}
+        {/* Welcome Banner Card with Circular Profile Image Well */}
         <section className="mb-12 mt-8 z-10 relative">
           <div className="relative bg-gradient-to-r from-[#F2EBE0]/60 to-[#E5ECE5]/60 dark:from-zinc-900/40 dark:to-zinc-800/20 backdrop-blur-md border border-white/20 dark:border-zinc-800 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center shadow-sm overflow-visible">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-center w-full overflow-visible">
@@ -300,45 +300,44 @@ const StudentDashboard = () => {
               {/* Welcome Text (3 columns) */}
               <div className="md:col-span-3 text-left z-10 space-y-4">
                 <h2 className="text-2xl md:text-4xl font-bold text-[#1C1B19] dark:text-zinc-100 font-serif leading-tight">
-                  Welcome back to your studies, {userName.split(' ')[0]}!
+                  Welcome back to your studies, {userName}!
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
                   Ready to explore your custom courses, scheduled sessions, and check in with your AI Study Buddy?
                 </p>
               </div>
 
-              {/* Overlapping pop-out cut-out portrait (2 columns, no circular crop or confinement frame on the image itself) */}
-              <div className="md:col-span-2 relative flex justify-center items-end h-[340px] md:h-[380px] -mt-16 md:-mt-24 overflow-visible z-20">
+              {/* Big circular placeholder profile image well */}
+              <div className="md:col-span-2 relative flex justify-center items-center overflow-visible z-20">
                 {/* Synchronized soft lavender/apricot gradient glow in the background */}
-                <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(91,74,159,0.14)_0%,rgba(143,129,214,0.06)_50%,transparent_75%)] blur-[45px] pointer-events-none z-0" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(91,74,159,0.14)_0%,rgba(143,129,214,0.06)_50%,transparent_75%)] blur-[45px] pointer-events-none z-0" />
                 
-                <div className="relative w-64 h-64 md:w-72 md:h-72 select-none overflow-visible z-10 transition-transform duration-300 hover:scale-[1.03] flex items-center justify-center">
-                  {/* Refined surrounding glass layer with frosted finish, soft blur, delicate edge highlight and thin border */}
-                  <div className="absolute inset-4 bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md border border-white/20 dark:border-zinc-800/40 rounded-[3rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.04)] z-0" />
-                  
-                  {/* Uploaded Profile Image: Sits on top of the glass, perfectly sharp, detailed, and unaffected by the blur */}
+                <div 
+                  onClick={handleImageClick}
+                  className="relative w-60 h-60 md:w-68 md:h-68 rounded-full bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md border border-white/20 dark:border-zinc-800/40 shadow-lg flex items-center justify-center cursor-pointer overflow-hidden group z-10 hover:scale-[1.02] transition-transform duration-300"
+                >
                   {user?.imageUrl ? (
                     <img
                       src={user.imageUrl}
-                      alt="Student Portrait"
-                      className="absolute bottom-0 h-[115%] w-auto object-contain object-bottom pointer-events-none drop-shadow-[0_12px_24px_rgba(0,0,0,0.15)] z-10"
+                      alt={userName}
+                      className="w-full h-full object-cover object-center rounded-full"
                     />
                   ) : (
-                    <div className="absolute inset-4 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-[3rem] border border-white/30 z-10">
-                      <span className="material-symbols-outlined text-5xl text-slate-455 dark:text-zinc-600">
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined text-6xl text-slate-400 dark:text-zinc-600">
                         face
                       </span>
+                      <span className="text-xs font-semibold text-[#8F81D6]">Click to upload</span>
                     </div>
                   )}
 
-                  {/* Highly clickable photo upload trigger */}
-                  <button 
-                    onClick={handleImageClick}
-                    type="button"
-                    className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#5B4A9F] hover:bg-[#4a3b8e] text-white flex items-center justify-center cursor-pointer shadow-lg transition-all hover:scale-110 active:scale-95 z-30"
-                  >
-                    <span className="material-symbols-outlined text-lg">photo_camera</span>
-                  </button>
+                  {/* Camera Hover Overlay */}
+                  <div className="absolute inset-0 bg-[#5B4A9F]/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
+                    <div className="w-12 h-12 rounded-full bg-white/95 text-[#5B4A9F] flex items-center justify-center shadow-md">
+                      <span className="material-symbols-outlined text-2xl font-bold">photo_camera</span>
+                    </div>
+                  </div>
+
                   <input 
                     type="file" 
                     ref={fileInputRef}

@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface ProgressModalProps {
     isOpen: boolean;
@@ -8,17 +10,178 @@ interface ProgressModalProps {
 
 export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
     const { user } = useAuth();
+    const userId = user?.id;
     const userName = user?.name || 'Student';
+
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        gpa: 4.0,
+        attendance: 100,
+        completedTasks: 0,
+        totalTasks: 0
+    });
+    const [coursesProgress, setCoursesProgress] = useState<any[]>([]);
+    const [studyFocusData, setStudyFocusData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]); // M, T, W, T, F, S, S
+
+    useEffect(() => {
+        if (isOpen && userId) {
+            fetchProgressData();
+        }
+    }, [isOpen, userId]);
+
+    const fetchProgressData = async () => {
+        try {
+            setLoading(true);
+
+            // 1. Fetch bookings to compute attendance & study hours
+            const { data: bookings } = await supabase
+                .from('bookings')
+                .select('*')
+                .eq('student_id', userId);
+
+            // 2. Fetch enrollments & course assignments
+            const { data: enrollments } = await supabase
+                .from('enrollments')
+                .select(`
+                    course_id,
+                    course:courses (
+                        id,
+                        title,
+                        assignments (
+                            id,
+                            title,
+                            due_date
+                        )
+                    )
+                `)
+                .eq('student_id', userId);
+
+            // 3. Fetch submissions to calculate GPA and completed tasks
+            const { data: submissions } = await supabase
+                .from('submissions')
+                .select('*')
+                .eq('student_id', userId);
+
+            // 4. Calculate GPA
+            let totalGradePoints = 0;
+            let gradedCount = 0;
+            submissions?.forEach((s: any) => {
+                if (s.grade) {
+                    const gradeVal = String(s.grade).trim().toUpperCase();
+                    let points = 4.0;
+                    if (gradeVal.startsWith('A')) points = 4.0;
+                    else if (gradeVal.startsWith('B')) points = 3.0;
+                    else if (gradeVal.startsWith('C')) points = 2.0;
+                    else if (gradeVal.startsWith('D')) points = 1.0;
+                    else if (gradeVal.startsWith('F')) points = 0.0;
+                    else {
+                        const numeric = parseFloat(gradeVal);
+                        if (!isNaN(numeric)) {
+                            if (numeric > 4) points = (numeric / 100) * 4;
+                            else points = numeric;
+                        }
+                    }
+                    totalGradePoints += points;
+                    gradedCount++;
+                }
+            });
+            const computedGpa = gradedCount > 0 ? parseFloat((totalGradePoints / gradedCount).toFixed(2)) : 4.0;
+
+            // 5. Calculate Tasks
+            const totalTasks = enrollments?.reduce((acc: number, curr: any) => {
+                return acc + (curr.course?.assignments?.length || 0);
+            }, 0) || 0;
+            const completedTasks = submissions?.length || 0;
+
+            // 6. Calculate Attendance
+            const pastBookings = bookings?.filter((b: any) => {
+                const bookingTime = new Date(`${b.date}T${b.time.replace(/ AM| PM/g, '')}`);
+                return bookingTime < new Date() && b.status === 'confirmed';
+            }) || [];
+            const attendedCount = pastBookings.length;
+            const computedAttendance = bookings && bookings.length > 0 
+                ? Math.round((attendedCount / bookings.length) * 100)
+                : 100;
+
+            setStats({
+                gpa: computedGpa,
+                attendance: computedAttendance,
+                completedTasks,
+                totalTasks
+            });
+
+            // 7. Calculate Study Focus (daily booking count or duration)
+            const days = [0, 0, 0, 0, 0, 0, 0]; // M, T, W, T, F, S, S
+            bookings?.forEach((b: any) => {
+                const dateObj = new Date(b.date);
+                let dayIndex = dateObj.getDay() - 1; // getDay: 0 = Sun, 1 = Mon ...
+                if (dayIndex < 0) dayIndex = 6; // Sunday index is 6
+                days[dayIndex] += 1.5; // assume 1.5 hours per class
+            });
+            setStudyFocusData(days);
+
+            // 8. Calculate Courses progress
+            const courseProgressList = enrollments?.map((e: any) => {
+                const assignments = e.course?.assignments || [];
+                const courseSubmissions = submissions?.filter((s: any) => 
+                    assignments.some((a: any) => a.id === s.assignment_id)
+                ) || [];
+                
+                let scoreSum = 0;
+                let scoredCount = 0;
+                courseSubmissions.forEach((s: any) => {
+                    if (s.grade) {
+                        const gradeVal = String(s.grade).trim().toUpperCase();
+                        let pct = 100;
+                        if (gradeVal === 'A' || gradeVal === 'A+') pct = 98;
+                        else if (gradeVal === 'A-') pct = 92;
+                        else if (gradeVal === 'B+') pct = 88;
+                        else if (gradeVal === 'B') pct = 85;
+                        else if (gradeVal === 'B-') pct = 80;
+                        else if (gradeVal === 'C+') pct = 77;
+                        else if (gradeVal === 'C') pct = 73;
+                        else if (gradeVal === 'D') pct = 65;
+                        else if (gradeVal === 'F') pct = 50;
+                        else {
+                            const numeric = parseFloat(gradeVal);
+                            if (!isNaN(numeric)) {
+                                if (numeric <= 4) pct = (numeric / 4) * 100;
+                                else pct = numeric;
+                            }
+                        }
+                        scoreSum += pct;
+                        scoredCount++;
+                    }
+                });
+
+                const averageScore = scoredCount > 0 ? Math.round(scoreSum / scoredCount) : 100;
+
+                return {
+                    id: e.course?.id || e.course_id,
+                    title: e.course?.title || 'General Course',
+                    score: averageScore,
+                    teacher: 'Class Instructor'
+                };
+            }) || [];
+
+            setCoursesProgress(courseProgressList);
+        } catch (err) {
+            console.error('Error fetching progress:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-md mx-auto bg-background-light dark:bg-student-bg-dark text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
                 <DialogTitle className="sr-only">Progress Overview</DialogTitle>
                 <DialogDescription className="sr-only">View your academic health check, grades overview, and studying progress stats.</DialogDescription>
+                
                 {/* Top App Bar */}
                 <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-student-bg-dark/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-white/5">
                     <div className="flex items-center gap-3">
-                        <div className="relative group cursor-pointer">
+                        <div className="relative group">
                             <div className="bg-gradient-to-br from-blue-400 to-purple-400 rounded-full size-10 border-2 border-student-primary"></div>
                             <div className="absolute bottom-0 right-0 size-3 bg-student-primary rounded-full border-2 border-student-bg-dark"></div>
                         </div>
@@ -36,7 +199,7 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                 </div>
 
                 {/* Main Content */}
-                <div className="px-4 pt-6 flex-1 overflow-y-auto pb-24">
+                <div className="px-4 pt-6 flex-1 overflow-y-auto pb-8">
                     {/* Headline */}
                     <div className="mb-6">
                         <h1 className="text-3xl font-bold tracking-tight">Progress Check</h1>
@@ -51,8 +214,7 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                                 <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">GPA</span>
                             </div>
                             <div className="flex items-end gap-1">
-                                <span className="text-2xl font-bold leading-none">3.8</span>
-                                <span className="text-[10px] font-bold text-student-primary mb-1">↑ 0.2</span>
+                                <span className="text-2xl font-bold leading-none">{stats.gpa}</span>
                             </div>
                         </div>
                         <div className="bg-white dark:bg-student-surface-dark rounded-xl p-3 flex flex-col gap-1 shadow-sm border border-gray-100 dark:border-white/5">
@@ -61,7 +223,7 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                                 <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Attend</span>
                             </div>
                             <div className="flex items-end gap-1">
-                                <span className="text-2xl font-bold leading-none">92%</span>
+                                <span className="text-2xl font-bold leading-none">{stats.attendance}%</span>
                             </div>
                         </div>
                         <div className="bg-white dark:bg-student-surface-dark rounded-xl p-3 flex flex-col gap-1 shadow-sm border border-gray-100 dark:border-white/5">
@@ -70,7 +232,7 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                                 <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Tasks</span>
                             </div>
                             <div className="flex items-end gap-1">
-                                <span className="text-2xl font-bold leading-none">12<span className="text-sm text-gray-500">/15</span></span>
+                                <span className="text-2xl font-bold leading-none">{stats.completedTasks}<span className="text-sm text-gray-500">/{stats.totalTasks}</span></span>
                             </div>
                         </div>
                     </div>
@@ -78,7 +240,6 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                     {/* AI Insights Panel */}
                     <div className="mb-8">
                         <div className="relative overflow-hidden bg-gradient-to-br from-student-surface-dark to-student-bg-dark border border-student-primary/20 rounded-2xl p-5 shadow-lg">
-                            {/* Abstract decoration */}
                             <div className="absolute -right-4 -top-4 size-24 bg-student-primary/10 rounded-full blur-xl"></div>
                             <div className="relative z-10 flex gap-4">
                                 <div className="shrink-0 size-10 rounded-full bg-student-primary/20 flex items-center justify-center">
@@ -86,13 +247,11 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                                 </div>
                                 <div className="flex-1">
                                     <h3 className="text-student-primary font-bold text-base mb-1">AI Insight</h3>
-                                    <p className="text-sm text-gray-300 leading-relaxed mb-3">
-                                        You've missed 2 assignments in History. Catch up this weekend to maintain your A- grade.
+                                    <p className="text-sm text-gray-300 leading-relaxed">
+                                        {stats.totalTasks - stats.completedTasks > 0 
+                                            ? `You have ${stats.totalTasks - stats.completedTasks} pending assignments. Keep up the dedication and complete them to raise your GPA!`
+                                            : "Excellent progress! You have completed all course assignments. Keep up the amazing work to maintain your grade."}
                                     </p>
-                                    <button className="bg-student-primary hover:bg-green-400 text-student-bg-dark text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1">
-                                        Review Assignments
-                                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -102,59 +261,28 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                     <div className="mb-8">
                         <div className="flex items-center justify-between mb-4 px-1">
                             <h3 className="text-lg font-bold">Study Focus</h3>
-                            <span className="text-xs font-medium text-student-primary bg-student-primary/10 px-2 py-1 rounded">14h this week</span>
+                            <span className="text-xs font-medium text-student-primary bg-student-primary/10 px-2 py-1 rounded">
+                                {studyFocusData.reduce((a, b) => a + b, 0)}h this week
+                            </span>
                         </div>
                         <div className="bg-white dark:bg-student-surface-dark rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-white/5">
                             <div className="grid grid-cols-7 gap-2 h-32 items-end">
-                                {/* Day M */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary/50 group-hover:bg-student-primary transition-all duration-300" style={{ height: '30%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400">M</span>
-                                </div>
-                                {/* Day T */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary/50 group-hover:bg-student-primary transition-all duration-300" style={{ height: '45%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400">T</span>
-                                </div>
-                                {/* Day W */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary/70 group-hover:bg-student-primary transition-all duration-300" style={{ height: '70%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400">W</span>
-                                </div>
-                                {/* Day T */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary group-hover:bg-student-primary transition-all duration-300" style={{ height: '90%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-student-primary">T</span>
-                                </div>
-                                {/* Day F */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary/60 group-hover:bg-student-primary transition-all duration-300" style={{ height: '60%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400">F</span>
-                                </div>
-                                {/* Day S */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary/30 group-hover:bg-student-primary transition-all duration-300" style={{ height: '20%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400">S</span>
-                                </div>
-                                {/* Day S */}
-                                <div className="flex flex-col items-center gap-2 h-full justify-end group">
-                                    <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
-                                        <div className="w-full bg-student-primary/40 group-hover:bg-student-primary transition-all duration-300" style={{ height: '35%' }}></div>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-400">S</span>
-                                </div>
+                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => {
+                                    const value = studyFocusData[idx];
+                                    const maxVal = Math.max(...studyFocusData, 1);
+                                    const percentage = (value / maxVal) * 100;
+                                    return (
+                                        <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end group">
+                                            <div className="w-full bg-gray-200 dark:bg-white/10 rounded-t-sm relative h-full flex items-end overflow-hidden">
+                                                <div 
+                                                    className="w-full bg-student-primary/50 group-hover:bg-student-primary transition-all duration-300" 
+                                                    style={{ height: `${percentage}%` }}
+                                                ></div>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-gray-400">{day}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -162,131 +290,37 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                     {/* Subjects & Skills */}
                     <div className="mb-4 flex items-center justify-between px-1">
                         <h3 className="text-lg font-bold">Subjects & Skills</h3>
-                        <button className="text-student-primary text-xs font-bold hover:underline">View All</button>
                     </div>
                     <div className="flex flex-col gap-4">
-                        {/* Math Card */}
-                        <div className="bg-white dark:bg-student-surface-dark rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-white/5">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="size-2 rounded-full bg-orange-400"></div>
-                                        <h4 className="font-bold text-lg">Mathematics</h4>
+                        {coursesProgress.length > 0 ? (
+                            coursesProgress.map((course: any) => (
+                                <div key={course.id} className="bg-white dark:bg-student-surface-dark rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-white/5">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="size-2 rounded-full bg-indigo-400"></div>
+                                                <h4 className="font-bold text-lg">{course.title}</h4>
+                                            </div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{course.teacher}</p>
+                                        </div>
+                                        <div className="relative size-14 flex items-center justify-center">
+                                            <svg className="size-full -rotate-90" viewBox="0 0 36 36">
+                                                <path className="text-gray-200 dark:text-white/10" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
+                                                <path className="text-student-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray={`${course.score}, 100`} strokeLinecap="round" strokeWidth="3.5"></path>
+                                            </svg>
+                                            <div className="absolute flex flex-col items-center">
+                                                <span className="text-xs font-bold text-student-primary">{course.score}%</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Mr. Anderson • Period 3</p>
                                 </div>
-                                <div className="relative size-14 flex items-center justify-center">
-                                    {/* SVG Donut Chart */}
-                                    <svg className="size-full -rotate-90" viewBox="0 0 36 36">
-                                        <path className="text-gray-200 dark:text-white/10" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
-                                        <path className="text-student-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="88, 100" strokeLinecap="round" strokeWidth="3.5"></path>
-                                    </svg>
-                                    <div className="absolute flex flex-col items-center">
-                                        <span className="text-xs font-bold text-student-primary">88%</span>
-                                    </div>
-                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 text-gray-500 dark:text-zinc-500">
+                                <span className="material-symbols-outlined text-4xl mb-2">school</span>
+                                <p className="text-sm">Enroll in courses to view progress tracking.</p>
                             </div>
-                            <div className="space-y-4">
-                                {/* Skill 1 */}
-                                <div>
-                                    <div className="flex justify-between text-xs font-medium mb-1.5">
-                                        <span className="text-gray-600 dark:text-gray-300">Calculus</span>
-                                        <span className="text-student-primary font-bold">90%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
-                                        <div className="h-full bg-student-primary rounded-full" style={{ width: '90%' }}></div>
-                                    </div>
-                                </div>
-                                {/* Skill 2 */}
-                                <div>
-                                    <div className="flex justify-between text-xs font-medium mb-1.5">
-                                        <span className="text-gray-600 dark:text-gray-300">Geometry</span>
-                                        <span className="text-white font-bold">75%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
-                                        <div className="h-full bg-student-primary/70 rounded-full" style={{ width: '75%' }}></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="mt-5 pt-4 border-t border-gray-100 dark:border-white/5">
-                                <button className="w-full flex items-center justify-between text-sm font-bold text-gray-700 dark:text-white hover:text-student-primary transition-colors">
-                                    <span>View Gradebook</span>
-                                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* English Card */}
-                        <div className="bg-white dark:bg-student-surface-dark rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-white/5">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="size-2 rounded-full bg-blue-400"></div>
-                                        <h4 className="font-bold text-lg">English Lit</h4>
-                                    </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Ms. Davis • Period 1</p>
-                                </div>
-                                <div className="relative size-14 flex items-center justify-center">
-                                    <svg className="size-full -rotate-90" viewBox="0 0 36 36">
-                                        <path className="text-gray-200 dark:text-white/10" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.5"></path>
-                                        <path className="text-student-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeDasharray="94, 100" strokeLinecap="round" strokeWidth="3.5"></path>
-                                    </svg>
-                                    <div className="absolute flex flex-col items-center">
-                                        <span className="text-xs font-bold text-student-primary">94%</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                {/* Skill 1 */}
-                                <div>
-                                    <div className="flex justify-between text-xs font-medium mb-1.5">
-                                        <span className="text-gray-600 dark:text-gray-300">Writing</span>
-                                        <span className="text-student-primary font-bold">96%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
-                                        <div className="h-full bg-student-primary rounded-full" style={{ width: '96%' }}></div>
-                                    </div>
-                                </div>
-                                {/* Skill 2 */}
-                                <div>
-                                    <div className="flex justify-between text-xs font-medium mb-1.5">
-                                        <span className="text-gray-600 dark:text-gray-300">Speaking</span>
-                                        <span className="text-white font-bold">88%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
-                                        <div className="h-full bg-student-primary/80 rounded-full" style={{ width: '88%' }}></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="mt-5 pt-4 border-t border-gray-100 dark:border-white/5">
-                                <button className="w-full flex items-center justify-between text-sm font-bold text-gray-700 dark:text-white hover:text-student-primary transition-colors">
-                                    <span>View Gradebook</span>
-                                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Bottom Navigation */}
-                <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-student-bg-dark/90 backdrop-blur-lg border-t border-gray-200 dark:border-white/5 pb-6 pt-2 z-50">
-                    <div className="flex justify-around items-center px-4">
-                        <button className="flex flex-col items-center gap-1 p-2 text-student-primary">
-                            <span className="material-symbols-outlined text-[24px] filled">dashboard</span>
-                            <span className="text-[10px] font-medium">Progress</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-student-primary transition-colors">
-                            <span className="material-symbols-outlined text-[24px]">calendar_month</span>
-                            <span className="text-[10px] font-medium">Calendar</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-student-primary transition-colors">
-                            <span className="material-symbols-outlined text-[24px]">book_2</span>
-                            <span className="text-[10px] font-medium">Courses</span>
-                        </button>
-                        <button className="flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-student-primary transition-colors">
-                            <span className="material-symbols-outlined text-[24px]">person</span>
-                            <span className="text-[10px] font-medium">Profile</span>
-                        </button>
+                        )}
                     </div>
                 </div>
             </DialogContent>

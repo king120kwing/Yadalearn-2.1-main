@@ -434,16 +434,18 @@ const Settings = () => {
                 />
               </div>
  
-              <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Short Bio</label>
-                <textarea
-                  value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  rows={4}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white resize-none"
-                  placeholder="Tell your students a bit about yourself..."
-                />
-              </div>
+              {userRole === 'teacher' && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Short Bio</label>
+                  <textarea
+                    value={editBio}
+                    onChange={(e) => setEditBio(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white resize-none"
+                    placeholder="Tell your students a bit about yourself..."
+                  />
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button
