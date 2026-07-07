@@ -91,6 +91,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('DEBUG: VITE_SUPABASE_ANON_KEY is missing');
     }
 
+    // Self-healing check: clean up any bloated auth token in local storage immediately on mount
+    let hasBloatedCache = false;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('auth-token') || key === 'yadalearn-user')) {
+        const val = localStorage.getItem(key);
+        if (val && (val.includes('data:image') || val.length > 10000)) {
+          console.warn('AuthContext: Bloated cache detected. Clearing local cache.');
+          hasBloatedCache = true;
+        }
+      }
+    }
+
+    if (hasBloatedCache) {
+      // Clear localStorage auth state
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('auth-token') || key.startsWith('yadalearn-') || key === 'sb-')) {
+          localStorage.removeItem(key);
+        }
+      }
+      // Clear bloated cookies starting with sb-
+      document.cookie.split(';').forEach(cookie => {
+        const parts = cookie.split('=');
+        const name = parts[0].trim();
+        if (name.startsWith('sb-')) {
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+      });
+      // Force reload to get a clean login state
+      window.location.reload();
+      return;
+    }
+
     // Check for OAuth redirect errors in hash or query parameters
     const hash = window.location.hash;
     const search = window.location.search;
