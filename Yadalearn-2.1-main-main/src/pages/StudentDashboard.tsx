@@ -79,13 +79,7 @@ const StudentDashboard = () => {
         // Resize and compress raw upload to prevent net::ERR_CONNECTION_CLOSED
         const processedImage = await resizeProfileImage(base64Data);
 
-        // 1. Update Auth Metadata
-        const { error: authError } = await supabase.auth.updateUser({
-          data: { imageUrl: processedImage, avatar_url: processedImage }
-        });
-        if (authError) throw authError;
-
-        // 2. Update profiles table in database
+        // 1. Update profiles table in database directly
         const { error: dbError } = await supabase
           .from('profiles')
           .update({ avatar_url: processedImage })

@@ -94,11 +94,6 @@ const Settings = () => {
         try {
           const processedResult = await resizeProfileImage(result);
 
-          // Update Auth user metadata as well to keep in sync
-          await supabase.auth.updateUser({
-            data: { imageUrl: processedResult, avatar_url: processedResult }
-          });
-
           const { error } = await supabase
             .from('profiles')
             .update({ avatar_url: processedResult })
