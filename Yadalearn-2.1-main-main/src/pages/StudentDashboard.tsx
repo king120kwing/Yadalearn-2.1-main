@@ -172,28 +172,15 @@ const StudentDashboard = () => {
       )}>
         <div className="flex flex-col gap-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="relative w-10 h-10 select-none">
-                {user?.imageUrl ? (
-                  <img
-                    src={user.imageUrl}
-                    alt={userName}
-                    className="w-full h-full object-cover object-center pointer-events-none"
-                    style={{
-                      maskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)',
-                      WebkitMaskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)'
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
-                    <span className="material-symbols-outlined text-sm text-slate-500">person</span>
-                  </div>
-                )}
+            <div className="flex items-center gap-2.5 px-1">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100 dark:border-zinc-700 shadow-sm relative">
+                <img 
+                  src="/logo (2).png" 
+                  alt="YadaLearn Logo" 
+                  className="absolute w-[185%] h-[185%] max-w-none object-contain top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" 
+                />
               </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-sm text-[#1C1B19] dark:text-white tracking-tight leading-tight">{userName}</span>
-                <span className="text-[10px] text-slate-500 font-medium">Student</span>
-              </div>
+              <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
             </div>
             <button 
               onClick={() => setIsDrawerOpen(false)}
@@ -233,21 +220,43 @@ const StudentDashboard = () => {
           </nav>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={() => { navigate('/settings'); setIsDrawerOpen(false); }}
-            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
-          >
-            <Settings className="h-5 w-5" />
-            <span>Settings</span>
-          </button>
-          <button
-            onClick={() => { navigate('/logout'); setIsDrawerOpen(false); }}
-            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
-          >
-            <LogOut className="h-5 w-5" />
-            <span>Logout</span>
-          </button>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2.5 px-4 py-2 border-t border-slate-200/20 dark:border-zinc-800/20 pt-4">
+            <div className="relative w-10 h-10 select-none shrink-0">
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={userName}
+                  className="w-full h-full object-cover object-center rounded-full border border-white/20 shadow-sm"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+                  <span className="material-symbols-outlined text-sm text-slate-500">person</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col truncate">
+              <span className="font-extrabold text-sm text-[#1C1B19] dark:text-white tracking-tight leading-tight truncate">{userName}</span>
+              <span className="text-[10px] text-slate-500 font-medium">Student</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => { navigate('/settings'); setIsDrawerOpen(false); }}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <Settings className="h-5 w-5" />
+              <span>Settings</span>
+            </button>
+            <button
+              onClick={() => { navigate('/logout'); setIsDrawerOpen(false); }}
+              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -264,9 +273,9 @@ const StudentDashboard = () => {
               <Menu className="h-6 w-6" />
             </button>
             <div>
-              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">Welcome back, {userName}</p>
+              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">{userName.split(' ')[0]}, welcome back.</p>
               <h1 className="text-3xl font-extrabold text-[#1C1B19] dark:text-white font-serif leading-tight">
-                Hi, {userName}
+                {userName}
               </h1>
             </div>
           </div>
@@ -294,60 +303,45 @@ const StudentDashboard = () => {
 
         {/* Welcome Banner Card with Circular Profile Image Well */}
         <section className="mb-12 mt-8 z-10 relative">
-          <div className="relative bg-gradient-to-r from-[#F2EBE0]/60 to-[#E5ECE5]/60 dark:from-zinc-900/40 dark:to-zinc-800/20 backdrop-blur-md border border-white/20 dark:border-zinc-800 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center shadow-sm overflow-visible">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-center w-full overflow-visible">
+          <div className="relative bg-gradient-to-r from-[#F2EBE0]/60 to-[#E5ECE5]/60 dark:from-zinc-900/40 dark:to-zinc-800/20 backdrop-blur-md border border-white/20 dark:border-zinc-800 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center justify-center shadow-sm overflow-visible">
+            <div className="relative flex justify-center items-center overflow-visible z-20">
+              {/* Synchronized soft lavender/apricot gradient glow in the background */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(91,74,159,0.14)_0%,rgba(143,129,214,0.06)_50%,transparent_75%)] blur-[45px] pointer-events-none z-0" />
               
-              {/* Welcome Text (3 columns) */}
-              <div className="md:col-span-3 text-left z-10 space-y-4">
-                <h2 className="text-2xl md:text-4xl font-bold text-[#1C1B19] dark:text-zinc-100 font-serif leading-tight">
-                  Welcome back to your studies, {userName}!
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  Ready to explore your custom courses, scheduled sessions, and check in with your AI Study Buddy?
-                </p>
-              </div>
-
-              {/* Big circular placeholder profile image well */}
-              <div className="md:col-span-2 relative flex justify-center items-center overflow-visible z-20">
-                {/* Synchronized soft lavender/apricot gradient glow in the background */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(91,74,159,0.14)_0%,rgba(143,129,214,0.06)_50%,transparent_75%)] blur-[45px] pointer-events-none z-0" />
-                
-                <div 
-                  onClick={handleImageClick}
-                  className="relative w-60 h-60 md:w-68 md:h-68 rounded-full bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md border border-white/20 dark:border-zinc-800/40 shadow-lg flex items-center justify-center cursor-pointer overflow-hidden group z-10 hover:scale-[1.02] transition-transform duration-300"
-                >
-                  {user?.imageUrl ? (
-                    <img
-                      src={user.imageUrl}
-                      alt={userName}
-                      className="w-full h-full object-cover object-center rounded-full"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="material-symbols-outlined text-6xl text-slate-400 dark:text-zinc-600">
-                        face
-                      </span>
-                      <span className="text-xs font-semibold text-[#8F81D6]">Click to upload</span>
-                    </div>
-                  )}
-
-                  {/* Camera Hover Overlay */}
-                  <div className="absolute inset-0 bg-[#5B4A9F]/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
-                    <div className="w-12 h-12 rounded-full bg-white/95 text-[#5B4A9F] flex items-center justify-center shadow-md">
-                      <span className="material-symbols-outlined text-2xl font-bold">photo_camera</span>
-                    </div>
-                  </div>
-
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleImageUpload} 
+              <div 
+                onClick={handleImageClick}
+                className="relative w-60 h-60 md:w-68 md:h-68 rounded-full bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md border border-white/20 dark:border-zinc-800/40 shadow-lg flex items-center justify-center cursor-pointer overflow-hidden group z-10 hover:scale-[1.02] transition-transform duration-300"
+              >
+                {user?.imageUrl ? (
+                  <img
+                    src={user.imageUrl}
+                    alt={userName}
+                    className="w-full h-full object-cover object-center rounded-full"
                   />
-                </div>
-              </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="material-symbols-outlined text-6xl text-slate-400 dark:text-zinc-650">
+                      face
+                    </span>
+                    <span className="text-xs font-semibold text-[#8F81D6]">Click to upload</span>
+                  </div>
+                )}
 
+                {/* Camera Hover Overlay */}
+                <div className="absolute inset-0 bg-[#5B4A9F]/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
+                  <div className="w-12 h-12 rounded-full bg-white/95 text-[#5B4A9F] flex items-center justify-center shadow-md">
+                    <span className="material-symbols-outlined text-2xl font-bold">photo_camera</span>
+                  </div>
+                </div>
+
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload} 
+                />
+              </div>
             </div>
           </div>
         </section>

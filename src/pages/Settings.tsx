@@ -46,6 +46,45 @@ const Settings = () => {
     }
   }, [user]);
 
+  const resizeProfileImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(base64Str);
+          return;
+        }
+
+        const targetWidth = 400;
+        const targetHeight = 500;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        // Draw image keeping proportions
+        const imgRatio = img.width / img.height;
+        const targetRatio = targetWidth / targetHeight;
+        let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+        if (imgRatio > targetRatio) {
+          sWidth = img.height * targetRatio;
+          sx = (img.width - sWidth) / 2;
+        } else {
+          sHeight = img.width / targetRatio;
+          sy = (img.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Compact size, high quality
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   const handleProfileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -53,20 +92,27 @@ const Settings = () => {
       reader.onloadend = async () => {
         const result = reader.result as string;
         try {
-          const processedResult = await removeImageBackground(result);
+          const processedResult = await resizeProfileImage(result);
+
+          // Update Auth user metadata as well to keep in sync
+          await supabase.auth.updateUser({
+            data: { imageUrl: processedResult, avatar_url: processedResult }
+          });
+
           const { error } = await supabase
             .from('profiles')
             .update({ avatar_url: processedResult })
             .eq('id', user.id);
- 
+  
           if (error) {
             console.error('Error saving image:', error);
             alert('Failed to save profile photo: ' + error.message);
           } else {
             const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
             savedUser.imageUrl = processedResult;
+            savedUser.avatar_url = processedResult;
             localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
- 
+  
             refreshUser?.();
             window.location.reload();
           }

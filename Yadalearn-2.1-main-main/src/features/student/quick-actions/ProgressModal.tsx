@@ -182,7 +182,17 @@ export const ProgressModal = ({ isOpen, onClose }: ProgressModalProps) => {
                 <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-student-bg-dark/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-white/5">
                     <div className="flex items-center gap-3">
                         <div className="relative group">
-                            <div className="bg-gradient-to-br from-blue-400 to-purple-400 rounded-full size-10 border-2 border-student-primary"></div>
+                            {user?.imageUrl ? (
+                                <img 
+                                    src={user.imageUrl} 
+                                    alt={userName} 
+                                    className="rounded-full size-10 object-cover border-2 border-student-primary" 
+                                />
+                            ) : (
+                                <div className="bg-gradient-to-br from-blue-400 to-purple-400 rounded-full size-10 border-2 border-student-primary flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-sm text-white">person</span>
+                                </div>
+                            )}
                             <div className="absolute bottom-0 right-0 size-3 bg-student-primary rounded-full border-2 border-student-bg-dark"></div>
                         </div>
                         <div>
