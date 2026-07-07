@@ -58,8 +58,8 @@ const Settings = () => {
           return;
         }
 
-        const targetWidth = 400;
-        const targetHeight = 500;
+        const targetWidth = 250;
+        const targetHeight = 300;
         canvas.width = targetWidth;
         canvas.height = targetHeight;
 
