@@ -57,18 +57,18 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-md mx-auto bg-student-bg-dark text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+            <DialogContent className="!max-w-3xl mx-auto bg-student-bg-dark text-white border-0 p-0 overflow-hidden rounded-[2.5rem] max-h-[85vh] flex flex-col shadow-2xl">
                 <DialogTitle className="sr-only">Join Class - {className}</DialogTitle>
                 <DialogDescription className="sr-only">Perform a pre-class camera and mic check before entering the classroom.</DialogDescription>
                 {/* Header */}
-                <div className="flex items-center p-4 pb-2 justify-between z-10 shrink-0">
+                <div className="flex items-center p-6 pb-2 justify-between z-10 shrink-0 border-b border-white/5 bg-student-bg-dark">
                     <button
                         onClick={onClose}
                         className="text-white flex size-10 shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors"
                     >
                         <span className="material-symbols-outlined text-[24px]">close</span>
                     </button>
-                    <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em] text-center">
+                    <h2 className="text-white text-xl font-extrabold leading-tight tracking-[-0.015em] text-center">
                         Pre-Class Check
                     </h2>
                     <button className="flex h-10 px-2 items-center justify-end rounded-full active:bg-white/10 transition-colors">
@@ -79,25 +79,11 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                 </div>
 
                 {/* Scrollable Main Content */}
-                <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
-                    {/* Class Info */}
-                    <div className="flex flex-col items-center pt-2 pb-6 px-4">
-                        <h1 className="text-white tracking-tight text-[28px] font-bold leading-tight text-center mb-1">
-                            {className}
-                        </h1>
-                        <div className="flex items-center gap-2 text-student-primary/80 text-sm font-medium">
-                            <span>{teacherName || 'Prof. Alan Grant'}</span>
-                            <span className="size-1 rounded-full bg-student-primary/50"></span>
-                            <span className="text-student-primary flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[16px] fill-1">timer</span>
-                                Starts in 04:12
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Video Preview Card */}
-                    <div className="px-4 mb-6">
-                        <div className="relative w-full aspect-[3/4] bg-student-surface-dark rounded-3xl overflow-hidden shadow-2xl border border-white/5 ring-1 ring-white/5 group">
+                <div className="flex-1 overflow-y-auto no-scrollbar p-6 pb-28">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Left Column: Webcam Preview */}
+                        <div className="space-y-4">
+                            <div className="relative w-full aspect-video bg-student-surface-dark rounded-3xl overflow-hidden shadow-2xl border border-white/5 ring-1 ring-white/5 group">
                             {/* Camera Feed */}
                             {cameraEnabled ? (
                                 cameraError ? (
@@ -153,7 +139,7 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                                 <div className="flex flex-col items-center gap-2">
                                     <button
                                         onClick={handleCameraToggle}
-                                        className={`flex shrink-0 items-center justify-center rounded-full size-16 shadow-[0_0_20px_rgba(48,232,110,0.4)] transition-transform active:scale-95 ${cameraEnabled
+                                        className={`flex shrink-0 items-center justify-center rounded-full size-16 shadow-[0_0_20px_rgba(143,129,214,0.4)] transition-transform active:scale-95 ${cameraEnabled
                                                 ? 'bg-student-primary text-student-bg-dark hover:brightness-110'
                                                 : 'bg-red-500 text-white hover:bg-red-600'
                                             }`}
@@ -184,16 +170,32 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                         </div>
                     </div>
 
-                    {/* Hardware & Connection Status */}
-                    <div className="px-4 mb-8">
+                    {/* Right Column: Class Details & Hardware checks */}
+                    <div className="space-y-6">
+                        {/* Class Info */}
+                        <div className="flex flex-col items-start px-1">
+                            <h1 className="text-white tracking-tight text-[24px] font-extrabold leading-tight mb-1">
+                                {className}
+                            </h1>
+                            <div className="flex items-center gap-2 text-student-primary/85 text-xs font-semibold">
+                                <span>{teacherName || 'Prof. Alan Grant'}</span>
+                                <span className="size-1 rounded-full bg-student-primary/50"></span>
+                                <span className="text-student-primary flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[14px] fill-1">timer</span>
+                                    Starts in 04:12
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Microphone & Output Dropdowns */}
                         <div className="flex flex-col gap-3">
-                            {/* Dropdowns Row */}
+                            <label className="text-xs font-extrabold text-white/50 uppercase tracking-wider pl-1">Devices</label>
                             <div className="flex gap-3 overflow-x-auto no-scrollbar">
                                 <button className="flex items-center gap-2 px-4 py-3 bg-student-surface-dark rounded-xl border border-white/5 flex-shrink-0 active:bg-white/5 transition-colors">
                                     <span className="material-symbols-outlined text-student-primary text-[20px]">mic</span>
                                     <div className="flex flex-col items-start">
                                         <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Microphone</span>
-                                        <span className="text-sm font-medium text-white truncate max-w-[100px]">MacBook Pro Mic</span>
+                                        <span className="text-sm font-medium text-white truncate max-w-[105px]">MacBook Pro Mic</span>
                                     </div>
                                     <span className="material-symbols-outlined text-gray-500 text-[20px]">expand_more</span>
                                 </button>
@@ -201,28 +203,27 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                                     <span className="material-symbols-outlined text-student-primary text-[20px]">headphones</span>
                                     <div className="flex flex-col items-start">
                                         <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Output</span>
-                                        <span className="text-sm font-medium text-white truncate max-w-[100px]">AirPods Pro</span>
+                                        <span className="text-sm font-medium text-white truncate max-w-[105px]">AirPods Pro</span>
                                     </div>
                                     <span className="material-symbols-outlined text-gray-500 text-[20px]">expand_more</span>
                                 </button>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Virtual Backgrounds */}
-                    <div className="px-4 mb-4">
-                        <div className="flex items-center justify-between mb-3 px-1">
-                            <h3 className="text-white text-sm font-bold">Virtual Background</h3>
-                            <button className="text-student-primary text-xs font-medium">View All</button>
-                        </div>
-                        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                        {/* Virtual Backgrounds */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between mb-1 px-1">
+                                <h3 className="text-white text-sm font-bold">Virtual Background</h3>
+                                <button className="text-student-primary text-xs font-semibold">View All</button>
+                            </div>
+                            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                             {/* None Option */}
                             <button
                                 onClick={() => setSelectedBackground('none')}
                                 className="flex flex-col gap-2 items-center group shrink-0"
                             >
                                 <div className={`size-16 rounded-2xl border-2 flex items-center justify-center transition-all ${selectedBackground === 'none'
-                                    ? 'border-student-primary bg-student-primary/10 shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    ? 'border-student-primary bg-student-primary/10 shadow-[0_0_15px_rgba(143,129,214,0.3)]'
                                     : 'border-white/10 bg-student-surface-dark group-hover:border-white/30'
                                     }`}>
                                     <span className={`material-symbols-outlined text-[24px] ${selectedBackground === 'none' ? 'text-student-primary' : 'text-gray-400'
@@ -238,7 +239,7 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                                 className="flex flex-col gap-2 items-center group shrink-0"
                             >
                                 <div className={`size-16 rounded-2xl border-2 overflow-hidden relative transition-all ${selectedBackground === 'blur'
-                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(143,129,214,0.3)]'
                                     : 'border-transparent group-hover:border-white/20'
                                     }`}>
                                     <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 blur-sm opacity-50"></div>
@@ -257,7 +258,7 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                                 className="flex flex-col gap-2 items-center group shrink-0"
                             >
                                 <div className={`size-16 rounded-2xl border-2 overflow-hidden transition-all ${selectedBackground === 'library'
-                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(143,129,214,0.3)]'
                                     : 'border-transparent group-hover:border-white/20'
                                     }`}>
                                     <div className="w-full h-full bg-gradient-to-br from-amber-700 to-amber-900 opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -272,7 +273,7 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                                 className="flex flex-col gap-2 items-center group shrink-0"
                             >
                                 <div className={`size-16 rounded-2xl border-2 overflow-hidden transition-all ${selectedBackground === 'space'
-                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(143,129,214,0.3)]'
                                     : 'border-transparent group-hover:border-white/20'
                                     }`}>
                                     <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-black opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -287,7 +288,7 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                                 className="flex flex-col gap-2 items-center group shrink-0"
                             >
                                 <div className={`size-16 rounded-2xl border-2 overflow-hidden transition-all ${selectedBackground === 'office'
-                                    ? 'border-student-primary shadow-[0_0_15px_rgba(48,232,110,0.3)]'
+                                    ? 'border-student-primary shadow-[0_0_15px_rgba(143,129,214,0.3)]'
                                     : 'border-transparent group-hover:border-white/20'
                                     }`}>
                                     <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-300 opacity-80 group-hover:opacity-100 transition-opacity"></div>
@@ -297,11 +298,13 @@ export const JoinClassModal = ({ isOpen, onClose, className, teacherName }: Join
                             </button>
                         </div>
                     </div>
+                    </div>
+                    </div>
                 </div>
 
                 {/* Sticky Footer */}
                 <div className="absolute bottom-0 left-0 right-0 bg-student-bg-dark/95 backdrop-blur-xl border-t border-white/5 p-4 z-50 pb-8">
-                    <button className="w-full bg-student-primary hover:bg-[#25c45b] text-student-bg-dark font-bold text-lg h-14 rounded-2xl shadow-[0_4px_20px_rgba(48,232,110,0.25)] flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
+                    <button className="w-full bg-student-primary hover:bg-[#7c6ec4] text-student-bg-dark font-bold text-lg h-14 rounded-2xl shadow-[0_4px_20px_rgba(143,129,214,0.25)] flex items-center justify-center gap-3 transition-all active:scale-[0.98]">
                         <span>Join Class Now</span>
                         <span className="material-symbols-outlined text-[24px]">arrow_forward</span>
                     </button>

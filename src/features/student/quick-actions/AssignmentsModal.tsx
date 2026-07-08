@@ -171,166 +171,312 @@ export const AssignmentsModal = ({ isOpen, onClose }: AssignmentsModalProps) => 
         );
     };
 
+    const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+
+    const activeAssignment = assignments.find(a => a.id === selectedAssignmentId);
+    const canSubmitActive = activeAssignment && (activeAssignment.status === 'To Do' || activeAssignment.status === 'Missing');
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => {
-            if (!open) setSubmittingId(null);
+            if (!open) {
+                setSelectedAssignmentId(null);
+                setSubmittingId(null);
+            }
             onClose();
         }}>
-            <DialogContent className="max-w-md mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+            <DialogContent className="!max-w-4xl mx-auto bg-white dark:bg-zinc-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden rounded-[2.5rem] max-h-[85vh] flex flex-col shadow-2xl w-[95vw] md:w-full">
                 <DialogTitle className="sr-only">Assignments</DialogTitle>
                 <DialogDescription className="sr-only">Submit, review, and view grades for your enrolled class assignments.</DialogDescription>
 
-                {/* SUBMISSION FORM OVERLAY */}
-                {submittingId ? (
-                    <div className="flex flex-col h-full bg-white dark:bg-gray-900 z-50 animate-in slide-in-from-right relative">
-                        <header className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700">
-                            <button onClick={() => setSubmittingId(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                                <span className="material-symbols-outlined">arrow_back</span>
-                            </button>
-                            <h2 className="text-lg font-bold">Submit Assignment</h2>
-                        </header>
+                {/* Header */}
+                <header className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 border-b border-gray-150 dark:border-zinc-800 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="flex items-center justify-center p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[28px]">close</span>
+                    </button>
+                    <h1 className="text-lg font-bold tracking-tight">Assignments</h1>
+                    <div className="w-10"></div>
+                </header>
 
-                        <div className="p-6 flex-1">
-                            <div className="mb-6">
-                                <h3 className="text-xl font-bold mb-1">{assignments.find(a => a.id === submittingId)?.title}</h3>
-                                <p className="text-sm text-gray-500">{assignments.find(a => a.id === submittingId)?.description}</p>
-                            </div>
-
-                            <form onSubmit={handleSubmitAssignment} className="flex flex-col gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-2">Detailed Response or Link</label>
-                                    <textarea
-                                        className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border-none focus:ring-2 ring-indigo-500 min-h-[200px] resize-none"
-                                        placeholder="Type your answer here or paste a link to your Google Doc..."
-                                        value={submissionContent}
-                                        onChange={(e) => setSubmissionContent(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl mt-4 transition-all active:scale-95 flex items-center justify-center gap-2"
-                                >
-                                    {isSubmitting ? 'Sending...' : 'Submit Assignment'}
-                                    {!isSubmitting && <span className="material-symbols-outlined text-lg">send</span>}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {/* TopAppBar */}
-                        <header className="sticky top-0 z-20 bg-white dark:bg-gray-900 px-4 pt-6 pb-2 border-b border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    {/* User Info */}
-                                    <div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Welcome back,</p>
-                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{user?.fullName || user?.firstName || 'Student'}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-between items-end">
-                                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Assignments</h1>
-                                <button
-                                    onClick={onClose}
-                                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white size-10 rounded-full flex items-center justify-center shadow-md transition-all active:scale-95"
-                                >
-                                    <span className="material-symbols-outlined font-bold">close</span>
-                                </button>
-                            </div>
-                        </header>
-
-                        {/* Main Content Scroll Area */}
-                        <main className="flex-1 flex flex-col gap-6 px-4 pt-4 overflow-y-auto pb-24 bg-gray-50 dark:bg-gray-900">
-                            {loading ? <p className="text-center py-4">Loading assignments...</p> : (
-                                <>
-                                    {/* OVERDUE Section */}
-                                    {overdue.length > 0 && (
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <h3 className="text-red-600 dark:text-red-400 tracking-tight text-xl font-bold leading-tight">⚠️ Overdue</h3>
-                                                <div className="h-px bg-red-300 dark:bg-red-800 flex-1"></div>
-                                                <span className="text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-800">{overdue.length} Task{overdue.length !== 1 && 's'}</span>
-                                            </div>
-                                            <div className="flex flex-col gap-3">
-                                                {overdue.map(a => <AssignmentCard key={a.id} assignment={a} statusColor="border-red-500" statusText="Missing" />)}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* DUE TODAY Section */}
-                                    {dueToday.length > 0 && (
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <h3 className="text-orange-600 dark:text-orange-400 tracking-tight text-xl font-bold leading-tight">🔥 Due Today</h3>
-                                                <div className="h-px bg-orange-300 dark:bg-orange-800 flex-1"></div>
-                                            </div>
-                                            <div className="flex flex-col gap-3">
-                                                {dueToday.map(a => <AssignmentCard key={a.id} assignment={a} statusColor="border-orange-500" statusText="To Do" />)}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* THIS WEEK Section */}
-                                    {thisWeek.length > 0 && (
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <h3 className="text-yellow-600 dark:text-yellow-400 tracking-tight text-xl font-bold leading-tight">📅 This Week</h3>
-                                                <div className="h-px bg-yellow-300 dark:bg-yellow-800 flex-1"></div>
-                                            </div>
-                                            <div className="flex flex-col gap-3">
-                                                {thisWeek.map(a => <AssignmentCard key={a.id} assignment={a} statusColor="border-yellow-500" statusText="Upcoming" />)}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* UPCOMING Section */}
-                                    {upcoming.length > 0 && (
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <h3 className="text-emerald-600 dark:text-emerald-400 tracking-tight text-xl font-bold leading-tight">🔮 Upcoming</h3>
-                                                <div className="h-px bg-emerald-300 dark:bg-emerald-800 flex-1"></div>
-                                            </div>
-                                            <div className="flex flex-col gap-3">
-                                                {upcoming.map(a => <AssignmentCard key={a.id} assignment={a} statusColor="border-emerald-500" statusText="Open" />)}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* COMPLETED/GRADED Section */}
-                                    {completed.length > 0 && (
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <h3 className="text-gray-500 dark:text-gray-400 tracking-tight text-xl font-bold leading-tight">✅ Completed</h3>
-                                                <div className="h-px bg-gray-300 dark:bg-gray-800 flex-1"></div>
-                                            </div>
-                                            <div className="flex flex-col gap-3">
-                                                {completed.map(a => <AssignmentCard key={a.id} assignment={a} statusColor="border-gray-500" statusText={a.status} />)}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {assignments.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center mt-10 gap-4">
-                                            <p className="text-center text-gray-500">No assignments found.</p>
-                                            <button
-                                                onClick={async () => {
-                                                    if (userId) await seedDatabase(userId, 'student');
-                                                }}
-                                                className="text-xs px-4 py-2 rounded-lg border border-dashed border-indigo-500 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-2"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">database</span>
-                                                Load Demo Assignments
-                                            </button>
+                {/* Main Content: Split Grid */}
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                    {/* Left Column: Scrollable List of Assignments */}
+                    <div className="w-full md:w-1/2 border-r border-gray-150 dark:border-zinc-800 flex flex-col overflow-y-auto no-scrollbar p-6 bg-gray-50 dark:bg-zinc-900/30">
+                        {loading ? (
+                            <p className="text-center py-4 text-sm text-gray-500">Loading assignments...</p>
+                        ) : (
+                            <div className="space-y-6">
+                                {/* OVERDUE Section */}
+                                {overdue.length > 0 && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <h3 className="text-red-500 tracking-tight text-sm font-bold uppercase">⚠️ Overdue</h3>
+                                            <div className="h-px bg-red-100 dark:bg-red-950 flex-1"></div>
+                                            <span className="text-[10px] font-bold text-red-650 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-full">{overdue.length}</span>
                                         </div>
-                                    )}
-                                </>
-                            )}
-                        </main>
-                    </>
-                )}
+                                        <div className="flex flex-col gap-2.5">
+                                            {overdue.map(a => (
+                                                <div
+                                                    key={a.id}
+                                                    onClick={() => setSelectedAssignmentId(a.id)}
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                                        selectedAssignmentId === a.id
+                                                            ? 'border-[#5B4A9F] bg-purple-50/45 dark:bg-purple-950/20 shadow-sm'
+                                                            : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-gray-300 dark:hover:border-zinc-850'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{a.title}</p>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{a.courseTitle}</p>
+                                                        </div>
+                                                        <span className="text-[10px] font-extrabold uppercase bg-red-150 text-red-700 px-2 py-0.5 rounded-full shrink-0">Missing</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* DUE TODAY Section */}
+                                {dueToday.length > 0 && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <h3 className="text-orange-500 tracking-tight text-sm font-bold uppercase">🔥 Due Today</h3>
+                                            <div className="h-px bg-orange-100 dark:bg-orange-950 flex-1"></div>
+                                            <span className="text-[10px] font-bold text-orange-650 bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full">{dueToday.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-2.5">
+                                            {dueToday.map(a => (
+                                                <div
+                                                    key={a.id}
+                                                    onClick={() => setSelectedAssignmentId(a.id)}
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                                        selectedAssignmentId === a.id
+                                                            ? 'border-[#5B4A9F] bg-purple-50/45 dark:bg-purple-950/20 shadow-sm'
+                                                            : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-gray-300 dark:hover:border-zinc-850'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{a.title}</p>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{a.courseTitle}</p>
+                                                        </div>
+                                                        <span className="text-[10px] font-extrabold uppercase bg-orange-150 text-orange-700 px-2 py-0.5 rounded-full shrink-0">Today</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* THIS WEEK Section */}
+                                {thisWeek.length > 0 && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <h3 className="text-yellow-600 dark:text-yellow-500 tracking-tight text-sm font-bold uppercase">📅 This Week</h3>
+                                            <div className="h-px bg-yellow-100 dark:bg-yellow-950 flex-1"></div>
+                                            <span className="text-[10px] font-bold text-yellow-650 bg-yellow-50 dark:bg-yellow-950/40 px-2 py-0.5 rounded-full">{thisWeek.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-2.5">
+                                            {thisWeek.map(a => (
+                                                <div
+                                                    key={a.id}
+                                                    onClick={() => setSelectedAssignmentId(a.id)}
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                                        selectedAssignmentId === a.id
+                                                            ? 'border-[#5B4A9F] bg-purple-50/45 dark:bg-purple-950/20 shadow-sm'
+                                                            : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-gray-300 dark:hover:border-zinc-850'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{a.title}</p>
+                                                            <p className="text-xs text-gray-550 mt-0.5">{a.courseTitle}</p>
+                                                        </div>
+                                                        <span className="text-[10px] font-extrabold uppercase bg-yellow-150 text-yellow-750 px-2 py-0.5 rounded-full shrink-0">Soon</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* UPCOMING Section */}
+                                {upcoming.length > 0 && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <h3 className="text-[#5B4A9F] tracking-tight text-sm font-bold uppercase">🔮 Upcoming</h3>
+                                            <div className="h-px bg-purple-100 dark:bg-purple-950 flex-1"></div>
+                                            <span className="text-[10px] font-bold text-purple-650 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full">{upcoming.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-2.5">
+                                            {upcoming.map(a => (
+                                                <div
+                                                    key={a.id}
+                                                    onClick={() => setSelectedAssignmentId(a.id)}
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                                        selectedAssignmentId === a.id
+                                                            ? 'border-[#5B4A9F] bg-purple-50/45 dark:bg-purple-950/20 shadow-sm'
+                                                            : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-gray-300 dark:hover:border-zinc-850'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{a.title}</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5">{a.courseTitle}</p>
+                                                        </div>
+                                                        <span className="text-[10px] font-extrabold uppercase bg-purple-100 text-[#5B4A9F] px-2 py-0.5 rounded-full shrink-0">Open</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* COMPLETED/GRADED Section */}
+                                {completed.length > 0 && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <h3 className="text-gray-550 dark:text-gray-400 tracking-tight text-sm font-bold uppercase">✅ Completed</h3>
+                                            <div className="h-px bg-gray-150 dark:bg-zinc-800 flex-1"></div>
+                                            <span className="text-[10px] font-bold text-gray-650 bg-gray-50 dark:bg-zinc-850 px-2 py-0.5 rounded-full">{completed.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-2.5">
+                                            {completed.map(a => (
+                                                <div
+                                                    key={a.id}
+                                                    onClick={() => setSelectedAssignmentId(a.id)}
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                                                        selectedAssignmentId === a.id
+                                                            ? 'border-[#5B4A9F] bg-purple-50/45 dark:bg-purple-950/20 shadow-sm'
+                                                            : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-gray-300 dark:hover:border-zinc-850'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{a.title}</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5">{a.courseTitle}</p>
+                                                        </div>
+                                                        <span className="text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full shrink-0">Done</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {assignments.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center mt-10 gap-4">
+                                        <p className="text-center text-sm text-gray-550">No assignments found.</p>
+                                        <button
+                                            onClick={async () => {
+                                                if (userId) await seedDatabase(userId, 'student');
+                                            }}
+                                            className="text-xs px-4 py-2 rounded-lg border border-dashed border-indigo-500 text-indigo-650 hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">database</span>
+                                            Load Demo Assignments
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right Column: Selected Assignment Details & Submission Panel */}
+                    <div className="w-full md:w-1/2 flex flex-col overflow-y-auto no-scrollbar p-6 bg-white dark:bg-zinc-900">
+                        {activeAssignment ? (
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="flex justify-between items-start gap-4">
+                                        <h3 className="text-xl font-bold leading-tight">{activeAssignment.title}</h3>
+                                        <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase shrink-0 ${
+                                            activeAssignment.status === 'Graded' ? 'bg-emerald-100 text-emerald-700' :
+                                            activeAssignment.status === 'Submitted' ? 'bg-blue-100 text-blue-700' :
+                                            activeAssignment.status === 'Missing' ? 'bg-red-150 text-red-700' : 'bg-purple-100 text-[#5B4A9F]'
+                                        }`}>
+                                            {activeAssignment.status}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-semibold">{activeAssignment.courseTitle}</p>
+                                    <p className="text-xs text-gray-550 dark:text-gray-400 mt-2">Due Date: <span className="font-bold">{format(parseISO(activeAssignment.due_date), 'MMMM d, yyyy h:mm a')}</span></p>
+                                </div>
+
+                                <div className="border-t border-gray-150 dark:border-zinc-800 pt-4">
+                                    <h4 className="text-sm font-bold uppercase text-gray-500 tracking-wider mb-2">Description</h4>
+                                    <p className="text-sm leading-relaxed text-gray-700 dark:text-zinc-300 bg-gray-50 dark:bg-zinc-850 p-4 rounded-2xl border border-gray-150 dark:border-zinc-800/80">
+                                        {activeAssignment.description || 'No description provided.'}
+                                    </p>
+                                </div>
+
+                                {canSubmitActive ? (
+                                    <div className="border-t border-gray-150 dark:border-zinc-800 pt-4">
+                                        <h4 className="text-sm font-bold uppercase text-gray-500 tracking-wider mb-3">Submit Assignment</h4>
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            setSubmittingId(activeAssignment.id);
+                                            handleSubmitAssignment(e);
+                                        }} className="space-y-4">
+                                            <textarea
+                                                className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800 border border-gray-250 dark:border-zinc-700 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 min-h-[140px] resize-none text-sm leading-relaxed"
+                                                placeholder="Type your response or paste a link to your Google Doc..."
+                                                value={submissionContent}
+                                                onChange={(e) => setSubmissionContent(e.target.value)}
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={isSubmitting}
+                                                className="w-full py-3 bg-[#5B4A9F] hover:bg-[#4a3b8c] text-white font-bold rounded-2xl shadow-lg shadow-purple-100 dark:shadow-purple-900/20 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                {isSubmitting ? 'Sending...' : 'Submit Response'}
+                                                {!isSubmitting && <span className="material-symbols-outlined text-lg">send</span>}
+                                            </button>
+                                        </form>
+                                    </div>
+                                ) : (
+                                    <div className="border-t border-gray-150 dark:border-zinc-800 pt-4 space-y-4">
+                                        <h4 className="text-sm font-bold uppercase text-gray-500 tracking-wider">Your Submission</h4>
+                                        {activeAssignment.submission ? (
+                                            <div className="space-y-4">
+                                                <div className="bg-gray-50 dark:bg-zinc-850 p-4 rounded-2xl border border-gray-150 dark:border-zinc-800/80">
+                                                    <p className="text-sm text-gray-700 dark:text-zinc-300 whitespace-pre-wrap">{activeAssignment.submission.content}</p>
+                                                    <p className="text-[10px] text-gray-550 dark:text-gray-400 mt-3">Submitted: {format(parseISO(activeAssignment.submission.submitted_at), 'MMMM d, yyyy')}</p>
+                                                </div>
+                                                {activeAssignment.status === 'Graded' && (
+                                                    <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-2xl border border-emerald-250 dark:border-emerald-900/30">
+                                                        <h5 className="text-sm font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-base">grade</span>
+                                                            Grade: {activeAssignment.submission.grade}
+                                                        </h5>
+                                                        {activeAssignment.submission.feedback && (
+                                                            <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2 font-medium">Feedback: "{activeAssignment.submission.feedback}"</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-gray-500 italic">No submission found.</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                                <div className="w-16 h-16 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-[#5B4A9F] mb-4">
+                                    <span className="material-symbols-outlined text-3xl">assignment_turned_in</span>
+                                </div>
+                                <h3 className="font-bold text-lg">No Assignment Selected</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs leading-relaxed">
+                                    Select an assignment from the list on the left to view details, grades, and submit.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     );

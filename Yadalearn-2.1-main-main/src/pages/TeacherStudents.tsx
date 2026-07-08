@@ -4,6 +4,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useTeacherDashboardData } from '@/hooks/useTeacherDashboardData';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 const TeacherStudents = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -11,6 +13,32 @@ const TeacherStudents = () => {
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
 
     const { topStudents: students, loading } = useTeacherDashboardData();
+    const { user } = useAuth();
+    const userId = user?.id;
+
+    const handleDeleteStudent = async (studentId: string) => {
+        const confirmDelete = window.confirm("Are you sure you want to end the contract and delete this student? All bookings will be deleted.");
+        if (!confirmDelete) return;
+
+        try {
+            const { error } = await supabase
+                .from('bookings')
+                .delete()
+                .eq('student_id', studentId)
+                .eq('teacher_id', userId);
+
+            if (error) {
+                console.error("Error deleting student contract:", error);
+                alert("Failed to delete student contract.");
+            } else {
+                alert("Student contract terminated successfully.");
+                setSelectedStudent(null);
+                window.location.reload();
+            }
+        } catch (err) {
+            console.error("Unexpected error ending contract:", err);
+        }
+    };
 
     const filters = [
         { id: 'all', label: 'All' },
@@ -171,8 +199,11 @@ const TeacherStudents = () => {
                                 <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 shadow-lg shadow-purple-200 dark:shadow-purple-900/30">
                                     Message
                                 </Button>
-                                <Button variant="outline" className="rounded-full px-6 border-gray-200 dark:border-gray-700">
-                                    Report
+                                <Button 
+                                    onClick={() => handleDeleteStudent(selectedStudent.id)}
+                                    className="bg-red-500 hover:bg-red-600 text-white rounded-full px-6 shadow-lg shadow-red-200 dark:shadow-red-900/30"
+                                >
+                                    End Contract
                                 </Button>
                             </div>
                         </div>

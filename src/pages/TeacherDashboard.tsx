@@ -22,7 +22,8 @@ import {
   ChevronRight, 
   Home, 
   Settings as SettingsIcon, 
-  Bell 
+  Bell,
+  Menu
 } from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
 import { StudentProfileModal } from '@/components/ProfileModals';
@@ -39,6 +40,69 @@ const TeacherDashboard = () => {
   const navigate = useNavigate();
   const { user, isLoaded, userRole, logout, refreshUser } = useAuth();
   const { teacherSchedule, topStudents, stats, pendingBookings, loading } = useTeacherDashboardData(); // Use the hook
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
+  const [detectedCountryName, setDetectedCountryName] = useState<string | null>(null);
+
+  const getFlagEmoji = (countryCode: string) => {
+    const codePoints = countryCode
+      .toUpperCase()
+      .split('')
+      .map(char => 127397 + char.charCodeAt(0));
+    try {
+      return String.fromCodePoint(...codePoints);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  useEffect(() => {
+    async function detectGeo() {
+      try {
+        const savedGeo = localStorage.getItem('user_geo_loc');
+        let geo = savedGeo ? JSON.parse(savedGeo) : null;
+        
+        if (!geo) {
+          const res = await fetch('https://ipapi.co/json/');
+          if (res.ok) {
+            const data = await res.json();
+            geo = {
+              countryCode: data.country_code || 'US',
+              countryName: data.country_name || 'United States',
+              ip: data.ip || '127.0.0.1'
+            };
+            localStorage.setItem('user_geo_loc', JSON.stringify(geo));
+          }
+        }
+
+        if (geo && user?.id) {
+          setDetectedCountry(geo.countryCode);
+          setDetectedCountryName(geo.countryName);
+          
+          // Update database profiles table if database country does not match or is empty
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('country')
+            .eq('id', user.id)
+            .single();
+             
+          if (profile && (!profile.country || profile.country.trim() !== geo.countryName)) {
+            await supabase
+              .from('profiles')
+              .update({ country: geo.countryName })
+              .eq('id', user.id);
+            
+            if (refreshUser) {
+              await refreshUser();
+            }
+          }
+        }
+      } catch (err) {
+        console.error("IP geolocation failed:", err);
+      }
+    }
+    detectGeo();
+  }, [user?.id]);
 
   const parseDateTime = (dateStr: string, timeStr: string) => {
     try {
@@ -286,20 +350,28 @@ const TeacherDashboard = () => {
   const strokeDasharray = `${progressPercentage}, 100`;
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-zinc-950 font-sans text-slate-800 dark:text-slate-200 w-full relative overflow-x-hidden">
+    <div className="flex min-h-screen bg-[#FAF8F6] dark:bg-zinc-950 font-sans text-slate-800 dark:text-slate-200 w-full relative overflow-x-hidden">
 
       {/* Sidebar on desktop */}
-      <aside className="hidden md:flex flex-col justify-between w-64 p-8 border-r border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10">
+      <aside className={`hidden flex-col justify-between w-64 p-8 border-r border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 sticky top-0 h-screen z-10 ${!isSidebarCollapsed ? 'md:flex' : 'md:hidden'}`}>
         <div className="flex flex-col gap-10">
-          <div className="flex items-center gap-2.5 px-1">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100 dark:border-zinc-700 shadow-sm relative">
-              <img 
-                src="/logo (2).png" 
-                alt="YadaLearn Logo" 
-                className="absolute w-[185%] h-[185%] max-w-none object-contain top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" 
-              />
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2.5 px-1">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100 dark:border-zinc-700 shadow-sm relative">
+                <img 
+                  src="/logo (2).png" 
+                  alt="YadaLearn Logo" 
+                  className="absolute w-[185%] h-[185%] max-w-none object-contain top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" 
+                />
+              </div>
+              <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
             </div>
-            <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
+            <button 
+              onClick={() => setIsSidebarCollapsed(true)} 
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-550 dark:text-zinc-400 transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
           
           <nav className="flex flex-col gap-1.5">
@@ -354,7 +426,22 @@ const TeacherDashboard = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 md:pb-10 max-w-7xl w-full mx-auto bg-transparent overflow-x-hidden">
+      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 md:pb-10 w-full bg-transparent overflow-x-hidden">
+        {/* Soft floating background blobs for glassmorphism refraction */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#FF7D46]/5 dark:bg-orange-950/5 blur-[120px] rounded-full pointer-events-none z-0" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[60%] h-[60%] bg-purple-200/5 dark:bg-purple-950/5 blur-[150px] rounded-full pointer-events-none z-0" />
+
+        {/* Header with hamburger toggle */}
+        <header className="relative flex justify-start items-center mb-6 pt-2 z-10">
+          {isSidebarCollapsed && (
+            <button 
+              onClick={() => setIsSidebarCollapsed(false)} 
+              className="hidden md:flex p-2.5 rounded-xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-slate-200/40 dark:border-zinc-700/40 text-slate-700 dark:text-zinc-200 shadow-sm hover:scale-105 active:scale-95 transition-all"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          )}
+        </header>
 
         {/* Hidden File Input for Portrait Upload */}
         <input
@@ -369,38 +456,85 @@ const TeacherDashboard = () => {
         <div className="relative flex flex-col md:flex-row items-center md:items-start justify-start gap-12 mt-4 md:mt-0 mb-4 pt-4 w-full z-10">
 
            {/* Portrait Image Area (Interactive / Uploadable) */}
-           <div className="relative shrink-0 md:-mb-[135px] z-10">
+           <div className="relative shrink-0 md:-mb-[135px] z-30 group">
              {/* Soft, organic localized peach/apricot glow behind the portrait (circular aura, no clipping) */}
              <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] md:w-[640px] md:h-[640px] bg-[radial-gradient(circle,rgba(255,125,70,0.85)_0%,rgba(255,185,130,0.45)_50%,transparent_75%)] blur-[60px] pointer-events-none z-0" />
              {currentUser?.imageUrl ? (
-               <div 
-                 className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/20 bg-white/10 dark:bg-black/20 backdrop-blur-md shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] flex items-center justify-center relative group cursor-pointer overflow-hidden z-10" 
-                 onClick={handleImageClick}
-               >
-                 {/* Photograph processed with blurred background and sharp individual */}
-                 <img
-                   src={currentUser.imageUrl}
-                   alt="Teacher Portrait"
-                   className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
-                 />
+               <div className="relative">
+                 <div 
+                   className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(255,125,70,0.15)] flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(255,125,70,0.25)]" 
+                   onClick={handleImageClick}
+                 >
+                   {/* Photograph processed with blurred background and sharp individual */}
+                   <img
+                     src={currentUser.imageUrl}
+                     alt="Teacher Portrait"
+                     className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
+                   />
+
+                   {/* Dark overlay mask that dims the image on hover to signal editability */}
+                   <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none rounded-[2rem] z-16" />
+                   
+                   {/* Frosted glass highlight overlay over the portrait */}
+                   <div className="absolute inset-0 border border-white/20 bg-gradient-to-tr from-white/10 via-white/5 to-transparent pointer-events-none rounded-[2rem] z-15 backdrop-blur-[0.5px]" />
+                 </div>
                  
-                 {/* Floating Edit Badge */}
-                 <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 p-2.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-105 z-20">
-                   <span className="material-symbols-outlined text-sm text-slate-700 dark:text-zinc-300">edit</span>
+                  {/* Country Geolocation Flag Badge (Circular Flag, bottom-right edge corner overlap) */}
+                  {detectedCountry && (
+                    <div 
+                      className="absolute bottom-16 -right-5 z-40 transition-transform duration-300 group-hover:scale-105"
+                      title={`Detected Country: ${detectedCountryName}`}
+                    >
+                      <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-slate-300 dark:border-zinc-655 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_10px_rgba(0,0,0,0.25)] flex items-center justify-center bg-zinc-100 shrink-0 relative">
+                        <img 
+                          src={`https://flagcdn.com/w80/${detectedCountry.toLowerCase()}.png`} 
+                          alt={detectedCountryName || 'Flag'} 
+                          className="w-full h-full object-cover scale-[1.15]" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/30 pointer-events-none rounded-full" />
+                      </div>
+                    </div>
+                  )}
+
+                 {/* Floating Edit Badge (Moved to bottom-left corner to prevent overlapping the bottom-right flag badge) */}
+                 <div 
+                   onClick={handleImageClick}
+                   className="absolute bottom-4 left-4 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 p-3 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-110 z-50 cursor-pointer w-11 h-11"
+                 >
+                   <span className="material-symbols-outlined text-base text-slate-700 dark:text-zinc-300">edit</span>
                  </div>
                </div>
              ) : (
-               <div
-                 onClick={handleImageClick}
-                 className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border-2 border-dashed border-slate-300 dark:border-zinc-700 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-sm flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/50 transition-all group shadow-sm z-10"
-               >
-                <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
-                  <span className="material-symbols-outlined text-2xl">upload</span>
+               <div className="relative">
+                 <div
+                   onClick={handleImageClick}
+                   className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(255,125,70,0.15)] flex flex-col items-center justify-center gap-3 cursor-pointer hover:scale-[1.02] transition-all group z-10"
+                 >
+                  <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-[#FF7D46] group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
+                    <span className="material-symbols-outlined text-2xl">upload</span>
+                  </div>
+                  <div className="text-center px-4">
+                    <p className="text-xs font-bold text-slate-600 dark:text-zinc-300">Upload Portrait</p>
+                    <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Professional Photo</p>
+                  </div>
                 </div>
-                <div className="text-center px-4">
-                  <p className="text-xs font-bold text-slate-600 dark:text-zinc-300">Upload Portrait</p>
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Professional Photo</p>
-                </div>
+
+                {/* Country Geolocation Flag Badge (Circular Flag, bottom-right edge corner overlap) */}
+                {detectedCountry && (
+                    <div 
+                      className="absolute bottom-16 -right-5 z-40 transition-transform duration-300 group-hover:scale-105"
+                      title={`Detected Country: ${detectedCountryName}`}
+                    >
+                      <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-slate-300 dark:border-zinc-650 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_10px_rgba(0,0,0,0.25)] flex items-center justify-center bg-zinc-100 shrink-0 relative">
+                        <img 
+                          src={`https://flagcdn.com/w80/${detectedCountry.toLowerCase()}.png`} 
+                          alt={detectedCountryName || 'Flag'} 
+                          className="w-full h-full object-cover scale-[1.15]" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/30 pointer-events-none rounded-full" />
+                      </div>
+                    </div>
+                  )}
               </div>
             )}
             {uploading && (
@@ -412,8 +546,8 @@ const TeacherDashboard = () => {
 
           <div className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-8 pt-6 w-full text-center md:text-left">
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1">
-                {currentUser?.name || 'Anya Sharma'}
+              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1 font-serif">
+                {currentUser?.name || 'Teacher'}
               </h1>
               <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Welcome Back,</p>
               
@@ -443,7 +577,7 @@ const TeacherDashboard = () => {
             {/* Teacher Daily Rating Progress Widget */}
             <div className="shrink-0 flex flex-col items-center justify-center p-5 bg-white/45 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 rounded-[2.5rem] shadow-sm z-20 hover:scale-[1.02] transition-transform">
               {/* Circular Liquid Progress Animation */}
-              <div className="relative w-44 h-44 rounded-full border border-purple-500/35 overflow-hidden flex items-center justify-center bg-purple-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(150,100,255,0.15)] shrink-0">
+              <div className="relative w-44 h-44 rounded-full border border-orange-500/35 overflow-hidden flex items-center justify-center bg-orange-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(255,125,70,0.15)] shrink-0">
                 <style>{`
                   @keyframes wave-rotation-1 {
                     from { transform: translate(-50%, 0) rotate(0deg); }
@@ -457,7 +591,7 @@ const TeacherDashboard = () => {
                 
                 {/* Liquid Wave 1 */}
                 <div 
-                  className="absolute bg-gradient-to-t from-purple-500/60 to-pink-500/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
+                  className="absolute bg-gradient-to-t from-[#FF7D46]/60 to-[#FFB982]/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
                   style={{
                     left: '50%',
                     bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 200}%`,
@@ -467,7 +601,7 @@ const TeacherDashboard = () => {
                 
                 {/* Liquid Wave 2 */}
                 <div 
-                  className="absolute bg-gradient-to-t from-purple-650/40 to-pink-650/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
+                  className="absolute bg-gradient-to-t from-[#FF7D46]/40 to-[#FFB982]/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
                   style={{
                     left: '50%',
                     bottom: `${((stats.avgRating || 0) / 5.0) * 100 - 195}%`,
@@ -544,8 +678,8 @@ const TeacherDashboard = () => {
                 onClick={() => setActiveModal('start-class')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                  <Play className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-[#FF7D46]/10 flex items-center justify-center">
+                  <Play className="h-5 w-5 text-[#FF7D46] dark:text-orange-450" />
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Start Class</p>
               </div>
@@ -554,8 +688,8 @@ const TeacherDashboard = () => {
                 onClick={() => setActiveModal('create-session')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                  <CalendarIcon className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-[#FF7D46]/10 flex items-center justify-center">
+                  <CalendarIcon className="h-5 w-5 text-[#FF7D46] dark:text-orange-450" />
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Create Session</p>
               </div>
@@ -564,8 +698,8 @@ const TeacherDashboard = () => {
                 onClick={() => setActiveModal('review-submissions')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                  <Edit3 className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-[#FF7D46]/10 flex items-center justify-center">
+                  <Edit3 className="h-5 w-5 text-[#FF7D46] dark:text-orange-450" />
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Review Assignments</p>
               </div>
@@ -574,8 +708,8 @@ const TeacherDashboard = () => {
                 onClick={() => setActiveModal('student-overview')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-[#FF7D46]/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-[#FF7D46] dark:text-orange-450" />
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Students</p>
               </div>
@@ -584,8 +718,8 @@ const TeacherDashboard = () => {
                 onClick={() => setActiveModal('announcement')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                  <Megaphone className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-[#FF7D46]/10 flex items-center justify-center">
+                  <Megaphone className="h-5 w-5 text-[#FF7D46] dark:text-orange-450" />
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Announcements</p>
               </div>
@@ -594,8 +728,8 @@ const TeacherDashboard = () => {
                 onClick={() => setActiveModal('upload-materials')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                  <Upload className="h-5 w-5 text-purple-650 dark:text-purple-400" />
+                <div className="w-10 h-10 rounded-full bg-[#FF7D46]/10 flex items-center justify-center">
+                  <Upload className="h-5 w-5 text-[#FF7D46] dark:text-orange-450" />
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Upload Materials</p>
               </div>
@@ -733,7 +867,11 @@ const TeacherDashboard = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                 {topStudents.length > 0 ? (
                   topStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors">
+                    <tr 
+                      key={student.id} 
+                      onClick={() => handleStudentClick(student)}
+                      className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    >
                       <td className="py-3.5 flex items-center gap-3 font-bold text-slate-800 dark:text-white text-sm">
                         <Avatar className="h-9 w-9">
                           <AvatarImage src={student.avatar} />

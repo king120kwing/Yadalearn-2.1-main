@@ -4,10 +4,23 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export function useDashboardData() {
     const { user, subjects: studentSubjects } = useAuth();
-    // Use real user ID (via AuthContext)
     const userId = user?.id;
-    const [upcomingClasses, setUpcomingClasses] = useState<any[]>([]);
-    const [topTeachers, setTopTeachers] = useState<any[]>([]);
+    const [upcomingClasses, setUpcomingClasses] = useState<any[]>(() => {
+        try {
+            const cached = localStorage.getItem('yadalearn-cached-classes');
+            return cached ? JSON.parse(cached) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [topTeachers, setTopTeachers] = useState<any[]>(() => {
+        try {
+            const cached = localStorage.getItem('yadalearn-cached-teachers');
+            return cached ? JSON.parse(cached) : [];
+        } catch (e) {
+            return [];
+        }
+    });
     const [unratedClasses, setUnratedClasses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -32,35 +45,68 @@ export function useDashboardData() {
                     }
                 }
 
-                // Query teachers that teach subjects overlapping with the student's interested subjects
-                let query = supabase
-                    .from('profiles')
-                    .select(`
-                        id,
-                        full_name,
-                        avatar_url,
-                        subjects,
-                        bio,
-                        teacher_profiles (
-                            rating,
-                            min_rate
-                        )
-                    `)
-                    .eq('role', 'teacher')
-                    .eq('onboarding_completed', true);
+                // Step 1: Query bookings to get teacherIds that this student has signed up with
+                const { data: studentBookings } = await supabase
+                    .from('bookings')
+                    .select('teacher_id')
+                    .eq('student_id', userId);
 
-                if (currentSubjects.length > 0) {
-                    query = query.overlaps('subjects', currentSubjects);
+                const teacherIds = studentBookings
+                    ? Array.from(new Set(studentBookings.map((b: any) => b.teacher_id).filter(Boolean)))
+                    : [];
+
+                let finalTeachersData = [];
+
+                if (teacherIds.length > 0) {
+                    const { data: bookedTeachers } = await supabase
+                        .from('profiles')
+                        .select(`
+                            id,
+                            full_name,
+                            avatar_url,
+                            subjects,
+                            bio,
+                            teacher_profiles (
+                                rating,
+                                min_rate,
+                                max_rate
+                            )
+                        `)
+                        .in('id', teacherIds)
+                        .eq('role', 'teacher')
+                        .eq('onboarding_completed', true);
+                    
+                    finalTeachersData = bookedTeachers || [];
                 }
 
-                const { data: teachersData, error: teachersError } = await query.limit(5);
+                // Step 2: Fallback to interested subjects overlap query if no bookings exist yet
+                if (finalTeachersData.length === 0) {
+                    let query = supabase
+                        .from('profiles')
+                        .select(`
+                            id,
+                            full_name,
+                            avatar_url,
+                            subjects,
+                            bio,
+                            teacher_profiles (
+                                rating,
+                                min_rate,
+                                max_rate
+                            )
+                        `)
+                        .eq('role', 'teacher')
+                        .eq('onboarding_completed', true);
 
-                if (teachersError) {
-                    console.error('Error fetching teachers:', teachersError);
+                    if (currentSubjects.length > 0) {
+                        query = query.overlaps('subjects', currentSubjects);
+                    }
+
+                    const { data: teachersData } = await query.limit(5);
+                    finalTeachersData = teachersData || [];
                 }
 
-                // Fallback: If no matching teachers, fetch any teachers so dashboard is not empty
-                let finalTeachersData = teachersData || [];
+                // Fallback: If still empty, query any onboarded teachers
                 if (finalTeachersData.length === 0) {
                     const { data: fallbackTeachers } = await supabase
                         .from('profiles')
@@ -72,7 +118,8 @@ export function useDashboardData() {
                             bio,
                             teacher_profiles (
                                 rating,
-                                min_rate
+                                min_rate,
+                                max_rate
                             )
                         `)
                         .eq('role', 'teacher')
@@ -87,16 +134,19 @@ export function useDashboardData() {
                         id: t.id,
                         name: t.full_name || 'Unknown Teacher',
                         avatar: t.avatar_url || 'https://i.pravatar.cc/150',
-                        subject: t.subjects?.join(', ') || 'General',
+                        subjects: t.subjects || ['General'],
                         rating: tp.rating ? Number(tp.rating) : 4.8,
                         reviews: 12,
-                        hourlyRate: tp.min_rate || 150,
+                        rateMin: tp.min_rate || 40,
+                        rateMax: tp.max_rate || 80,
+                        yearsExperience: 8,
                         bio: t.bio || 'Experienced teacher.',
                         isOnline: true
                     };
                 });
 
                 setTopTeachers(teachers);
+                localStorage.setItem('yadalearn-cached-teachers', JSON.stringify(teachers));
 
                 // Fetch confirmed bookings from database (representing classes scheduled from the calendar)
                 const { data: bookings, error: bookingsError } = await supabase
@@ -165,6 +215,7 @@ export function useDashboardData() {
                 }
 
                 setUpcomingClasses(upcoming);
+                localStorage.setItem('yadalearn-cached-classes', JSON.stringify(upcoming));
                 setUnratedClasses(unratedPast);
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);

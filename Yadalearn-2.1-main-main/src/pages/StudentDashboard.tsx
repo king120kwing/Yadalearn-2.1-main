@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -12,22 +12,248 @@ import { JoinClassModal } from '@/features/student/quick-actions/JoinClassModal'
 import { BookClassModal } from '@/features/student/quick-actions/BookClassModal';
 import { AIStudyBuddyModal } from '@/features/student/quick-actions/AIStudyBuddyModal';
 import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsModal';
-import { ProgressModal } from '@/features/student/quick-actions/ProgressModal';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { supabase } from '@/lib/supabase';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { removeImageBackground } from '@/utils/imageProcessor';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth(); // use custom AuthContext hook
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const { user, refreshUser } = useAuth();
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
+
+  const [allBookings, setAllBookings] = useState<any[]>([]);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
+  const [detectedCountryName, setDetectedCountryName] = useState<string | null>(null);
+
+  const getFlagEmoji = (countryCode: string) => {
+    const codePoints = countryCode
+      .toUpperCase()
+      .split('')
+      .map(char => 127397 + char.charCodeAt(0));
+    try {
+      return String.fromCodePoint(...codePoints);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  useEffect(() => {
+    async function detectGeo() {
+      try {
+        const savedGeo = localStorage.getItem('user_geo_loc');
+        let geo = savedGeo ? JSON.parse(savedGeo) : null;
+        
+        if (!geo) {
+          const res = await fetch('https://ipapi.co/json/');
+          if (res.ok) {
+            const data = await res.json();
+            geo = {
+              countryCode: data.country_code || 'US',
+              countryName: data.country_name || 'United States',
+              ip: data.ip || '127.0.0.1'
+            };
+            localStorage.setItem('user_geo_loc', JSON.stringify(geo));
+          }
+        }
+
+        if (geo && user?.id) {
+          setDetectedCountry(geo.countryCode);
+          setDetectedCountryName(geo.countryName);
+          
+          // Update database profiles table if database country does not match or is empty
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('country')
+            .eq('id', user.id)
+            .single();
+             
+          if (profile && (!profile.country || profile.country.trim() !== geo.countryName)) {
+            await supabase
+              .from('profiles')
+              .update({ country: geo.countryName })
+              .eq('id', user.id);
+            
+            if (refreshUser) {
+              await refreshUser();
+            }
+          }
+        }
+      } catch (err) {
+        console.error("IP geolocation failed:", err);
+      }
+    }
+    detectGeo();
+  }, [user?.id]);
+
+  useEffect(() => {
+    async function processDefaultImage() {
+      if (user?.imageUrl && user.id) {
+        try {
+          const processed = await removeImageBackground(user.imageUrl);
+          setProcessedImageUrl(processed);
+          if (processed !== user.imageUrl) {
+            await supabase
+              .from('profiles')
+              .update({ avatar_url: processed })
+              .eq('id', user.id);
+          }
+        } catch (e) {
+          console.error("Error processing default image:", e);
+        }
+      }
+    }
+    processDefaultImage();
+  }, [user?.imageUrl, user?.id]);
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  const parseDateTime = (dateStr: string, timeStr: string) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return new Date(0);
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+
+      const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+      let hours = 0;
+      let minutes = 0;
+      if (match) {
+        hours = parseInt(match[1], 10);
+        minutes = parseInt(match[2], 10);
+        const ampm = match[3].toUpperCase();
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+      }
+      return new Date(year, month, day, hours, minutes);
+    } catch (e) {
+      return new Date(0);
+    }
+  };
+
+  const getNextUpcomingEvent = (schedule: any[]) => {
+    if (!schedule || schedule.length === 0) return null;
+    const now = new Date();
+    
+    const upcoming = schedule.filter((event: any) => {
+      const start = parseDateTime(event.date, event.time);
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      return end > now;
+    });
+
+    return upcoming.length > 0 ? upcoming[0] : null;
+  };
+
+  const getCalendarDays = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const prevMonthTotalDays = new Date(year, month, 0).getDate();
+    
+    const days: { date: number; isCurrentMonth: boolean; isToday: boolean; dateStr: string }[] = [];
+    
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = prevMonthTotalDays - i;
+      const m = month === 0 ? 11 : month - 1;
+      const y = month === 0 ? year - 1 : year;
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({ date: d, isCurrentMonth: false, isToday: false, dateStr });
+    }
+    for (let i = 1; i <= totalDays; i++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      days.push({ date: i, isCurrentMonth: true, isToday: i === now.getDate(), dateStr });
+    }
+    const remaining = days.length % 7;
+    if (remaining > 0) {
+      for (let i = 1; i <= (7 - remaining); i++) {
+        const m = month === 11 ? 0 : month + 1;
+        const y = month === 11 ? year + 1 : year;
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        days.push({ date: i, isCurrentMonth: false, isToday: false, dateStr });
+      }
+    }
+    return days;
+  };
+
+  useEffect(() => {
+    async function fetchBookings() {
+      if (!user?.id) return;
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          subject,
+          date,
+          time,
+          status,
+          rating,
+          teacher:profiles!bookings_teacher_id_fkey(id, full_name, avatar_url)
+        `)
+        .eq('student_id', user.id);
+      
+      if (bookingsData) {
+        setAllBookings(bookingsData);
+        
+        const now = new Date();
+        const parseBookingDateTime = (dateStr: string, timeStr: string) => {
+          try {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+            let hours = 0;
+            let minutes = 0;
+            if (match) {
+              hours = Number(match[1]);
+              minutes = Number(match[2]);
+              const ampm = match[3].toUpperCase();
+              if (ampm === 'PM' && hours < 12) hours += 12;
+              if (ampm === 'AM' && hours === 12) hours = 0;
+            }
+            return new Date(year, month - 1, day, hours, minutes);
+          } catch (e) {
+            return new Date(0);
+          }
+        };
+
+        const completed = bookingsData.filter((b: any) => {
+          const bookingTime = parseBookingDateTime(b.date, b.time);
+          return bookingTime <= now && b.status === 'confirmed' && b.rating !== null && b.rating !== undefined;
+        }).length;
+
+        setCompletedCount(completed);
+        setTotalCount(bookingsData.length);
+      }
+    }
+    fetchBookings();
+  }, [user?.id]);
+
+  const studentSchedule = allBookings.map((b: any) => ({
+    id: b.id,
+    date: b.date,
+    time: b.time,
+    title: `${b.subject} with ${b.teacher?.full_name || 'Teacher'}`,
+    status: b.status
+  }));
+
+  const nextEvent = getNextUpcomingEvent(studentSchedule);
+  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const resizeProfileImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -77,7 +303,8 @@ const StudentDashboard = () => {
       const base64Data = reader.result as string;
       try {
         // Resize and compress raw upload to prevent net::ERR_CONNECTION_CLOSED
-        const processedImage = await resizeProfileImage(base64Data);
+        const resizedImage = await resizeProfileImage(base64Data);
+        const processedImage = await removeImageBackground(resizedImage);
 
         // 1. Update profiles table in database directly
         const { error: dbError } = await supabase
@@ -85,18 +312,16 @@ const StudentDashboard = () => {
           .update({ avatar_url: processedImage })
           .eq('id', user?.id);
         if (dbError) throw dbError;
+
+        // 2. Update processedImageUrl state immediately
+        setProcessedImageUrl(processedImage);
         
-        // 3. Update localStorage user cache immediately
-        const savedUserStr = localStorage.getItem('yadalearn-user');
-        if (savedUserStr) {
-          const parsed = JSON.parse(savedUserStr);
-          parsed.imageUrl = processedImage;
-          parsed.avatar_url = processedImage;
-          localStorage.setItem('yadalearn-user', JSON.stringify(parsed));
+        // 3. Call refreshUser to sync the AuthContext/Cache
+        if (refreshUser) {
+          await refreshUser();
         }
 
         alert("Profile picture updated successfully!");
-        window.location.reload();
       } catch (error: any) {
         console.error("Error updating profile photo:", error);
         alert("Failed to update profile photo: " + error.message);
@@ -150,20 +375,8 @@ const StudentDashboard = () => {
 
   return (
     <div className="flex min-h-screen bg-[#FCFAF5] dark:bg-zinc-950 font-sans text-[#1C1B19] dark:text-slate-200 w-full relative overflow-x-hidden">
-      
-      {/* Frosted Glass Navigation Drawer Overlay */}
-      {isDrawerOpen && (
-        <div 
-          onClick={() => setIsDrawerOpen(false)} 
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity animate-in fade-in duration-200" 
-        />
-      )}
-
-      {/* Frosted Glass Drawer Side Menu */}
-      <aside className={cn(
-        "fixed top-0 left-0 bottom-0 w-80 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-2xl border-r border-white/20 shadow-2xl p-8 flex flex-col justify-between z-50 transition-all duration-300 transform",
-        isDrawerOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      {/* Sidebar Navigation */}
+      <aside className={`hidden flex-col justify-between w-64 bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md border-r border-slate-200/20 dark:border-zinc-850/20 p-8 shrink-0 relative z-25 ${!isSidebarCollapsed ? 'md:flex' : 'md:hidden'}`}>
         <div className="flex flex-col gap-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 px-1">
@@ -177,10 +390,10 @@ const StudentDashboard = () => {
               <span className="font-extrabold text-xl text-slate-900 dark:text-white tracking-tight">YadaLearn</span>
             </div>
             <button 
-              onClick={() => setIsDrawerOpen(false)}
-              className="w-8 h-8 rounded-full bg-white/60 dark:bg-zinc-800/60 border border-slate-200/20 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-zinc-400"
+              onClick={() => setIsSidebarCollapsed(true)} 
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-550 dark:text-zinc-400 transition-colors"
             >
-              <span className="material-symbols-outlined text-lg">close</span>
+              <Menu className="h-5 w-5" />
             </button>
           </div>
 
@@ -197,7 +410,6 @@ const StudentDashboard = () => {
                   key={item.label}
                   onClick={() => {
                     navigate(item.path);
-                    setIsDrawerOpen(false);
                   }}
                   className={cn(
                     "flex items-center gap-3.5 px-4 py-3 rounded-2xl font-bold transition-all text-left w-full",
@@ -215,79 +427,61 @@ const StudentDashboard = () => {
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2.5 px-4 py-2 border-t border-slate-200/20 dark:border-zinc-800/20 pt-4">
-            <div className="relative w-10 h-10 select-none shrink-0">
-              {user?.imageUrl ? (
-                <img
-                  src={user.imageUrl}
-                  alt={userName}
-                  className="w-full h-full object-cover object-center rounded-full border border-white/20 shadow-sm"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
-                  <span className="material-symbols-outlined text-sm text-slate-500">person</span>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col truncate">
-              <span className="font-extrabold text-sm text-[#1C1B19] dark:text-white tracking-tight leading-tight truncate">{userName}</span>
-              <span className="text-[10px] text-slate-500 font-medium">Student</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => { navigate('/settings'); setIsDrawerOpen(false); }}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <Settings className="h-5 w-5" />
-              <span>Settings</span>
-            </button>
-            <button
-              onClick={() => { navigate('/logout'); setIsDrawerOpen(false); }}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <LogOut className="h-5 w-5" />
-              <span>Logout</span>
-            </button>
-          </div>
+          <button
+            onClick={() => { navigate('/settings'); }}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <Settings className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+          <button
+            onClick={() => { navigate('/logout'); }}
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
+          >
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={processedImageUrl || user?.imageUrl} />
+              <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
+                {userName ? userName.split(' ').map((n: string) => n[0]).join('') : 'S'}
+              </AvatarFallback>
+            </Avatar>
+            <span>Logout</span>
+          </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 lg:pb-10 max-w-7xl w-full mx-auto bg-transparent">
-        
-        {/* Header with Menu Drawer Trigger */}
-        <header className="flex justify-between items-center mb-8">
+      <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 lg:pb-10 w-full bg-transparent overflow-x-hidden">
+        {/* Soft floating background blobs for glassmorphism refraction */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#5B4A9F]/10 dark:bg-purple-900/10 blur-[120px] rounded-full pointer-events-none z-0" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[60%] h-[60%] bg-rose-200/10 dark:bg-rose-900/10 blur-[150px] rounded-full pointer-events-none z-0" />
+
+        {/* Header (Desktop matching layout) */}
+        <header className="relative flex justify-between items-center mb-8 z-10">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsDrawerOpen(true)} 
-              className="p-2 rounded-xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-slate-200/40 dark:border-zinc-700/40 text-slate-700 dark:text-zinc-200 shadow-sm hover:scale-105 transition-all"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-            <div>
-              <p className="text-xs font-semibold text-[#8F81D6] mb-0.5">{userName.split(' ')[0]}, welcome back.</p>
-              <h1 className="text-3xl font-extrabold text-[#1C1B19] dark:text-white font-serif leading-tight">
-                {userName}
-              </h1>
-            </div>
+            {isSidebarCollapsed && (
+              <button 
+                onClick={() => setIsSidebarCollapsed(false)} 
+                className="hidden md:flex p-2.5 rounded-xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-slate-200/40 dark:border-zinc-700/40 text-slate-700 dark:text-zinc-200 shadow-sm hover:scale-105 active:scale-95 transition-all"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
-            <div className="relative w-12 h-12 select-none">
-              {user?.imageUrl ? (
-                <img
-                  src={user.imageUrl}
-                  alt={userName}
-                  className="w-full h-full object-cover object-center pointer-events-none"
-                  style={{
-                    maskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)',
-                    WebkitMaskImage: 'radial-gradient(circle at center, black 40%, transparent 72%)'
-                  }}
-                />
+            <div className="relative w-12 h-12 rounded-full border border-white/30 bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md shadow-sm overflow-hidden flex items-center justify-center select-none">
+              {(processedImageUrl || user?.imageUrl) ? (
+                <>
+                  <img
+                    src={processedImageUrl || user?.imageUrl}
+                    alt={userName}
+                    className="w-full h-full object-cover object-center pointer-events-none"
+                  />
+                  {/* Frosted glass highlight overlay */}
+                  <div className="absolute inset-0 border border-white/25 rounded-full bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
+                </>
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+                <div className="w-full h-full flex items-center justify-center bg-white/15 dark:bg-zinc-900/10 rounded-full">
                   <span className="material-symbols-outlined text-xl text-slate-500">person</span>
                 </div>
               )}
@@ -295,158 +489,408 @@ const StudentDashboard = () => {
           </div>
         </header>
 
-        {/* Welcome Banner Card with Circular Profile Image Well */}
-        <section className="mb-12 mt-8 z-10 relative">
-          <div className="relative bg-gradient-to-r from-[#F2EBE0]/60 to-[#E5ECE5]/60 dark:from-zinc-900/40 dark:to-zinc-800/20 backdrop-blur-md border border-white/20 dark:border-zinc-800 rounded-[2.5rem] p-8 md:p-12 min-h-[260px] flex items-center justify-center shadow-sm overflow-visible">
-            <div className="relative flex justify-center items-center overflow-visible z-20">
-              {/* Synchronized soft lavender/apricot gradient glow in the background */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] md:w-[440px] md:h-[440px] bg-[radial-gradient(circle,rgba(91,74,159,0.14)_0%,rgba(143,129,214,0.06)_50%,transparent_75%)] blur-[45px] pointer-events-none z-0" />
-              
-              <div 
-                onClick={handleImageClick}
-                className="relative w-60 h-60 md:w-68 md:h-68 rounded-full bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md border border-white/20 dark:border-zinc-800/40 shadow-lg flex items-center justify-center cursor-pointer overflow-hidden group z-10 hover:scale-[1.02] transition-transform duration-300"
-              >
-                {user?.imageUrl ? (
+        {/* Hero Section (No Card Wrapper - matching Teacher Dashboard) */}
+        <div className="relative flex flex-col md:flex-row items-center md:items-start justify-start gap-12 mt-4 md:mt-0 mb-4 pt-4 w-full z-10">
+          {/* Portrait Image Area (Interactive / Uploadable) */}
+          <div className="relative shrink-0 md:-mb-[55px] z-30 group">
+            {/* Soft, organic localized lavender glow behind the portrait (circular aura, no clipping) */}
+            <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] md:w-[640px] md:h-[640px] bg-[radial-gradient(circle,rgba(143,129,214,0.85)_0%,rgba(175,160,250,0.45)_50%,transparent_75%)] blur-[60px] pointer-events-none z-0" />
+            
+            {(processedImageUrl || user?.imageUrl) ? (
+              <div className="relative">
+                <div 
+                  className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(91,74,159,0.15)] flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(91,74,159,0.25)]" 
+                  onClick={handleImageClick}
+                >
                   <img
-                    src={user.imageUrl}
+                    src={processedImageUrl || user?.imageUrl}
                     alt={userName}
-                    className="w-full h-full object-cover object-center rounded-full"
+                    className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
                   />
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="material-symbols-outlined text-6xl text-slate-400 dark:text-zinc-650">
-                      face
-                    </span>
-                    <span className="text-xs font-semibold text-[#8F81D6]">Click to upload</span>
+                  
+                  {/* Dark overlay mask that dims the image on hover to signal editability */}
+                  <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none rounded-[2rem] z-16" />
+
+                  {/* Frosted glass highlight overlay over the portrait */}
+                  <div className="absolute inset-0 border border-white/20 bg-gradient-to-tr from-white/10 via-white/5 to-transparent pointer-events-none rounded-[2rem] z-15 backdrop-blur-[0.5px]" />
+                </div>
+
+                {/* Country Geolocation Flag Badge (Circular Flag, bottom-right edge corner overlap) */}
+                {detectedCountry && (
+                  <div 
+                    className="absolute bottom-16 -right-5 z-40 transition-transform duration-300 group-hover:scale-105"
+                    title={`Detected Country: ${detectedCountryName}`}
+                  >
+                    <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-slate-300 dark:border-zinc-650 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_10px_rgba(0,0,0,0.25)] flex items-center justify-center bg-zinc-100 shrink-0 relative">
+                      <img 
+                        src={`https://flagcdn.com/w80/${detectedCountry.toLowerCase()}.png`} 
+                        alt={detectedCountryName || 'Flag'} 
+                        className="w-full h-full object-cover scale-[1.15]" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/30 pointer-events-none rounded-full" />
+                    </div>
                   </div>
                 )}
 
-                {/* Camera Hover Overlay */}
-                <div className="absolute inset-0 bg-[#5B4A9F]/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
-                  <div className="w-12 h-12 rounded-full bg-white/95 text-[#5B4A9F] flex items-center justify-center shadow-md">
-                    <span className="material-symbols-outlined text-2xl font-bold">photo_camera</span>
+                {/* Floating Edit Badge (Moved to bottom-left corner to prevent overlapping the bottom-right flag badge) */}
+                <div 
+                  onClick={handleImageClick}
+                  className="absolute bottom-4 left-4 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 p-3 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center border border-slate-100 dark:border-zinc-700 hover:scale-110 z-50 cursor-pointer w-11 h-11"
+                >
+                  <span className="material-symbols-outlined text-base text-slate-700 dark:text-zinc-300">edit</span>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <div
+                  onClick={handleImageClick}
+                  className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(91,74,159,0.15)] flex flex-col items-center justify-center gap-3 cursor-pointer hover:scale-[1.02] transition-all group z-10"
+                >
+                  <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-950/20 flex items-center justify-center text-[#8F81D6] group-hover:scale-115 transition-transform duration-200 shadow-sm border border-purple-100/50 dark:border-zinc-800">
+                    <span className="material-symbols-outlined text-2xl">upload</span>
+                  </div>
+                  <div className="text-center px-4">
+                    <p className="text-xs font-bold text-slate-655 dark:text-zinc-300">Upload Portrait</p>
+                    <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 mt-1">Recommended:<br/>Professional Photo</p>
                   </div>
                 </div>
 
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleImageUpload} 
-                />
+                {/* Country Geolocation Flag Badge (Circular Flag, bottom-right edge corner overlap) */}
+                {detectedCountry && (
+                  <div 
+                    className="absolute bottom-16 -right-5 z-40 transition-transform duration-300 group-hover:scale-105"
+                    title={`Detected Country: ${detectedCountryName}`}
+                  >
+                    <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-slate-300 dark:border-zinc-650 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_10px_rgba(0,0,0,0.25)] flex items-center justify-center bg-zinc-100 shrink-0 relative">
+                      <img 
+                        src={`https://flagcdn.com/w80/${detectedCountry.toLowerCase()}.png`} 
+                        alt={detectedCountryName || 'Flag'} 
+                        className="w-full h-full object-cover scale-[1.15]" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/30 pointer-events-none rounded-full" />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Quick Action Card */}
-        <section className="mb-12">
-          <div className="bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 dark:border-zinc-800/80 rounded-[2rem] p-8 shadow-sm">
-            <h3 className="text-xl font-bold text-[#1C1B19] dark:text-white mb-6 tracking-tight">Quick Action</h3>
+            )}
             
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-6 justify-items-center">
-              <div 
-                onClick={() => setActiveModal('progress')}
-                className="flex flex-col items-center gap-2 cursor-pointer group"
-              >
-                <div className="w-14 h-14 rounded-full bg-[#E5F6FD] dark:bg-sky-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <span className="material-symbols-outlined text-[#00A3FF] text-2xl">monitoring</span>
-                </div>
-                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Progress</span>
-              </div>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              accept="image/*" 
+              className="hidden" 
+              onChange={handleImageUpload} 
+            />
+          </div>
 
-              <div 
+          {/* Student Welcome Details (Matching Teacher Dashboard Layout) */}
+          <div className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-8 pt-6 w-full text-center md:text-left">
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1 font-serif">
+                {userName}
+              </h1>
+              <p className="text-lg font-bold text-slate-850 dark:text-slate-100">Welcome Back,</p>
+              
+              {/* Profile Stats List */}
+              <div className="flex flex-col gap-2.5 max-w-xs mx-auto md:mx-0 mt-6">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="text-slate-600 dark:text-slate-350 font-semibold">Active Classes:</span>
+                  <span className="font-extrabold text-slate-850 dark:text-slate-100">{upcomingClasses?.length || 0}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="text-slate-600 dark:text-slate-355 font-semibold">Status:</span>
+                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">Active Student</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Student Progress Widget */}
+            <div className="shrink-0 flex flex-col items-center justify-center p-5 bg-white/45 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 rounded-[2.5rem] shadow-sm z-20 hover:scale-[1.02] transition-transform">
+              {/* Circular Liquid Progress Animation */}
+              <div className="relative w-44 h-44 rounded-full border border-purple-500/35 overflow-hidden flex items-center justify-center bg-purple-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(91,74,159,0.15)] shrink-0">
+                <style>{`
+                  @keyframes wave-rotation-1 {
+                    from { transform: translate(-50%, 0) rotate(0deg); }
+                    to { transform: translate(-50%, 0) rotate(360deg); }
+                  }
+                  @keyframes wave-rotation-2 {
+                    from { transform: translate(-50%, 0) rotate(45deg); }
+                    to { transform: translate(-50%, 0) rotate(405deg); }
+                  }
+                `}</style>
+                
+                {/* Liquid Wave 1 */}
+                <div 
+                  className="absolute bg-gradient-to-t from-[#5B4A9F]/60 to-[#8F81D6]/60 w-[200%] h-[200%] rounded-[38%] opacity-85"
+                  style={{
+                    left: '50%',
+                    bottom: `${progressPercent - 200}%`,
+                    animation: 'wave-rotation-1 12s infinite linear'
+                  }}
+                />
+                
+                {/* Liquid Wave 2 */}
+                <div 
+                  className="absolute bg-gradient-to-t from-[#5B4A9F]/40 to-[#8F81D6]/40 w-[195%] h-[195%] rounded-[40%] opacity-65"
+                  style={{
+                    left: '50%',
+                    bottom: `${progressPercent - 195}%`,
+                    animation: 'wave-rotation-2 9s infinite linear'
+                  }}
+                />
+
+                {/* Percentage Center Value */}
+                <div className="relative z-10 flex flex-col items-center justify-center select-none text-center">
+                  <span className="text-4xl font-black text-slate-800 dark:text-white drop-shadow-sm leading-none">
+                    {progressPercent}%
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mt-1.5">Completed</span>
+                </div>
+              </div>
+              
+              <p className="text-[10px] font-extrabold text-slate-650 dark:text-zinc-405 mt-3 tracking-wide text-center uppercase">
+                Course Progress
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Grid & Planning */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-10 z-20 relative">
+          {/* Quick Actions Panel */}
+          <div className="lg:col-span-3 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(91,74,159,0.15),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#E0DAF5] border-l-2 border-l-[#E9E4F9]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 z-10 relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Quick Actions</h2>
+              <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                <span className="material-symbols-outlined">more_horiz</span>
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div
                 onClick={() => setActiveModal('book-class')}
-                className="flex flex-col items-center gap-2 cursor-pointer group"
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-14 h-14 rounded-full bg-[#FFF9E6] dark:bg-amber-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <span className="material-symbols-outlined text-[#FFC700] text-2xl">event</span>
+                <div className="w-10 h-10 rounded-full bg-[#5B4A9F]/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#8F81D6] dark:text-purple-400 text-xl">event</span>
                 </div>
-                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Book Class</span>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Book Class</p>
               </div>
 
-              <div 
+              <div
                 onClick={() => setActiveModal('assignments')}
-                className="flex flex-col items-center gap-2 cursor-pointer group"
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-14 h-14 rounded-full bg-[#ECFDF3] dark:bg-emerald-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <span className="material-symbols-outlined text-[#12B76A] text-2xl">assignment</span>
+                <div className="w-10 h-10 rounded-full bg-[#5B4A9F]/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#8F81D6] dark:text-purple-400 text-xl">assignment</span>
                 </div>
-                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Assignments</span>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Assignments</p>
               </div>
 
-              <div 
+              <div
                 onClick={() => setActiveModal('message')}
-                className="flex flex-col items-center gap-2 cursor-pointer group"
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-14 h-14 rounded-full bg-[#FDF2F8] dark:bg-rose-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <span className="material-symbols-outlined text-[#F43F5E] text-2xl">mail</span>
+                <div className="w-10 h-10 rounded-full bg-[#5B4A9F]/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#8F81D6] dark:text-purple-400 text-xl">mail</span>
                 </div>
-                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Messages</span>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Messages</p>
               </div>
 
-              <div 
+              <div
                 onClick={() => setActiveModal('join-class')}
-                className="flex flex-col items-center gap-2 cursor-pointer group"
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-14 h-14 rounded-full bg-[#F3E8FF] dark:bg-purple-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <span className="material-symbols-outlined text-[#A855F7] text-2xl">videocam</span>
+                <div className="w-10 h-10 rounded-full bg-[#5B4A9F]/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#8F81D6] dark:text-purple-400 text-xl">videocam</span>
                 </div>
-                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">Join Class</span>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Join Class</p>
               </div>
 
-              <div 
+              <div
                 onClick={() => setActiveModal('ai-buddy')}
-                className="flex flex-col items-center gap-2 cursor-pointer group"
+                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
               >
-                <div className="w-14 h-14 rounded-full bg-[#FFF7ED] dark:bg-orange-950/40 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <span className="material-symbols-outlined text-[#F97316] text-2xl">psychology</span>
+                <div className="w-10 h-10 rounded-full bg-[#5B4A9F]/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#8F81D6] dark:text-purple-400 text-xl">psychology</span>
                 </div>
-                <span className="text-xs font-semibold text-[#1C1B19] dark:text-zinc-350 tracking-tight text-center">AI Buddy</span>
+                <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">AI Buddy</p>
               </div>
             </div>
           </div>
-        </section>
 
-        {/* Upcoming Classes */}
-        {upcomingClasses && upcomingClasses.length > 0 && (
-          <section className="animate-in fade-in duration-300">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-text-light dark:text-text-dark">Upcoming Classes</h2>
-              <a className="text-sm font-medium text-indigo-500 dark:text-indigo-400" href="#">View All</a>
-            </div>
-            <div className="space-y-4">
-              {upcomingClasses.slice(0, 2).map((classItem) => (
-                <div key={classItem.id} className="bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 dark:border-zinc-800/80 rounded-[2rem] px-5 py-6 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center">
-                        <span className="material-symbols-outlined text-3xl text-indigo-500 dark:text-indigo-400">
-                          edit_document
-                        </span>
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-indigo-400 rounded-full border-2 border-white dark:border-zinc-800 flex items-center justify-center shadow-sm">
-                        <span className="material-symbols-outlined text-white text-xs" style={{ fontVariationSettings: "'wght' 700" }}>
-                          hourglass_top
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-base text-text-light dark:text-text-dark">
-                        {classItem.title}
-                      </p>
-                      <p className="text-sm text-subtext-light dark:text-subtext-dark">
-                        {classItem.day ? `Schedule: ${classItem.day}` : 'Scheduled'}
-                      </p>
-                    </div>
+          {/* Right Column: Calendar */}
+          <div className="lg:col-span-2 flex flex-col gap-8 z-10 relative">
+            {/* Calendar & Planning Panel */}
+            <div className="flex-1 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 border-t-2 border-t-[#E0DAF5] border-l-2 border-l-[#E9E4F9]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 flex flex-col relative">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Calendar & Planning</h2>
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+                  <span className="material-symbols-outlined">more_horiz</span>
+                </button>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-6 justify-between items-start">
+                {/* Calendar Widget */}
+                <div className="w-full sm:w-1/2 max-w-[200px] shrink-0">
+                  <div className="grid grid-cols-7 gap-y-1 gap-x-1 text-center">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                      <span key={idx} className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase h-6 flex items-center justify-center">{day}</span>
+                    ))}
+                    {getCalendarDays().map((d, idx) => {
+                      const isSelected = d.dateStr === selectedDateStr;
+                      return (
+                        <div 
+                          key={idx} 
+                          onClick={() => setSelectedDateStr(d.dateStr)}
+                          className="flex items-center justify-center h-7 w-7 mx-auto cursor-pointer transition-all hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full"
+                        >
+                          <span className={
+                            isSelected
+                              ? "bg-[#5B4A9F] text-white dark:bg-white dark:text-slate-950 font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                              : d.isToday
+                                ? "border border-[#5B4A9F] text-[#5B4A9F] dark:border-white dark:text-white font-bold text-xs rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                                : d.isCurrentMonth
+                                  ? "text-slate-750 dark:text-zinc-100 font-semibold text-xs"
+                                  : "text-slate-350 dark:text-zinc-650 font-medium text-[10px]"
+                          }>
+                            {d.date}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <span className="material-symbols-outlined text-subtext-light dark:text-subtext-dark cursor-pointer">more_vert</span>
                 </div>
-              ))}
+
+                {/* Schedule and Events */}
+                <div className="flex-1 w-full space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Daily Schedule & Planning</p>
+                    
+                    {(() => {
+                      const filtered = studentSchedule.filter((session: any) => session.date === selectedDateStr);
+                      const now = new Date();
+                      
+                      if (filtered.length > 0) {
+                        return filtered.map((session: any) => {
+                          const sessionTime = parseDateTime(session.date, session.time);
+                          const hasPassed = sessionTime < now;
+                          const isNext = nextEvent && session.id === nextEvent.id;
+                          
+                          if (hasPassed) {
+                            return (
+                              <div key={session.id} className="flex items-center gap-3 p-2.5 bg-slate-50/50 dark:bg-zinc-800/10 border-l-4 border-slate-300 rounded-r-xl border border-y-slate-100/50 border-r-slate-100/50 dark:border-y-transparent dark:border-r-transparent opacity-60">
+                                <span className="font-bold text-[10px] text-slate-400 dark:text-zinc-500 whitespace-nowrap line-through">{session.time}</span>
+                                <span className="text-xs font-semibold text-slate-555 dark:text-zinc-400 truncate line-through flex-1">{session.title}</span>
+                                <span className="material-symbols-outlined text-xs text-slate-400 shrink-0">check_circle</span>
+                              </div>
+                            );
+                          }
+                          
+                          if (isNext) {
+                            return (
+                              <div key={session.id} className="flex items-center gap-3 p-2.5 bg-purple-50/80 dark:bg-purple-950/20 border-l-4 border-[#5B4A9F] rounded-r-xl border border-y-purple-150 dark:border-y-transparent ring-2 ring-[#5B4A9F]/20 ring-offset-1 dark:ring-offset-zinc-900 shadow-sm transition-all hover:scale-[1.01]">
+                                <span className="font-bold text-[10px] text-[#5B4A9F] dark:text-purple-400 whitespace-nowrap">{session.time}</span>
+                                <span className="text-xs font-bold text-slate-850 dark:text-white truncate flex-1">{session.title}</span>
+                                <span className="bg-[#5B4A9F] text-white text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full tracking-wider animate-pulse shrink-0">Next Up</span>
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div key={session.id} className="flex items-center gap-3 p-2.5 bg-indigo-50/60 dark:bg-indigo-950/10 border-l-4 border-indigo-500 rounded-r-xl border border-y-indigo-100/30 dark:border-y-transparent">
+                              <span className="font-bold text-[10px] text-indigo-650 dark:text-indigo-400 whitespace-nowrap">{session.time}</span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate flex-1">{session.title}</span>
+                            </div>
+                          );
+                        });
+                      } else {
+                        return (
+                          <div className="flex flex-col items-center justify-center p-6 text-center bg-gray-50/50 dark:bg-zinc-800/10 rounded-2xl border border-dashed border-gray-200 dark:border-zinc-700">
+                            <span className="material-symbols-outlined text-gray-400 dark:text-zinc-650 text-2xl mb-1">event_busy</span>
+                            <p className="text-[11px] font-semibold text-gray-550 dark:text-zinc-400">No scheduled classes</p>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
-          </section>
-        )}
+          </div>
+        </div>
+
+        {/* My Teachers Section */}
+        <div className="bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(91,74,159,0.15),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#E0DAF5] border-l-2 border-l-[#E9E4F9]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 mb-10 z-10 relative">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">My Teachers</h2>
+            <button className="w-8 h-8 flex items-center justify-center hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 rounded-full shrink-0 text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-white">
+              <span className="material-symbols-outlined">more_horiz</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                  <th className="pb-3 font-semibold">Teacher</th>
+                  <th className="pb-3 font-semibold">Enrolled Subjects</th>
+                  <th className="pb-3 font-semibold">Rating</th>
+                  <th className="pb-3 font-semibold">Registration Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                 {loading && (!topTeachers || topTeachers.length === 0) ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 dark:text-zinc-400 font-semibold text-xs">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-650"></div>
+                        <span>Loading registered teachers...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : topTeachers && topTeachers.length > 0 ? (
+                  topTeachers.map((teacher: any) => (
+                    <tr 
+                      key={teacher.id} 
+                      onClick={() => { setSelectedTeacher(teacher); setIsModalOpen(true); }}
+                      className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 flex items-center gap-3 font-bold text-slate-800 dark:text-white text-sm">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={teacher.avatar} />
+                          <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white">
+                            {teacher.name.split(' ').map((n: string) => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{teacher.name}</span>
+                      </td>
+                      <td className="py-3.5 text-slate-700 dark:text-slate-200 text-xs font-bold">
+                        {teacher.subjects && teacher.subjects.length > 0
+                          ? teacher.subjects.join(', ')
+                          : 'General Subjects'}
+                      </td>
+                      <td className="py-3.5 text-slate-655 dark:text-slate-355 text-xs font-medium">
+                        ⭐ {Number(teacher.rating || 0).toFixed(1)}
+                      </td>
+                      <td className="py-3.5">
+                        <span className="inline-block px-3 py-1 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-250 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-transparent">
+                          Active Contract
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 dark:text-zinc-400 font-semibold text-xs">
+                      No registered teachers found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </main>
 
       <BottomNav />
@@ -465,7 +909,6 @@ const StudentDashboard = () => {
       <BookClassModal isOpen={activeModal === 'book-class'} onClose={() => setActiveModal(null)} />
       <AIStudyBuddyModal isOpen={activeModal === 'ai-buddy'} onClose={() => setActiveModal(null)} />
       <AssignmentsModal isOpen={activeModal === 'assignments'} onClose={() => setActiveModal(null)} />
-      <ProgressModal isOpen={activeModal === 'progress'} onClose={() => setActiveModal(null)} />
       <MessageTeacherModal isOpen={activeModal === 'message'} onClose={() => setActiveModal(null)} />
 
       {/* Rate Session Modal */}

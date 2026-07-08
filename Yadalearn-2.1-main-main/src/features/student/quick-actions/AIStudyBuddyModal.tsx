@@ -9,158 +9,182 @@ interface AIStudyBuddyModalProps {
 
 export const AIStudyBuddyModal = ({ isOpen, onClose }: AIStudyBuddyModalProps) => {
     const [message, setMessage] = useState('');
-    const { user } = useAuth();
+    const { user, subjects } = useAuth();
     const userName = user?.name || 'Student';
-    const firstSubject = user?.subjects?.[0] || 'General Studies';
+    const firstSubject = (subjects && subjects.length > 0) ? subjects[0] : 'General Studies';
+
+    const [messages, setMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string; time: string }>>(() => [
+        {
+            sender: 'ai',
+            text: `Hi ${userName.split(' ')[0]}! Ready to continue our study on ${firstSubject}? What questions do you have?`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+    ]);
+
+    const handleSend = () => {
+        if (!message.trim()) return;
+        const userMsg = {
+            sender: 'user' as const,
+            text: message.trim(),
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, userMsg]);
+        setMessage('');
+
+        setTimeout(() => {
+            const aiMsg = {
+                sender: 'ai' as const,
+                text: `That's an interesting question about ${firstSubject}! Let me help you break down: "${userMsg.text}".`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, aiMsg]);
+        }, 1000);
+    };
+
+    const handleSuggestionClick = (query: string) => {
+        const userMsg = {
+            sender: 'user' as const,
+            text: query,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, userMsg]);
+
+        setTimeout(() => {
+            const aiMsg = {
+                sender: 'ai' as const,
+                text: `Generating resource for: "${query}". Let's dive deeper!`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, aiMsg]);
+        }, 1000);
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-md mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden h-screen max-h-screen flex flex-col">
+            <DialogContent className="!max-w-3xl mx-auto bg-white dark:bg-zinc-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden rounded-[2.5rem] max-h-[85vh] flex flex-col shadow-2xl w-[95vw] md:w-full">
                 <DialogTitle className="sr-only">AI Study Buddy - {firstSubject}</DialogTitle>
                 <DialogDescription className="sr-only">Chat with your AI study buddy on {firstSubject} topics.</DialogDescription>
                 {/* Navigation Header */}
-                <header className="shrink-0 flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 z-20">
+                <header className="shrink-0 flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 border-b border-gray-150 dark:border-zinc-800 z-20">
                     <button
                         onClick={onClose}
-                        className="text-gray-700 dark:text-gray-300 flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="text-gray-700 dark:text-gray-300 flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
                     >
-                        <span className="material-symbols-outlined text-[24px]">menu</span>
+                        <span className="material-symbols-outlined text-[24px]">close</span>
                     </button>
                     <div className="flex flex-col items-center">
-                        <h2 className="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-tight">{firstSubject}</h2>
-                        <div className="flex items-center gap-1">
-                            <div className="size-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Online</span>
+                        <h2 className="text-gray-950 dark:text-white text-lg font-bold leading-tight tracking-tight">{firstSubject}</h2>
+                        <div className="flex items-center gap-1.5">
+                            <div className="size-2 rounded-full bg-purple-500 animate-pulse"></div>
+                            <span className="text-xs font-semibold text-[#5B4A9F] dark:text-purple-400">Online</span>
                         </div>
                     </div>
-                    <button className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <button className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
                         <span className="material-symbols-outlined text-[24px] text-gray-700 dark:text-gray-300">more_vert</span>
                     </button>
                 </header>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto relative w-full scrollbar-hide bg-gray-50 dark:bg-gray-900">
-                    <div className="flex flex-col min-h-full px-4 pt-6 pb-24 max-w-3xl mx-auto w-full gap-6">
+                <main className="flex-1 overflow-y-auto relative w-full scrollbar-hide bg-gray-50 dark:bg-zinc-950/20">
+                    <div className="flex flex-col min-h-full px-6 pt-6 pb-24 max-w-3xl mx-auto w-full gap-6">
                         {/* Date Separator */}
                         <div className="flex justify-center">
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
-                                Today, 10:23 AM
+                            <span className="text-xs font-semibold text-gray-550 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-3.5 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800">
+                                Today, {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
 
-                        {/* AI Greeting */}
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-end gap-3">
-                                <div className="size-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shrink-0 shadow-md">
-                                    <span className="material-symbols-outlined text-white text-lg">smart_toy</span>
-                                </div>
-                                <div className="p-4 rounded-2xl rounded-tl-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 max-w-[85%] shadow-sm">
-                                    <p>Hi {userName.split(' ')[0]}! Ready to continue our study on <strong>{firstSubject}</strong>? I can also quiz you on the last chapter.</p>
-                                </div>
-                            </div>
-                        </div>
+                        {/* Messages List */}
+                        {messages.map((msg, index) => {
+                            if (msg.sender === 'ai') {
+                                return (
+                                    <div key={index} className="flex flex-col gap-2">
+                                        <div className="flex items-end gap-3">
+                                            <div className="size-8 rounded-full bg-gradient-to-br from-[#5B4A9F] to-[#8F81D6] flex items-center justify-center shrink-0 shadow-md">
+                                                <span className="material-symbols-outlined text-white text-lg">smart_toy</span>
+                                            </div>
+                                            <div className="p-4 rounded-2xl rounded-tl-none bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white max-w-[85%] shadow-sm">
+                                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div key={index} className="flex items-end gap-3 justify-end">
+                                        <div className="flex flex-col items-end gap-1 max-w-[85%]">
+                                            <div className="p-4 rounded-2xl rounded-tr-none bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6] text-white shadow-md">
+                                                <p className="text-sm font-semibold leading-relaxed whitespace-pre-wrap">
+                                                    {msg.text}
+                                                </p>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 pr-1">{msg.time}</span>
+                                        </div>
+                                        <div className="size-8 rounded-full bg-gradient-to-br from-[#8F81D6] to-purple-400 overflow-hidden shrink-0 border-2 border-white dark:border-zinc-850 shadow-sm flex items-center justify-center text-white text-xs font-bold">
+                                            {userName[0]}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        })}
 
                         {/* Suggestion Chips */}
                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                            <button className="flex shrink-0 items-center justify-center gap-x-2 rounded-full border-2 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
-                                <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[18px]">quiz</span>
-                                <span className="text-emerald-700 dark:text-emerald-300 text-sm font-medium">Quiz: Photosynthesis</span>
+                            <button 
+                                onClick={() => handleSuggestionClick(`Quiz: ${firstSubject}`)}
+                                className="flex shrink-0 items-center justify-center gap-x-2 rounded-full border-2 border-[#8F81D6] bg-purple-50 dark:bg-purple-950/20 px-4 py-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[#5B4A9F] dark:text-purple-400 text-[18px]">quiz</span>
+                                <span className="text-purple-800 dark:text-purple-300 text-xs font-bold">Quiz: {firstSubject}</span>
                             </button>
-                            <button className="flex shrink-0 items-center justify-center gap-x-2 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                <span className="material-symbols-outlined text-gray-600 dark:text-gray-400 text-[18px]">summarize</span>
-                                <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">Summarize Lecture</span>
+                            <button 
+                                onClick={() => handleSuggestionClick(`Summarize: ${firstSubject}`)}
+                                className="flex shrink-0 items-center justify-center gap-x-2 rounded-full border border-gray-300 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-2 hover:bg-gray-55 dark:hover:bg-zinc-850 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-gray-550 dark:text-zinc-400 text-[18px]">summarize</span>
+                                <span className="text-gray-700 dark:text-zinc-300 text-xs font-bold">Summarize: {firstSubject}</span>
                             </button>
-                        </div>
-
-                        {/* User Message */}
-                        <div className="flex items-end gap-3 justify-end">
-                            <div className="flex flex-col items-end gap-1 max-w-[85%]">
-                                <div className="p-4 rounded-2xl rounded-tr-none bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md">
-                                    <p className="text-base font-medium leading-relaxed">
-                                        Can you explain the main difference between Mitosis and Meiosis simply? I keep mixing them up.
-                                    </p>
-                                </div>
-                                <span className="text-[11px] text-gray-400 pr-1">10:25 AM</span>
-                            </div>
-                            <div className="size-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 overflow-hidden shrink-0 border-2 border-white dark:border-gray-900 shadow-sm">
-                            </div>
-                        </div>
-
-                        {/* AI Response */}
-                        <div className="flex flex-col gap-2 w-full">
-                            <div className="flex items-end gap-3 w-full">
-                                <div className="size-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shrink-0 shadow-md">
-                                    <span className="material-symbols-outlined text-white text-lg font-bold">smart_toy</span>
-                                </div>
-                                <div className="flex flex-col gap-3 w-full max-w-[90%]">
-                                    {/* Main Text Bubble */}
-                                    <div className="p-5 rounded-2xl rounded-tl-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 shadow-sm relative group">
-                                        <p className="text-base leading-7">
-                                            Think of <span className="text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/30 px-1 rounded">Mitosis</span> as making a <strong>photocopy</strong>. It creates two identical cells for growth and repair.
-                                            <br /><br />
-                                            <span className="text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/30 px-1 rounded">Meiosis</span> is for <strong>reproduction</strong>. It shuffles the genetics to create four unique cells with half the chromosomes.
-                                        </p>
-                                        {/* Inline Actions */}
-                                        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
-                                            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                                                <span className="material-symbols-outlined text-[16px]">child_care</span>
-                                                Simplify More
-                                            </button>
-                                            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                                                <span className="material-symbols-outlined text-[16px]">psychology</span>
-                                                Deeper Dive
-                                            </button>
-                                            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 ml-auto">
-                                                <span className="material-symbols-outlined text-[16px]">note_add</span>
-                                                Add to Notes
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* AI Follow up Suggestion */}
-                        <div className="pl-11 pr-4">
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 font-medium">Suggested next steps:</p>
-                            <div className="flex flex-col gap-2">
-                                <button className="w-full text-left p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors flex items-center justify-between group shadow-sm">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Show me a comparison table</span>
-                                    <span className="material-symbols-outlined text-gray-400 group-hover:text-emerald-500 text-lg">arrow_forward</span>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </main>
 
                 {/* Fixed Input Area */}
-                <footer className="shrink-0 bg-white dark:bg-gray-900 p-4 pb-6 pt-2 z-20 border-t border-gray-200 dark:border-gray-700">
+                <footer className="shrink-0 bg-white dark:bg-zinc-900 p-4 pb-6 pt-2 z-20 border-t border-gray-150 dark:border-zinc-800">
                     {/* Floating Input Container */}
-                    <div className="relative flex items-end gap-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-[24px] p-2 shadow-sm max-w-3xl mx-auto">
+                    <div className="relative flex items-end gap-2 bg-gray-50 dark:bg-zinc-950 border border-gray-250 dark:border-zinc-750 rounded-[24px] p-2 shadow-sm max-w-3xl mx-auto">
                         {/* Attachment Button */}
-                        <button className="size-10 shrink-0 flex items-center justify-center rounded-full text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <button className="size-10 shrink-0 flex items-center justify-center rounded-full text-gray-500 hover:text-[#5B4A9F] dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-zinc-850 transition-colors">
                             <span className="material-symbols-outlined">add_circle</span>
                         </button>
                         {/* Text Input */}
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
-                            className="flex-1 bg-transparent border-0 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-0 py-3 px-0 resize-none max-h-32 leading-relaxed"
-                            placeholder="Ask anything about Biology..."
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSend();
+                                }
+                            }}
+                            className="flex-1 bg-transparent border-0 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-0 py-3 px-0 resize-none max-h-32 leading-relaxed text-sm"
+                            placeholder={`Ask anything about ${firstSubject}...`}
                             rows={1}
                             style={{ minHeight: '44px' }}
                         />
                         {/* Voice Input */}
-                        <button className="size-10 shrink-0 flex items-center justify-center rounded-full text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <button className="size-10 shrink-0 flex items-center justify-center rounded-full text-gray-500 hover:text-[#5B4A9F] dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-zinc-850 transition-colors">
                             <span className="material-symbols-outlined">mic</span>
                         </button>
                         {/* Send Button */}
-                        <button className="size-10 shrink-0 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white transition-colors shadow-md">
+                        <button 
+                            onClick={handleSend}
+                            className="size-10 shrink-0 flex items-center justify-center rounded-full bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6] hover:from-[#493a85] hover:to-[#7c6ec4] text-white transition-all duration-200 shadow-md"
+                        >
                             <span className="material-symbols-outlined filled" style={{ fontVariationSettings: "'FILL' 1" }}>arrow_upward</span>
                         </button>
                     </div>
                     <div className="text-center mt-2">
-                        <p className="text-[10px] text-gray-500">AI can make mistakes. Verify important info.</p>
+                        <p className="text-[10px] text-gray-550">AI can make mistakes. Verify important info.</p>
                     </div>
                 </footer>
             </DialogContent>

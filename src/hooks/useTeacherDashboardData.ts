@@ -26,6 +26,14 @@ export function useTeacherDashboardData() {
         async function fetchData() {
             setLoading(true);
             try {
+                // Fetch the teacher's subjects from profiles
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('subjects')
+                    .eq('id', userId)
+                    .single();
+                const teacherSubjects = profile?.subjects || [];
+
                 // Auto-seed courses if none exist for this teacher
                 const { data: courses } = await supabase
                     .from('courses')
@@ -34,29 +42,23 @@ export function useTeacherDashboardData() {
 
                 if (!courses || courses.length === 0) {
                     console.log('No courses found. Seeding default courses for teacher:', userId);
-                    const coursesData = [
-                        {
-                            title: 'Advanced Mathematics',
-                            description: 'Calculus and Linear Algebra.',
+                    const coursesData = teacherSubjects.map((subject: string) => ({
+                        title: `Intro to ${subject}`,
+                        description: `Foundational concepts in ${subject}.`,
+                        teacher_id: userId,
+                        schedule: 'Mon, Wed 09:00 AM',
+                        image_url: ''
+                    }));
+                    
+                    if (coursesData.length === 0) {
+                        coursesData.push({
+                            title: 'General Studies',
+                            description: 'Foundational concepts and interactive learning.',
                             teacher_id: userId,
                             schedule: 'Mon, Wed 09:00 AM',
                             image_url: ''
-                        },
-                        {
-                            title: 'Physics for Beginners',
-                            description: 'Newtonian Mechanics.',
-                            teacher_id: userId,
-                            schedule: 'Tue, Thu 11:00 AM',
-                            image_url: ''
-                        },
-                        {
-                            title: 'Computer Science 101',
-                            description: 'Intro to Programming.',
-                            teacher_id: userId,
-                            schedule: 'Fri 01:00 PM',
-                            image_url: ''
-                        }
-                    ];
+                        });
+                    }
                     await supabase.from('courses').insert(coursesData);
                 }
 
@@ -146,6 +148,31 @@ export function useTeacherDashboardData() {
 
                 const activeCoursesCount = teacherCourses ? teacherCourses.length : 0;
 
+                // Query all assignments and count submissions dynamically
+                let completedTasksCount = 0;
+                let pendingTasksCount = 0;
+
+                if (teacherCourses && teacherCourses.length > 0) {
+                    const courseIds = teacherCourses.map(c => c.id);
+                    const { data: teacherAssignments } = await supabase
+                        .from('assignments')
+                        .select('id')
+                        .in('course_id', courseIds);
+
+                    if (teacherAssignments && teacherAssignments.length > 0) {
+                        const assignmentIds = teacherAssignments.map(a => a.id);
+                        const { data: teacherSubmissions } = await supabase
+                            .from('submissions')
+                            .select('id, grade')
+                            .in('assignment_id', assignmentIds);
+
+                        if (teacherSubmissions) {
+                            completedTasksCount = teacherSubmissions.filter(s => s.grade !== null && s.grade !== undefined && s.grade !== '').length;
+                            pendingTasksCount = teacherSubmissions.filter(s => s.grade === null || s.grade === undefined || s.grade === '').length;
+                        }
+                    }
+                }
+
                 // Fetch monthly fee from teacher_profiles table
                 const { data: tp } = await supabase
                     .from('teacher_profiles')
@@ -160,8 +187,8 @@ export function useTeacherDashboardData() {
                     totalStudents: uniqueStudentIds.size,
                     upcomingClasses: teacherInitiated.length,
                     activeCourses: activeCoursesCount,
-                    completedTasks: 0,
-                    pendingTasks: 0,
+                    completedTasks: completedTasksCount,
+                    pendingTasks: pendingTasksCount,
                     avgRating: avgRating
                 });
 

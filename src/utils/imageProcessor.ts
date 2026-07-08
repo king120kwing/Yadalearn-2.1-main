@@ -1,10 +1,10 @@
 /**
  * Programmatically removes white, off-white, or corner-sampled background colors
  * from a base64 image string, returning a transparent PNG base64 string.
+ * Uses a higher 800x1000 resolution for maximum sharpening and clarity.
  */
 export function removeImageBackground(base64Str: string): Promise<string> {
   return new Promise((resolve) => {
-    // If it's not a valid data URL or is already a clean transparent image, return it
     if (!base64Str || !base64Str.startsWith('data:image')) {
       resolve(base64Str);
       return;
@@ -20,9 +20,9 @@ export function removeImageBackground(base64Str: string): Promise<string> {
         return;
       }
 
-      // Calculate target dimensions maintaining a 4:5 aspect ratio for portrait card
-      const targetWidth = 400;
-      const targetHeight = 500;
+      // 800x1000 high-res target dimensions for extreme sharpness and clarity
+      const targetWidth = 800;
+      const targetHeight = 1000;
       
       canvas.width = targetWidth;
       canvas.height = targetHeight;
@@ -40,55 +40,80 @@ export function removeImageBackground(base64Str: string): Promise<string> {
         sy = (img.height - sHeight) / 2;
       }
 
-      // 1. Create a blurred, semi-transparent background layer (Layer 1)
-      const bgCanvas = document.createElement('canvas');
-      bgCanvas.width = targetWidth;
-      bgCanvas.height = targetHeight;
-      const bgCtx = bgCanvas.getContext('2d');
-      if (bgCtx) {
-        if (bgCtx.filter !== undefined) {
-          bgCtx.filter = 'blur(20px)';
+      // Draw original image on a temporary canvas to analyze and key out solid background
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = targetWidth;
+      tempCanvas.height = targetHeight;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) {
+        resolve(base64Str);
+        return;
+      }
+
+      // Enable high-quality image smoothing
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
+      tempCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+
+      const imgData = tempCtx.getImageData(0, 0, targetWidth, targetHeight);
+      const data = imgData.data;
+
+      // Sample corners to check if the image has a solid background
+      const corners = [
+        [0, 0],
+        [targetWidth - 1, 0],
+        [0, targetHeight - 1],
+        [targetWidth - 1, targetHeight - 1]
+      ];
+
+      let rSum = 0, gSum = 0, bSum = 0;
+      let isAlreadyTransparent = false;
+
+      corners.forEach(([cx, cy]) => {
+        const idx = (cy * targetWidth + cx) * 4;
+        rSum += data[idx];
+        gSum += data[idx + 1];
+        bSum += data[idx + 2];
+        if (data[idx + 3] < 150) {
+          isAlreadyTransparent = true;
         }
-        bgCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+      });
+
+      // If the image is already transparent or has transparent elements, skip color keying
+      if (!isAlreadyTransparent) {
+        const bgR = rSum / 4;
+        const bgG = gSum / 4;
+        const bgB = bSum / 4;
+
+        // Key out light studio/gray backgrounds or corners
+        const colorThreshold = 75; 
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          const dist = Math.sqrt(
+            Math.pow(r - bgR, 2) +
+            Math.pow(g - bgG, 2) +
+            Math.pow(b - bgB, 2)
+          );
+
+          const isNearWhite = r > 215 && g > 215 && b > 215;
+
+          if (dist < colorThreshold || isNearWhite) {
+            data[i + 3] = 0; // Set to transparent
+          }
+        }
+        tempCtx.putImageData(imgData, 0, 0);
       }
 
-      // 2. Create a sharp center subject layer with a smooth radial mask (Layer 2)
-      const sharpCanvas = document.createElement('canvas');
-      sharpCanvas.width = targetWidth;
-      sharpCanvas.height = targetHeight;
-      const sharpCtx = sharpCanvas.getContext('2d');
-      if (sharpCtx) {
-        // Create radial gradient mask offset slightly upward toward the face
-        const grad = sharpCtx.createRadialGradient(
-          targetWidth / 2, 
-          targetHeight / 2 - 20, 
-          0, 
-          targetWidth / 2, 
-          targetHeight / 2 - 20, 
-          targetHeight * 0.55
-        );
-        grad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');   // Center is fully opaque
-        grad.addColorStop(0.45, 'rgba(0, 0, 0, 1.0)');  // Main subject is fully opaque
-        grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.0)');  // Edges fade smoothly to transparent
-        
-        sharpCtx.fillStyle = grad;
-        sharpCtx.fillRect(0, 0, targetWidth, targetHeight);
-        
-        // Draw the sharp image masked in
-        sharpCtx.globalCompositeOperation = 'source-in';
-        sharpCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
-      }
-
-      // 3. Composite layers on the main canvas
+      // Draw onto final canvas
       ctx.clearRect(0, 0, targetWidth, targetHeight);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       
-      // Draw blurred background with 45% opacity
-      ctx.globalAlpha = 0.45;
-      ctx.drawImage(bgCanvas, 0, 0, targetWidth, targetHeight);
-      
-      // Draw sharp masked center with 100% opacity
-      ctx.globalAlpha = 1.0;
-      ctx.drawImage(sharpCanvas, 0, 0, targetWidth, targetHeight);
+      // Draw transparent processed subject layer
+      ctx.drawImage(tempCanvas, 0, 0);
 
       resolve(canvas.toDataURL('image/png'));
     };

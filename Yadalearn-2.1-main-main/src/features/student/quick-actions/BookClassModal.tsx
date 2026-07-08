@@ -27,7 +27,7 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
             const fetchTeachers = async () => {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('id, full_name, subjects, avatar_url')
+                    .select('id, full_name, subjects, avatar_url, teacher_profiles(min_rate)')
                     .eq('role', 'teacher')
                     .eq('onboarding_completed', true);
                 
@@ -37,13 +37,17 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                 }
                 
                 if (data) {
-                    const mapped = data.map((t: any) => ({
-                        id: t.id,
-                        name: t.subjects?.[0] || 'General Studies',
-                        teacher: t.full_name,
-                        avatar: t.avatar_url || 'https://i.pravatar.cc/150?u=' + t.id,
-                        color: 'from-purple-400 to-indigo-400'
-                    }));
+                    const mapped = data.map((t: any) => {
+                        const minRate = t.teacher_profiles?.min_rate || (Array.isArray(t.teacher_profiles) ? t.teacher_profiles[0]?.min_rate : null) || 45;
+                        return ({
+                            id: t.id,
+                            name: t.subjects?.[0] || 'General Studies',
+                            teacher: t.full_name,
+                            avatar: t.avatar_url || 'https://i.pravatar.cc/150?u=' + t.id,
+                            color: 'from-purple-400 to-indigo-400',
+                            rate: minRate
+                        });
+                    });
                     setTopics(mapped);
                 }
             };
@@ -91,16 +95,16 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl mx-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden max-h-[90vh] flex flex-col">
+            <DialogContent className="!max-w-3xl mx-auto bg-white dark:bg-zinc-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden rounded-[2.5rem] max-h-[85vh] flex flex-col shadow-2xl w-[95vw] md:w-full">
                 <DialogTitle className="sr-only">Book a Class</DialogTitle>
                 <DialogDescription className="sr-only">Schedule a new live video tutoring session with a qualified teacher.</DialogDescription>
                 {/* Header */}
-                <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-zinc-800">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Book a Class</h2>
                         <button
                             onClick={onClose}
-                            className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
                         >
                             <span className="material-symbols-outlined text-gray-500">close</span>
                         </button>
@@ -111,8 +115,8 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                             <div
                                 key={i}
                                 className={`h-1.5 flex-1 rounded-full transition-all ${i <= step
-                                        ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
-                                        : 'bg-gray-200 dark:bg-gray-700'
+                                        ? 'bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6]'
+                                        : 'bg-gray-200 dark:bg-zinc-800'
                                     }`}
                             />
                         ))}
@@ -133,16 +137,16 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                                     <div
                                         key={t.id}
                                         className={`relative p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${selectedTopic === t.id
-                                                ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/20'
-                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md'
+                                                ? 'border-[#5B4A9F] bg-purple-50 dark:bg-purple-950/20 shadow-lg shadow-purple-100 dark:shadow-purple-900/20'
+                                                : 'border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 hover:shadow-md'
                                             }`}
                                         onClick={() => setSelectedTopic(t.id)}
                                     >
                                         <div className="flex flex-col items-center text-center gap-3">
                                             <div className={`relative size-16 rounded-full bg-gradient-to-br ${t.color} p-0.5`}>
-                                                <Avatar className="size-full border-2 border-white dark:border-gray-900">
+                                                <Avatar className="size-full border-2 border-white dark:border-zinc-900">
                                                     <AvatarImage src={t.avatar} />
-                                                    <AvatarFallback className="bg-white dark:bg-gray-800">{t.teacher[0]}</AvatarFallback>
+                                                    <AvatarFallback className="bg-white dark:bg-zinc-800">{t.teacher[0]}</AvatarFallback>
                                                 </Avatar>
                                             </div>
                                             <div>
@@ -151,7 +155,7 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                                             </div>
                                             {selectedTopic === t.id && (
                                                 <div className="absolute top-3 right-3">
-                                                    <div className="size-6 rounded-full bg-emerald-400 flex items-center justify-center">
+                                                    <div className="size-6 rounded-full bg-[#5B4A9F] flex items-center justify-center">
                                                         <span className="material-symbols-outlined text-white text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
                                                     </div>
                                                 </div>
@@ -174,7 +178,7 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                                 {/* Calendar */}
                                 <div>
                                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">Choose Date</label>
-                                    <div className="border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-3 bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="border-2 border-gray-200 dark:border-zinc-800 rounded-2xl p-3 bg-gray-50 dark:bg-zinc-800/30">
                                         <Calendar
                                             mode="single"
                                             selected={selectedDate}
@@ -191,8 +195,8 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                                             <button
                                                 key={slot}
                                                 className={`px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${selectedSlot === slot
-                                                        ? 'bg-gradient-to-r from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30'
-                                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                                                        ? 'bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6] text-white shadow-lg shadow-purple-200 dark:shadow-purple-900/30'
+                                                        : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 border border-gray-200 dark:border-zinc-850'
                                                     }`}
                                                 onClick={() => setSelectedSlot(slot)}
                                             >
@@ -208,15 +212,15 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                     {/* Step 3: Confirmation */}
                     {step === 3 && (
                         <div className="space-y-6 text-center py-6">
-                            <div className="size-20 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/20">
-                                <span className="material-symbols-outlined text-5xl text-emerald-500 dark:text-emerald-400" style={{ fontVariationSettings: "'FILL' 1" }}>event_available</span>
+                            <div className="size-20 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-100 dark:shadow-purple-900/25">
+                                <span className="material-symbols-outlined text-5xl text-[#5B4A9F] dark:text-[#8F81D6]" style={{ fontVariationSettings: "'FILL' 1" }}>event_available</span>
                             </div>
                             <div>
                                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirm Your Booking</h3>
                                 <p className="text-gray-600 dark:text-gray-400">Please review the details below</p>
                             </div>
 
-                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-6 rounded-2xl max-w-md mx-auto text-left space-y-4 border border-gray-200 dark:border-gray-700">
+                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-800/40 dark:to-zinc-900/40 p-6 rounded-2xl max-w-md mx-auto text-left space-y-4 border border-gray-200 dark:border-zinc-800">
                                 <div className="flex justify-between items-center">
                                     <span className="text-gray-600 dark:text-gray-400 text-sm">Subject</span>
                                     <span className="font-semibold text-gray-900 dark:text-white">{topics.find(t => t.id === selectedTopic)?.name}</span>
@@ -233,9 +237,11 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                                     <span className="text-gray-600 dark:text-gray-400 text-sm">Time</span>
                                     <span className="font-semibold text-gray-900 dark:text-white">{selectedSlot}</span>
                                 </div>
-                                <div className="border-t-2 border-gray-200 dark:border-gray-700 pt-4 flex justify-between items-center">
+                                <div className="border-t-2 border-gray-200 dark:border-zinc-800 pt-4 flex justify-between items-center">
                                     <span className="text-gray-900 dark:text-white font-bold text-base">Total Price</span>
-                                    <span className="text-2xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">$45.00</span>
+                                    <span className="text-2xl font-bold bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6] bg-clip-text text-transparent">
+                                        ${topics.find(t => t.id === selectedTopic)?.rate || 45}.00
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -243,11 +249,11 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
+                <div className="px-6 py-4 border-t border-gray-100 dark:border-zinc-850 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/30">
                     {step > 1 ? (
                         <button
                             onClick={handleBack}
-                            className="px-5 py-2.5 rounded-xl font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                            className="px-5 py-2.5 rounded-xl font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
                         >
                             ← Back
                         </button>
@@ -260,8 +266,8 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                             onClick={handleNext}
                             disabled={step === 1 && !selectedTopic || step === 2 && (!selectedDate || !selectedSlot)}
                             className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 ${(step === 1 && !selectedTopic) || (step === 2 && (!selectedDate || !selectedSlot))
-                                    ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30'
+                                    ? 'bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-zinc-650 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6] hover:from-[#4a3b8c] hover:to-[#8274cf] text-white shadow-lg shadow-purple-200 dark:shadow-purple-900/30'
                                 }`}
                         >
                             Next Step →
@@ -269,7 +275,7 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                     ) : (
                         <button
                             onClick={handleConfirm}
-                            className="px-6 py-2.5 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 transition-all duration-200"
+                            className="px-6 py-2.5 rounded-xl font-semibold bg-gradient-to-r from-[#5B4A9F] to-[#8F81D6] hover:from-[#4a3b8c] hover:to-[#8274cf] text-white shadow-lg shadow-purple-200 dark:shadow-purple-900/30 transition-all duration-200"
                         >
                             Confirm Booking ✓
                         </button>

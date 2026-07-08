@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let hasBloatedCache = false;
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.includes('auth-token') || key === 'yadalearn-user')) {
+      if (key && key.includes('auth-token')) {
         const val = localStorage.getItem(key);
         if (val && (val.includes('data:image') || val.length > 10000)) {
           console.warn('AuthContext: Bloated cache detected. Clearing local cache.');
@@ -278,18 +278,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         console.log('AuthContext: Fetching profile for id:', u.id);
         
-        // Wrap the Supabase query in a promise with a timeout (30s to allow for database cold starts)
-        const queryPromise = supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('role, onboarding_completed, subjects, avatar_url, full_name, bio, country')
           .eq('id', u.id)
           .single();
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Profile fetch query timed out after 30 seconds')), 30000)
-        );
-
-        const { data: profile, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
         if (error) {
           console.warn('AuthContext: Profile fetch returned error:', error);
