@@ -332,7 +332,7 @@ const TeacherDashboard = () => {
   }
 
   // Show loading state after hooks are called
-  if (!isReady || loading) {
+  if (!isReady) {
     return (
       <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -865,7 +865,16 @@ const TeacherDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                {topStudents.length > 0 ? (
+                {loading && (!topStudents || topStudents.length === 0) ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 dark:text-zinc-400 font-semibold text-xs">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#FF7D46]"></div>
+                        <span>Loading registered students...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : topStudents && topStudents.length > 0 ? (
                   topStudents.map((student) => (
                     <tr 
                       key={student.id} 

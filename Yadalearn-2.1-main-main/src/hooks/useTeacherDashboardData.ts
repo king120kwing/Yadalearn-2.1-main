@@ -6,18 +6,47 @@ export function useTeacherDashboardData() {
     const { user, isLoaded } = useAuth();
     const userId = user?.id;
 
-    const [teacherSchedule, setTeacherSchedule] = useState<any[]>([]);
-    const [topStudents, setTopStudents] = useState<any[]>([]);
-    const [stats, setStats] = useState({
-        earnings: 0,
-        totalStudents: 0,
-        upcomingClasses: 0,
-        activeCourses: 0,
-        completedTasks: 0,
-        pendingTasks: 0,
-        avgRating: 4.8
+    const [teacherSchedule, setTeacherSchedule] = useState<any[]>(() => {
+        try {
+            const cached = localStorage.getItem('yadalearn-cached-teacher-schedule');
+            return cached ? JSON.parse(cached) : [];
+        } catch (e) {
+            return [];
+        }
     });
-    const [pendingBookings, setPendingBookings] = useState<any[]>([]);
+    const [topStudents, setTopStudents] = useState<any[]>(() => {
+        try {
+            const cached = localStorage.getItem('yadalearn-cached-teacher-students');
+            return cached ? JSON.parse(cached) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [stats, setStats] = useState(() => {
+        const defaultStats = {
+            earnings: 0,
+            totalStudents: 0,
+            upcomingClasses: 0,
+            activeCourses: 0,
+            completedTasks: 0,
+            pendingTasks: 0,
+            avgRating: 4.8
+        };
+        try {
+            const cached = localStorage.getItem('yadalearn-cached-teacher-stats');
+            return cached ? JSON.parse(cached) : defaultStats;
+        } catch (e) {
+            return defaultStats;
+        }
+    });
+    const [pendingBookings, setPendingBookings] = useState<any[]>(() => {
+        try {
+            const cached = localStorage.getItem('yadalearn-cached-teacher-pending-bookings');
+            return cached ? JSON.parse(cached) : [];
+        } catch (e) {
+            return [];
+        }
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -75,6 +104,7 @@ export function useTeacherDashboardData() {
                 const pendingBookingsList = dbBookings.filter((b: any) => b.status === 'pending');
                 
                 setPendingBookings(pendingBookingsList);
+                localStorage.setItem('yadalearn-cached-teacher-pending-bookings', JSON.stringify(pendingBookingsList));
 
                 // Format Schedule from confirmed bookings returning raw date & time
                 // Filter to only display bookings initiated by the teacher
@@ -93,6 +123,7 @@ export function useTeacherDashboardData() {
                     return a.time.localeCompare(b.time);
                 });
                 setTeacherSchedule(formattedSchedule);
+                localStorage.setItem('yadalearn-cached-teacher-schedule', JSON.stringify(formattedSchedule));
 
                 // Build unique students list from confirmed bookings
                 const uniqueStudentsMap = new Map();
@@ -112,6 +143,7 @@ export function useTeacherDashboardData() {
                 });
                 const students = Array.from(uniqueStudentsMap.values());
                 setTopStudents(students);
+                localStorage.setItem('yadalearn-cached-teacher-students', JSON.stringify(students));
 
                 const uniqueStudentIds = new Set(
                     confirmedBookings
@@ -182,7 +214,7 @@ export function useTeacherDashboardData() {
 
                 const monthlyRate = tp?.min_rate ? Number(tp.min_rate) : 150; // default to $150 if not specified
 
-                setStats({
+                const statsObject = {
                     earnings: uniqueStudentIds.size * monthlyRate, // Monthly subscription gap calculation
                     totalStudents: uniqueStudentIds.size,
                     upcomingClasses: teacherInitiated.length,
@@ -190,7 +222,9 @@ export function useTeacherDashboardData() {
                     completedTasks: completedTasksCount,
                     pendingTasks: pendingTasksCount,
                     avgRating: avgRating
-                });
+                };
+                setStats(statsObject);
+                localStorage.setItem('yadalearn-cached-teacher-stats', JSON.stringify(statsObject));
 
             } catch (err) {
                 console.error('Error fetching teacher dashboard data:', err);
