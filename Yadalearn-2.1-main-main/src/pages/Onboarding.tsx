@@ -74,21 +74,28 @@ const Onboarding = () => {
       localStorage.setItem('yadalearn-lang', language);
       localStorage.setItem('yadalearn-onboarding-answers', JSON.stringify(answers));
 
-      // Extract selected subjects
+      // Extract selected subjects & languages
       const selectedSubjectsList: string[] = [];
+      const selectedLanguagesList: string[] = [];
       if (role === 'student') {
         if (answers.studyPath === 'Languages') {
-          if (answers.selectedLanguages) selectedSubjectsList.push(...answers.selectedLanguages);
+          if (answers.selectedLanguages) {
+            selectedLanguagesList.push(...answers.selectedLanguages);
+            selectedSubjectsList.push(...answers.selectedLanguages);
+          }
         } else if (answers.studyPath === 'IGCSE') {
           if (answers.selectedSubjects) selectedSubjectsList.push(...answers.selectedSubjects);
         }
       } else { // teacher
-        if (answers.languageSpecialization) selectedSubjectsList.push(...answers.languageSpecialization);
+        if (answers.languageSpecialization) {
+          selectedLanguagesList.push(...answers.languageSpecialization);
+          selectedSubjectsList.push(...answers.languageSpecialization);
+        }
         if (answers.subjectSpecialization) selectedSubjectsList.push(...answers.subjectSpecialization);
       }
 
       setUserRole?.(role);
-      setOnboardingCompleted?.(true, selectedSubjectsList, answers, role);
+      setOnboardingCompleted?.(true, selectedSubjectsList, selectedLanguagesList, answers, role);
       refreshUser?.();
 
       const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : '/student-dashboard';
@@ -559,8 +566,8 @@ const Onboarding = () => {
         <CardContent className="p-8">
           <div className="flex justify-end mb-4">
             <select value={language} onChange={(e) => onChangeLanguage(e.target.value)} className="bg-transparent text-sm text-gray-500 focus:outline-none cursor-pointer">
-              <option value="en">English</option>
-              <option value="id">Indonesia</option>
+              <option value="en" className="bg-white text-gray-900">English</option>
+              <option value="id" className="bg-white text-gray-900">Indonesia</option>
             </select>
           </div>
 

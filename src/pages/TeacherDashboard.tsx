@@ -33,8 +33,11 @@ import {
   ReviewSubmissionsModal,
   StudentOverviewModal,
   QuickAnnouncementModal,
+  ClassLinkModal,
   UploadMaterialsModal
 } from '@/features/teacher/quick-actions';
+import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
+import { cn } from '@/lib/utils';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
@@ -147,6 +150,92 @@ const TeacherDashboard = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [selectedStudentIdForChat, setSelectedStudentIdForChat] = useState<string | undefined>(undefined);
+  const [presenceData, setPresenceData] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    // Fetch initial presence
+    const fetchInitialPresence = async () => {
+      const { data } = await supabase.from('profiles').select('id, is_online');
+      if (data) {
+        const mapping = data.reduce((acc: any, curr: any) => {
+          acc[curr.id] = !!curr.is_online;
+          return acc;
+        }, {});
+        setPresenceData(mapping);
+      }
+    };
+    fetchInitialPresence();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('presence-channel-teacher')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, (payload) => {
+        const updated = payload.new;
+        setPresenceData(prev => ({
+          ...prev,
+          [updated.id]: !!updated.is_online
+        }));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const [lastMessages, setLastMessages] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('yadalearn-user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    const userId = user?.id || parsedUser?.id;
+    if (!userId) return;
+
+    const fetchLastMessages = async () => {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: true });
+
+      if (data) {
+        const mapping: any = {};
+        data.forEach((m: any) => {
+          const partnerId = m.sender_id === userId ? m.receiver_id : m.sender_id;
+          mapping[partnerId] = {
+            message: m.message,
+            sender_id: m.sender_id,
+            is_read: !!m.is_read,
+            created_at: m.created_at,
+            attachment_type: m.attachment_type
+          };
+        });
+        setLastMessages(mapping);
+      }
+    };
+    fetchLastMessages();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('dashboard-last-messages-teacher')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_messages'
+      }, (payload) => {
+        fetchLastMessages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -375,27 +464,28 @@ const TeacherDashboard = () => {
           </div>
           
           <nav className="flex flex-col gap-1.5">
-            <button
-              onClick={() => navigate('/teacher-dashboard')}
-              className="flex items-center gap-3.5 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-2xl font-bold transition-all text-left w-full"
-            >
-              <Home className="h-5 w-5" />
-              <span>Home</span>
-            </button>
-            <button
-              onClick={() => navigate('/teacher-students')}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <Users className="h-5 w-5" />
-              <span>Students</span>
-            </button>
-            <button
-              onClick={() => navigate('/teacher-calendar')}
-              className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
-            >
-              <CalendarIcon className="h-5 w-5" />
-              <span>Calendar</span>
-            </button>
+            {[
+              { label: 'Home', path: '/teacher-dashboard', icon: Home },
+              { label: 'Students', path: '/teacher-students', icon: Users },
+              { label: 'Calendar', path: '/teacher-calendar', icon: CalendarIcon }
+            ].map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => navigate(item.path)}
+                  className={cn(
+                    "flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all text-left w-full",
+                    isActive
+                      ? "bg-[#FF7D46]/10 text-[#FF7D46] dark:text-orange-450 border border-[#FF7D46]/15 font-bold"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 font-semibold"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
         
@@ -876,27 +966,54 @@ const TeacherDashboard = () => {
                   </tr>
                 ) : topStudents && topStudents.length > 0 ? (
                   topStudents.map((student) => (
-                    <tr 
+                     <tr 
                       key={student.id} 
-                      onClick={() => handleStudentClick(student)}
+                      onClick={() => {
+                        setSelectedStudentIdForChat(student.id);
+                        setActiveModal('message');
+                      }}
                       className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <td className="py-3.5 flex items-center gap-3 font-bold text-slate-800 dark:text-white text-sm">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={student.avatar} />
-                          <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
-                            {student.name.split(' ').map((n: string) => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{student.name}</span>
+                      <td className="py-3.5 flex items-center gap-3 text-slate-800 dark:text-white text-sm">
+                        <div className="relative shrink-0">
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage src={student.avatar} />
+                            <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                              {student.name.split(' ').map((n: string) => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className={cn(
+                            "absolute bottom-0 right-0 w-2.5 h-2.5 border border-white dark:border-zinc-900 rounded-full",
+                            (presenceData[student.id] ?? (student.lastActive === 'Active now')) ? "bg-green-500" : "bg-gray-300"
+                          )} />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold truncate">{student.name}</span>
+                          {lastMessages[student.id] && (
+                            <span className={cn(
+                              "text-xs truncate max-w-[200px] mt-0.5",
+                              (!lastMessages[student.id].is_read && lastMessages[student.id].sender_id !== user?.id)
+                                ? "text-slate-900 dark:text-white font-bold"
+                                : "text-gray-400 font-normal"
+                            )}>
+                              {lastMessages[student.id].sender_id === user?.id ? "You: " : ""}
+                              {lastMessages[student.id].attachment_type === 'image' ? '📷 Image' :
+                               lastMessages[student.id].attachment_type === 'audio' ? '🎤 Voice note' :
+                               lastMessages[student.id].message}
+                            </span>
+                          )}
+                        </div>
+                        {lastMessages[student.id] && !lastMessages[student.id].is_read && lastMessages[student.id].sender_id !== user?.id && (
+                          <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shrink-0 ml-auto mr-2 shadow-sm animate-pulse" />
+                        )}
                       </td>
                       <td className="py-3.5 text-slate-700 dark:text-slate-200 text-xs font-bold">
                         {student.learningSubjects && student.learningSubjects.length > 0
                           ? student.learningSubjects[0] + ' Subjects'
                           : 'English Subjects'}
                       </td>
-                      <td className="py-3.5 text-slate-600 dark:text-slate-350 text-xs font-medium">
-                        {student.lastActive || 'Active now'}
+                      <td className="py-3.5 text-slate-600 dark:text-slate-355 text-xs font-medium">
+                        {(presenceData[student.id] ?? (student.lastActive === 'Active now')) ? 'Active now' : 'Offline'}
                       </td>
                       <td className="py-3.5">
                         <span className={`inline-block px-3 py-1 text-[10px] font-bold rounded-full ${
@@ -930,6 +1047,16 @@ const TeacherDashboard = () => {
         student={selectedStudent}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onMessage={(studentId) => {
+          setSelectedStudentIdForChat(studentId);
+          setActiveModal('message');
+        }}
+      />
+
+      <MessageTeacherModal
+        isOpen={activeModal === 'message'}
+        onClose={() => { setActiveModal(null); setSelectedStudentIdForChat(undefined); }}
+        recipientId={selectedStudentIdForChat}
       />
 
       {/* Teacher Quick Action Modals */}

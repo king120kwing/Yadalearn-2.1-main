@@ -30,7 +30,7 @@ export function useTeacherDashboardData() {
             activeCourses: 0,
             completedTasks: 0,
             pendingTasks: 0,
-            avgRating: 4.8
+            avgRating: 0
         };
         try {
             const cached = localStorage.getItem('yadalearn-cached-teacher-stats');
@@ -50,7 +50,11 @@ export function useTeacherDashboardData() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!isLoaded || !userId) return;
+        if (!isLoaded) return;
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
 
         async function fetchData() {
             setLoading(true);
@@ -91,84 +95,146 @@ export function useTeacherDashboardData() {
                     await supabase.from('courses').insert(coursesData);
                 }
 
-                // Fetch real bookings for this teacher
-                let { data: bookings, error: bookingsError } = await supabase
+                // 1. Fetch linked students
+                const { data: links, error: linksError } = await supabase
+                    .from('teacher_student_links')
+                    .select('*, student:profiles!teacher_student_links_student_id_fkey(*)')
+                    .eq('teacher_id', userId)
+                    .eq('status', 'accepted');
+
+                if (linksError) throw linksError;
+
+                // 2. Fetch bookings for this teacher to include booking students
+                const { data: teacherBookings } = await supabase
                     .from('bookings')
-                    .select('*, student:profiles!bookings_student_id_fkey(*)')
+                    .select('student:profiles!bookings_student_id_fkey(*)')
                     .eq('teacher_id', userId);
 
-                if (bookingsError) throw bookingsError;
-
-                const dbBookings = bookings || [];
-                const confirmedBookings = dbBookings.filter((b: any) => b.status === 'confirmed');
-                const pendingBookingsList = dbBookings.filter((b: any) => b.status === 'pending');
+                const studentMap = new Map<string, any>();
                 
+                // Add linked students
+                if (links) {
+                    links.forEach((link: any) => {
+                        if (link.student) {
+                            studentMap.set(link.student.id, link.student);
+                        }
+                    });
+                }
+                
+                // Add booking students
+                if (teacherBookings) {
+                    teacherBookings.forEach((b: any) => {
+                        if (b.student) {
+                            studentMap.set(b.student.id, b.student);
+                        }
+                    });
+                }
+
+                const studentsList = Array.from(studentMap.values()).map((student: any) => {
+                    return {
+                        id: student.id,
+                        name: student.full_name || 'Unknown Student',
+                        avatar: student.avatar_url || `https://i.pravatar.cc/150?u=${student.id}`,
+                        country: student.country || 'Global',
+                        learningSubjects: student.subjects || [],
+                        sessionsCompleted: 1,
+                        lastActive: student.is_online ? 'Active now' : 'Offline',
+                        status: 'active'
+                    };
+                });
+                setTopStudents(studentsList);
+                localStorage.setItem('yadalearn-cached-teacher-students', JSON.stringify(studentsList));
+
+                // 2. Fetch pending bookings from student bookings table
+                const { data: bookings, error: bookingsError } = await supabase
+                    .from('bookings')
+                    .select('*, student:profiles!bookings_student_id_fkey(*)')
+                    .eq('teacher_id', userId)
+                    .eq('status', 'pending');
+
+                if (bookingsError) throw bookingsError;
+                const pendingBookingsList = bookings || [];
                 setPendingBookings(pendingBookingsList);
                 localStorage.setItem('yadalearn-cached-teacher-pending-bookings', JSON.stringify(pendingBookingsList));
 
-                // Format Schedule from confirmed bookings returning raw date & time
-                // Filter to only display bookings initiated by the teacher
-                const initiatedIds = JSON.parse(localStorage.getItem('initiated_bookings') || '[]');
-                const teacherInitiated = confirmedBookings.filter((b: any) => initiatedIds.includes(b.id));
+                // 3. Fetch scheduled live classes for teacher's schedule
+                const { data: classes, error: classesError } = await supabase
+                    .from('live_classes')
+                    .select('*')
+                    .eq('teacher_id', userId)
+                    .order('scheduled_at', { ascending: true });
 
-                const formattedSchedule = teacherInitiated.map((b: any) => ({
-                    id: b.id,
-                    title: b.subject,
-                    date: b.date,
-                    time: b.time,
-                    status: 'confirmed'
-                })).sort((a: any, b: any) => {
-                    const dateCompare = a.date.localeCompare(b.date);
-                    if (dateCompare !== 0) return dateCompare;
-                    return a.time.localeCompare(b.time);
+                if (classesError) throw classesError;
+
+                const dbClasses = classes || [];
+                const formattedSchedule = dbClasses.map((b: any) => {
+                    const dateObj = new Date(b.scheduled_at);
+                    const yyyy = dateObj.getFullYear();
+                    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const dd = String(dateObj.getDate()).padStart(2, '0');
+                    const dateStr = `${yyyy}-${mm}-${dd}`;
+
+                    let hours = dateObj.getHours();
+                    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12;
+                    const timeStr = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+
+                    return {
+                        id: b.id,
+                        title: b.title,
+                        subject: b.subject,
+                        date: dateStr,
+                        time: timeStr,
+                        status: b.status
+                    };
                 });
                 setTeacherSchedule(formattedSchedule);
                 localStorage.setItem('yadalearn-cached-teacher-schedule', JSON.stringify(formattedSchedule));
 
-                // Build unique students list from confirmed bookings
-                const uniqueStudentsMap = new Map();
-                confirmedBookings.forEach((b: any) => {
-                    if (b.student) {
-                        uniqueStudentsMap.set(b.student.id, {
-                            id: b.student.id,
-                            name: b.student.full_name || 'Unknown Student',
-                            avatar: b.student.avatar_url || `https://i.pravatar.cc/150?u=${b.student.id}`,
-                            country: b.student.country || 'Global',
-                            learningSubjects: b.student.subjects && b.student.subjects.length > 0 ? b.student.subjects : [b.subject],
-                            sessionsCompleted: 1,
-                            lastActive: 'Active now',
-                            status: 'active'
-                        });
-                    }
-                });
-                const students = Array.from(uniqueStudentsMap.values());
-                setTopStudents(students);
-                localStorage.setItem('yadalearn-cached-teacher-students', JSON.stringify(students));
-
-                const uniqueStudentIds = new Set(
-                    confirmedBookings
-                        .map(b => b.student_id)
-                        .filter(id => id !== null && id !== undefined)
-                );
-
-                // Fetch actual ratings from confirmed bookings (from the bookings table)
-                const { data: ratedBookings, error: ratingsError } = await supabase
-                    .from('bookings')
+                // 4. Session-Based Ratings with daily reset
+                // Fetch all ratings for profile calculation
+                const { data: allRatings, error: ratingsError } = await supabase
+                    .from('session_ratings')
                     .select('rating')
-                    .eq('teacher_id', userId)
-                    .not('rating', 'is', null);
+                    .eq('rated_id', userId)
+                    .eq('rated_as', 'teacher');
 
                 if (ratingsError) {
-                    console.error('Error fetching student ratings for teacher:', ratingsError);
+                    console.error('Error fetching all ratings:', ratingsError);
                 }
 
-                let avgRating = 0;
-                if (ratedBookings && ratedBookings.length > 0) {
-                    const sum = ratedBookings.reduce((acc: number, curr: any) => acc + (curr.rating || 0), 0);
-                    avgRating = sum / ratedBookings.length;
+                let allTimeAvg = 0;
+                if (allRatings && allRatings.length > 0) {
+                    const sum = allRatings.reduce((acc: number, curr: any) => acc + (curr.rating || 0), 0);
+                    allTimeAvg = Math.round((sum / allRatings.length) * 10) / 10;
                 }
 
-                // Fetch actual courses count
+                // Update teacher_profiles with the average rating
+                await supabase
+                    .from('teacher_profiles')
+                    .update({ rating: allTimeAvg })
+                    .eq('id', userId);
+
+                // Fetch today's ratings for the teacher dashboard daily display
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+
+                const { data: todayRatings } = await supabase
+                    .from('session_ratings')
+                    .select('rating')
+                    .eq('rated_id', userId)
+                    .eq('rated_as', 'teacher')
+                    .gte('created_at', todayStart.toISOString());
+
+                let dailyAvg = 0;
+                if (todayRatings && todayRatings.length > 0) {
+                    const sum = todayRatings.reduce((acc: number, curr: any) => acc + (curr.rating || 0), 0);
+                    dailyAvg = Math.round((sum / todayRatings.length) * 10) / 10;
+                }
+
+                // 5. Fetch actual courses count
                 const { data: teacherCourses, error: coursesError } = await supabase
                     .from('courses')
                     .select('id')
@@ -177,10 +243,9 @@ export function useTeacherDashboardData() {
                 if (coursesError) {
                     console.error('Error fetching courses count:', coursesError);
                 }
-
                 const activeCoursesCount = teacherCourses ? teacherCourses.length : 0;
 
-                // Query all assignments and count submissions dynamically
+                // Query all assignments and count submissions
                 let completedTasksCount = 0;
                 let pendingTasksCount = 0;
 
@@ -205,23 +270,23 @@ export function useTeacherDashboardData() {
                     }
                 }
 
-                // Fetch monthly fee from teacher_profiles table
+                // Fetch min_rate from teacher_profiles
                 const { data: tp } = await supabase
                     .from('teacher_profiles')
                     .select('min_rate')
                     .eq('id', userId)
                     .maybeSingle();
 
-                const monthlyRate = tp?.min_rate ? Number(tp.min_rate) : 150; // default to $150 if not specified
+                const monthlyRate = tp?.min_rate ? Number(tp.min_rate) : 150;
 
                 const statsObject = {
-                    earnings: uniqueStudentIds.size * monthlyRate, // Monthly subscription gap calculation
-                    totalStudents: uniqueStudentIds.size,
-                    upcomingClasses: teacherInitiated.length,
+                    earnings: studentsList.length * monthlyRate,
+                    totalStudents: studentsList.length,
+                    upcomingClasses: formattedSchedule.filter(s => s.status === 'scheduled' || s.status === 'live').length,
                     activeCourses: activeCoursesCount,
                     completedTasks: completedTasksCount,
                     pendingTasks: pendingTasksCount,
-                    avgRating: avgRating
+                    avgRating: dailyAvg
                 };
                 setStats(statsObject);
                 localStorage.setItem('yadalearn-cached-teacher-stats', JSON.stringify(statsObject));

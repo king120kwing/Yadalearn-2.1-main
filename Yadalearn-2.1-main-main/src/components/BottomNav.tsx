@@ -58,7 +58,7 @@ export const BottomNav = () => {
   const navItems = getNavItems(isTeacherDashboard);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-black/95 backdrop-blur-sm z-50 safe-bottom">
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-zinc-800 rounded-3xl py-2 px-6 shadow-lg z-50 flex justify-between items-center md:hidden">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-around px-2 py-3 sm:px-4">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -79,8 +79,12 @@ export const BottomNav = () => {
               className={cn(
                 "flex flex-col items-center gap-1 transition-all p-2 rounded-lg min-w-[60px] active:scale-95",
                 isActive
-                  ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                  ? isTeacherDashboard
+                    ? "text-[#FF7D46] bg-[#FF7D46]/10 dark:bg-[#FF7D46]/20 shadow-sm font-bold"
+                    : "text-[#5B4A9F] bg-[#5B4A9F]/10 dark:bg-[#5B4A9F]/20 shadow-sm font-bold"
+                  : isTeacherDashboard
+                    ? "text-gray-500 dark:text-gray-450 hover:text-[#FF7D46] hover:bg-[#FF7D46]/5 dark:hover:bg-[#FF7D46]/10"
+                    : "text-gray-500 dark:text-gray-450 hover:text-[#5B4A9F] hover:bg-[#5B4A9F]/5 dark:hover:bg-[#5B4A9F]/10"
               )}
             >
               <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />

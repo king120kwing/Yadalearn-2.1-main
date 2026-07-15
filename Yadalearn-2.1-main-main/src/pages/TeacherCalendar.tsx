@@ -16,8 +16,7 @@ const TeacherCalendar = () => {
     const [days, setDays] = useState<{ day: string; date: number; fullDate: Date }[]>([]);
 
     useEffect(() => {
-        const today = new Date();
-        const start = startOfWeek(today, { weekStartsOn: 0 }); // Sunday start
+        const start = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday start
         const weekDays = [];
         for (let i = 0; i < 7; i++) {
             const currentDate = addDays(start, i);
@@ -28,7 +27,7 @@ const TeacherCalendar = () => {
             });
         }
         setDays(weekDays);
-    }, []);
+    }, [selectedDate]);
 
     // State for Teacher Events loaded from Supabase bookings table
     const [events, setEvents] = useState<any[]>([]);
@@ -144,10 +143,23 @@ const TeacherCalendar = () => {
             <div className="bg-white dark:bg-zinc-900 rounded-b-[40px] shadow-sm px-6 pt-6 pb-8 mb-6 relative z-10">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-xl font-bold">Teacher Schedule</h1>
-                    <button className="flex items-center gap-1 px-4 py-2 border border-gray-100 dark:border-zinc-700 rounded-full bg-white dark:bg-zinc-800 text-sm font-bold shadow-sm">
-                        {format(selectedDate, 'MMMM')}
-                        <span className="material-symbols-outlined text-sm">expand_more</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setSelectedDate(prev => addDays(prev, -7))}
+                            className="size-8 rounded-full border border-gray-150 dark:border-zinc-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-zinc-800"
+                        >
+                            <span className="material-symbols-outlined text-sm font-bold">chevron_left</span>
+                        </button>
+                        <button className="flex items-center gap-1 px-4 py-2 border border-gray-100 dark:border-zinc-700 rounded-full bg-white dark:bg-zinc-800 text-sm font-bold shadow-sm">
+                            {format(selectedDate, 'MMMM')}
+                        </button>
+                        <button 
+                            onClick={() => setSelectedDate(prev => addDays(prev, 7))}
+                            className="size-8 rounded-full border border-gray-150 dark:border-zinc-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-zinc-800"
+                        >
+                            <span className="material-symbols-outlined text-sm font-bold">chevron_right</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Days Horizontal Scroll */}
@@ -166,13 +178,13 @@ const TeacherCalendar = () => {
                                     {item.day}
                                 </span>
                                 <div className={`w-11 h-14 rounded-[20px] flex items-center justify-center text-sm font-bold transition-all shadow-sm relative ${isSelected
-                                        ? 'bg-purple-600 text-white shadow-purple-300 dark:shadow-purple-900/50 scale-110'
+                                        ? 'bg-[#FF7D46] text-white shadow-orange-200 dark:shadow-orange-950/20 scale-110'
                                         : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-gray-300 border border-transparent'
                                     }`}>
                                     {item.date}
                                     {/* Small dot for Today if not selected */}
                                     {!isSelected && isToday && (
-                                        <div className="absolute -bottom-1 w-1 h-1 bg-purple-600 rounded-full"></div>
+                                        <div className="absolute -bottom-1 w-1 h-1 bg-[#FF7D46] rounded-full"></div>
                                     )}
                                 </div>
                             </button>
@@ -206,22 +218,22 @@ const TeacherCalendar = () => {
                                                 <span className="material-symbols-outlined text-gray-300 text-sm">check</span>
                                             </div>
                                         ) : isActive ? (
-                                            <div className="w-7 h-7 rounded-full border-[3px] border-purple-600 bg-white dark:bg-zinc-900 flex items-center justify-center relative z-20 shadow-lg shadow-purple-200 dark:shadow-purple-900/30">
-                                                <div className="w-2.5 h-2.5 bg-purple-600 rounded-full"></div>
+                                            <div className="w-7 h-7 rounded-full border-[3px] border-[#FF7D46] bg-white dark:bg-zinc-900 flex items-center justify-center relative z-20 shadow-lg shadow-orange-100 dark:shadow-orange-950/20">
+                                                <div className="w-2.5 h-2.5 bg-[#FF7D46] rounded-full"></div>
                                             </div>
                                         ) : (
-                                            <div className="w-7 h-7 rounded-full border-2 border-purple-100 dark:border-purple-900/30 bg-purple-50 dark:bg-purple-950 flex items-center justify-center z-20">
-                                                <div className="w-2 h-2 bg-purple-300 rounded-full"></div>
+                                            <div className="w-7 h-7 rounded-full border-2 border-orange-100 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-950 flex items-center justify-center z-20">
+                                                <div className="w-2.5 h-2.5 bg-orange-300 rounded-full"></div>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Event Card */}
                                     <div className="flex-1 min-w-0">
-                                        <div className={`p-5 rounded-[24px] transition-all relative group-hover:bg-white group-hover:shadow-md dark:group-hover:bg-zinc-900 ${isActive ? 'bg-gradient-to-r from-purple-50/80 to-transparent dark:from-purple-900/10' : ''
+                                        <div className={`p-5 rounded-[24px] transition-all relative group-hover:bg-white group-hover:shadow-md dark:group-hover:bg-zinc-900 ${isActive ? 'bg-gradient-to-r from-orange-50/80 to-transparent dark:from-orange-900/10' : ''
                                             }`}>
                                             {isActive && (
-                                                <div className="absolute top-8 -left-8 w-8 h-[2px] bg-purple-600 z-0"></div>
+                                                <div className="absolute top-8 -left-8 w-8 h-[2px] bg-[#FF7D46] z-0"></div>
                                             )}
 
                                             <div className="flex justify-between items-start">
@@ -231,21 +243,21 @@ const TeacherCalendar = () => {
                                                             {event.title}
                                                         </h3>
                                                         {event.type === 'class' && (
-                                                            <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full uppercase">Class</span>
+                                                            <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full uppercase">Class</span>
                                                         )}
                                                     </div>
 
                                                     <div className="space-y-1.5">
                                                         <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
-                                                            <span className="material-symbols-outlined text-[16px] text-purple-400">location_on</span>
+                                                            <span className="material-symbols-outlined text-[16px] text-orange-400">location_on</span>
                                                             <span>{event.location}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
-                                                            <span className="material-symbols-outlined text-[16px] text-purple-400">calendar_today</span>
+                                                            <span className="material-symbols-outlined text-[16px] text-orange-400">calendar_today</span>
                                                             <span>{event.date}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
-                                                            <span className="material-symbols-outlined text-[16px] text-purple-400">schedule</span>
+                                                            <span className="material-symbols-outlined text-[16px] text-orange-400">schedule</span>
                                                             <span>{event.time} - {event.endTime}</span>
                                                         </div>
                                                     </div>
@@ -275,7 +287,7 @@ const TeacherCalendar = () => {
             {/* Floating Add Plan Button */}
             <button
                 onClick={() => setShowAddModal(true)}
-                className="fixed bottom-24 right-6 w-16 h-16 bg-purple-600 text-white rounded-full shadow-xl shadow-purple-600/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
+                className="fixed bottom-24 right-6 w-16 h-16 bg-[#FF7D46] text-white rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
             >
                 <Plus className="h-6 w-6" />
             </button>
@@ -292,7 +304,7 @@ const TeacherCalendar = () => {
                                 <input
                                     type="text"
                                     placeholder="e.g. Staff Meeting"
-                                    className="w-full h-14 rounded-2xl bg-gray-50 dark:bg-zinc-800 border-none px-6 font-semibold focus:ring-2 focus:ring-purple-500 transition-all outline-none"
+                                    className="w-full h-14 rounded-2xl bg-gray-50 dark:bg-zinc-800 border-none px-6 font-semibold focus:ring-2 focus:ring-[#FF7D46] transition-all outline-none"
                                     value={newEventTitle}
                                     onChange={e => setNewEventTitle(e.target.value)}
                                     autoFocus
@@ -304,7 +316,7 @@ const TeacherCalendar = () => {
                                 <input
                                     type="text"
                                     placeholder="e.g. 10:00 AM"
-                                    className="w-full h-14 rounded-2xl bg-gray-50 dark:bg-zinc-800 border-none px-6 font-semibold focus:ring-2 focus:ring-purple-500 transition-all outline-none"
+                                    className="w-full h-14 rounded-2xl bg-gray-50 dark:bg-zinc-800 border-none px-6 font-semibold focus:ring-2 focus:ring-[#FF7D46] transition-all outline-none"
                                     value={newEventTime}
                                     onChange={e => setNewEventTime(e.target.value)}
                                 />
@@ -320,7 +332,7 @@ const TeacherCalendar = () => {
                             </button>
                             <button
                                 onClick={handleAddEvent}
-                                className="flex-1 py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 dark:shadow-purple-900/30 hover:bg-purple-700 transition-colors"
+                                className="flex-1 py-4 bg-[#FF7D46] text-white rounded-2xl font-bold shadow-lg shadow-orange-100 dark:shadow-orange-950/20 hover:bg-[#e06530] transition-colors"
                             >
                                 Save
                             </button>

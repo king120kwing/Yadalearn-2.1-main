@@ -19,7 +19,7 @@ interface AuthContextType {
   onboardingCompleted: boolean;
   subjects: string[];
   setUserRole: (role: 'teacher' | 'student' | null) => void;
-  setOnboardingCompleted: (completed: boolean, subjects?: string[], onboardingAnswers?: any, role?: 'teacher' | 'student' | null) => Promise<void>;
+  setOnboardingCompleted: (completed: boolean, subjects?: string[], preferredLanguages?: string[], onboardingAnswers?: any, role?: 'teacher' | 'student' | null) => Promise<void>;
   clearUserRole: () => void;
   login: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<any>;
@@ -79,18 +79,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return !!(hasRole && hasUser);
   });
   const fetchingUserIdRef = useRef<string | null>(null);
+  const fetchedUserIdRef = useRef<string | null>(null);
+  const oauthTimeoutRef = useRef<any>(null);
   const initialCheckCompletedRef = useRef(false);
 
+  // Real-time Presence sync
   useEffect(() => {
-    console.log('DEBUG: window.location.href =', window.location.href);
-    console.log('DEBUG: VITE_SUPABASE_URL =', import.meta.env.VITE_SUPABASE_URL);
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (key) {
-      console.log('DEBUG: VITE_SUPABASE_ANON_KEY =', key.substring(0, 15) + '...' + key.substring(key.length - 15));
-    } else {
-      console.log('DEBUG: VITE_SUPABASE_ANON_KEY is missing');
-    }
+    if (!user?.id) return;
+    
+    // Set online on mount/auth change
+    supabase
+      .from('profiles')
+      .update({ is_online: true, last_active_at: new Date().toISOString() })
+      .eq('id', user.id)
+      .then();
 
+    const handleUnload = () => {
+      const url = `https://yxqezrvgvfwdgrlwczea.supabase.co/rest/v1/profiles?id=eq.${user.id}`;
+      const headers = {
+        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4cWV6cnZndmZ3ZGdybHdjemVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NTEwMTcsImV4cCI6MjA5NzUyNzAxN30.82swG99ZvWtYHwjgHxb5RlKVqwlIP6E-fevsdCz4Qzk",
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4cWV6cnZndmZ3ZGdybHdjemVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NTEwMTcsImV4cCI6MjA5NzUyNzAxN30.82swG99ZvWtYHwjgHxb5RlKVqwlIP6E-fevsdCz4Qzk",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      };
+      const body = JSON.stringify({ is_online: false, last_active_at: new Date().toISOString() });
+      fetch(url, { method: "PATCH", headers, body, keepalive: true });
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('unload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('unload', handleUnload);
+      handleUnload();
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     // Self-healing check: clean up any bloated auth token in local storage immediately on mount
     let hasBloatedCache = false;
     for (let i = 0; i < localStorage.length; i++) {
@@ -161,13 +187,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       window.location.search.includes('access_token=');
 
     // Check active session on mount
-    console.log('AuthContext: getSession started on mount');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('AuthContext: getSession returned session:', session);
       initialCheckCompletedRef.current = true;
       try {
         await handleSession(session);
-        console.log('AuthContext: getSession handleSession completed');
       } catch (err) {
         console.error('AuthContext: getSession handleSession failed:', err);
         setIsLoaded(true);
@@ -180,7 +203,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthContext: onAuthStateChange event:', event, 'session:', session);
       if (event === 'SIGNED_IN') {
         initialCheckCompletedRef.current = true;
         const hasCache = localStorage.getItem('yadalearn-user-role') && localStorage.getItem('yadalearn-user');
@@ -190,7 +212,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       try {
         await handleSession(session);
-        console.log('AuthContext: onAuthStateChange handleSession completed');
       } catch (err) {
         console.error('AuthContext: onAuthStateChange handleSession failed:', err);
         setIsLoaded(true);
@@ -198,9 +219,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     // Fallback timer: in case OAuth parsing fails or takes too long, set isLoaded to true after 2 seconds
-    let timeoutId: any;
     if (hasHashToken) {
-      timeoutId = setTimeout(() => {
+      oauthTimeoutRef.current = setTimeout(() => {
         console.log('AuthContext: OAuth fallback timer fired, setting isLoaded to true');
         initialCheckCompletedRef.current = true;
         setIsLoaded(true);
@@ -209,19 +229,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       subscription.unsubscribe();
-      if (timeoutId) clearTimeout(timeoutId);
+      if (oauthTimeoutRef.current) {
+        clearTimeout(oauthTimeoutRef.current);
+        oauthTimeoutRef.current = null;
+      }
     };
   }, []);
 
   const handleSession = async (session: any) => {
     console.log('AuthContext: handleSession start for user:', session?.user?.id);
     if (session?.user) {
+      if (oauthTimeoutRef.current) {
+        clearTimeout(oauthTimeoutRef.current);
+        oauthTimeoutRef.current = null;
+      }
+
+      const hasUrlParams = 
+        window.location.hash.includes('access_token=') || 
+        window.location.hash.includes('id_token=') || 
+        window.location.hash.includes('refresh_token=') || 
+        window.location.search.includes('code=') ||
+        window.location.search.includes('access_token=');
+      if (hasUrlParams) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
       initialCheckCompletedRef.current = true;
       const u = session.user;
       
-      // If we are already fetching/fetched this user's profile, skip database query
-      if (fetchingUserIdRef.current === u.id) {
-        console.log('AuthContext: Already fetching or fetched profile for user:', u.id);
+      // If we have already fully fetched this user's profile, skip database query
+      if (fetchedUserIdRef.current === u.id) {
+        console.log('AuthContext: Already fetched profile for user:', u.id);
         const savedUserStr = localStorage.getItem('yadalearn-user');
         let cachedUser: any = null;
         if (savedUserStr) {
@@ -242,6 +280,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           bio: cachedUser?.bio,
           country: cachedUser?.country
         });
+        return;
+      }
+
+      // If we are currently fetching this user's profile, wait for the query to resolve
+      if (fetchingUserIdRef.current === u.id) {
+        console.log('AuthContext: Fetch in progress for user:', u.id);
         return;
       }
       
@@ -290,6 +334,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('AuthContext: Profile fetch completed, profile:', profile);
 
         if (profile) {
+          fetchedUserIdRef.current = u.id;
           if (profile.role) {
             setUserRoleState(profile.role as 'teacher' | 'student');
             localStorage.setItem('yadalearn-user-role', profile.role);
@@ -321,10 +366,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             localStorage.removeItem('yadalearn-onboarding-completed');
           }
           fetchingUserIdRef.current = null;
+          fetchedUserIdRef.current = null;
         }
       } catch (dbErr) {
         console.error('AuthContext: Database profile query failed (retaining cached localStorage role/onboarding states):', dbErr);
         fetchingUserIdRef.current = null;
+        fetchedUserIdRef.current = null;
       } finally {
         console.log('AuthContext: handleSession profile fetch completed, setting isLoaded to true');
         setIsLoaded(true);
@@ -338,6 +385,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('yadalearn-user-role');
       localStorage.removeItem('yadalearn-onboarding-completed');
       fetchingUserIdRef.current = null;
+      fetchedUserIdRef.current = null;
 
       const hasOAuthToken = 
         window.location.hash.includes('access_token=') || 
@@ -385,6 +433,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 
   const logout = async () => {
+    if (user?.id) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ is_online: false, last_active_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch (err) {
+        console.error("Failed to update status on logout:", err);
+      }
+    }
     await supabase.auth.signOut();
     setUser(null);
     setUserRoleState(null);
@@ -393,6 +451,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem('yadalearn-user-role');
     localStorage.removeItem('yadalearn-onboarding-completed');
     fetchingUserIdRef.current = null;
+    fetchedUserIdRef.current = null;
   };
 
   const setUserRole = async (role: 'teacher' | 'student' | null) => {
@@ -417,6 +476,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const setOnboardingCompleted = async (
     completed: boolean,
     selectedSubjects: string[] = [],
+    selectedLanguages: string[] = [],
     onboardingAnswers: any = null,
     role: 'teacher' | 'student' | null = null
   ) => {
@@ -430,7 +490,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (user) {
       await supabase.from('profiles').update({
         onboarding_completed: completed,
-        subjects: selectedSubjects
+        subjects: selectedSubjects,
+        preferred_languages: selectedLanguages
       }).eq('id', user.id);
 
       if (onboardingAnswers && activeRole) {
@@ -450,10 +511,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else if (activeRole === 'teacher') {
           await supabase.from('teacher_profiles').upsert({
             id: user.id,
-            teaching_focus: onboardingAnswers.teachingFocus,
-            language_specialization: onboardingAnswers.languageSpecialization,
-            subject_specialization: onboardingAnswers.subjectSpecialization,
-            teaching_level: onboardingAnswers.teachingLevel,
+            teaching_focus: selectedSubjects,
+            language_specialization: selectedLanguages,
+            subject_specialization: onboardingAnswers.subjectSpecialization || [],
+            teaching_level: onboardingAnswers.teachingLevel || [],
             teaching_approach: onboardingAnswers.teachingApproach,
             lesson_format: onboardingAnswers.lessonFormat,
             availability: onboardingAnswers.availability,

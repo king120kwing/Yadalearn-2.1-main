@@ -10,9 +10,10 @@ import { format } from 'date-fns';
 interface BookClassModalProps {
     isOpen: boolean;
     onClose: () => void;
+    teacherId?: string;
 }
 
-export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
+export const BookClassModal = ({ isOpen, onClose, teacherId }: BookClassModalProps) => {
     const { user } = useAuth();
     const userId = user?.id;
 
@@ -23,13 +24,13 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
     const [topics, setTopics] = useState<any[]>([]);
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && userId) {
             const fetchTeachers = async () => {
                 const { data, error } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, subjects, avatar_url, teacher_profiles(min_rate)')
-                    .eq('role', 'teacher')
-                    .eq('onboarding_completed', true);
+                    .from('teacher_student_links')
+                    .select('teacher:profiles(id, full_name, subjects, avatar_url, teacher_profiles(min_rate))')
+                    .eq('student_id', userId)
+                    .eq('status', 'accepted');
                 
                 if (error) {
                     console.error('Error loading teachers:', error);
@@ -37,7 +38,9 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                 }
                 
                 if (data) {
-                    const mapped = data.map((t: any) => {
+                    const mapped = data.map((item: any) => {
+                        const t = item.teacher;
+                        if (!t) return null;
                         const minRate = t.teacher_profiles?.min_rate || (Array.isArray(t.teacher_profiles) ? t.teacher_profiles[0]?.min_rate : null) || 45;
                         return ({
                             id: t.id,
@@ -47,13 +50,22 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                             color: 'from-purple-400 to-indigo-400',
                             rate: minRate
                         });
-                    });
+                    }).filter(Boolean);
                     setTopics(mapped);
                 }
             };
             fetchTeachers();
         }
-    }, [isOpen]);
+    }, [isOpen, userId]);
+
+    // Handle preselected teacher if provided
+    useEffect(() => {
+        if (isOpen && teacherId && topics.length > 0) {
+            if (topics.some(t => t.id === teacherId)) {
+                setSelectedTopic(teacherId);
+            }
+        }
+    }, [isOpen, teacherId, topics]);
 
     const timeSlots = [
         '09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM', '05:00 PM'
@@ -100,14 +112,8 @@ export const BookClassModal = ({ isOpen, onClose }: BookClassModalProps) => {
                 <DialogDescription className="sr-only">Schedule a new live video tutoring session with a qualified teacher.</DialogDescription>
                 {/* Header */}
                 <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-zinc-800">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center mb-4">
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Book a Class</h2>
-                        <button
-                            onClick={onClose}
-                            className="size-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-gray-500">close</span>
-                        </button>
                     </div>
                     {/* Progress Steps */}
                     <div className="flex gap-2">

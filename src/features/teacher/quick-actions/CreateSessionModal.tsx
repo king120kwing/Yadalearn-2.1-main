@@ -38,20 +38,17 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
         async function fetchStudents() {
             try {
                 if (!user?.id) return;
-                const { data: bookings } = await supabase
-                    .from('bookings')
-                    .select('student:profiles!bookings_student_id_fkey(*)')
+                const { data: links } = await supabase
+                    .from('teacher_student_links')
+                    .select('student:profiles!teacher_student_links_student_id_fkey(*)')
                     .eq('teacher_id', user.id)
-                    .eq('status', 'confirmed');
+                    .eq('status', 'accepted');
 
-                if (bookings) {
-                    const uniqueMap = new Map();
-                    bookings.forEach((b: any) => {
-                        if (b.student) {
-                            uniqueMap.set(b.student.id, b.student);
-                        }
-                    });
-                    setStudents(Array.from(uniqueMap.values()));
+                if (links) {
+                    const uniqueStudents = links
+                        .map((l: any) => l.student)
+                        .filter(Boolean);
+                    setStudents(uniqueStudents);
                 }
             } catch (err) {
                 console.error("Error fetching students:", err);

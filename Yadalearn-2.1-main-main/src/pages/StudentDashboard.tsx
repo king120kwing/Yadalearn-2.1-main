@@ -26,8 +26,92 @@ const StudentDashboard = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [selectedTeacherIdForChat, setSelectedTeacherIdForChat] = useState<string | undefined>(undefined);
+  const [selectedTeacherIdForBooking, setSelectedTeacherIdForBooking] = useState<string | undefined>(undefined);
+  const [presenceData, setPresenceData] = useState<Record<string, boolean>>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
+
+  useEffect(() => {
+    // Fetch initial presence
+    const fetchInitialPresence = async () => {
+      const { data } = await supabase.from('profiles').select('id, is_online');
+      if (data) {
+        const mapping = data.reduce((acc: any, curr: any) => {
+          acc[curr.id] = !!curr.is_online;
+          return acc;
+        }, {});
+        setPresenceData(mapping);
+      }
+    };
+    fetchInitialPresence();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('presence-channel-student')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, (payload) => {
+        const updated = payload.new;
+        setPresenceData(prev => ({
+          ...prev,
+          [updated.id]: !!updated.is_online
+        }));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const [lastMessages, setLastMessages] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchLastMessages = async () => {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: true });
+
+      if (data) {
+        const mapping: any = {};
+        data.forEach((m: any) => {
+          const partnerId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
+          mapping[partnerId] = {
+            message: m.message,
+            sender_id: m.sender_id,
+            is_read: !!m.is_read,
+            created_at: m.created_at,
+            attachment_type: m.attachment_type
+          };
+        });
+        setLastMessages(mapping);
+      }
+    };
+    fetchLastMessages();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('dashboard-last-messages-student')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_messages'
+      }, (payload) => {
+        fetchLastMessages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
@@ -414,8 +498,8 @@ const StudentDashboard = () => {
                   className={cn(
                     "flex items-center gap-3.5 px-4 py-3 rounded-2xl font-bold transition-all text-left w-full",
                     isActive
-                      ? "bg-[#5B4A9F]/10 text-[#5B4A9F] dark:text-purple-400 border border-[#5B4A9F]/10"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30"
+                      ? "bg-[#5B4A9F]/10 text-[#5B4A9F] dark:text-purple-400 border border-[#5B4A9F]/15 font-bold"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-zinc-800/30 font-semibold"
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -853,17 +937,44 @@ const StudentDashboard = () => {
                   topTeachers.map((teacher: any) => (
                     <tr 
                       key={teacher.id} 
-                      onClick={() => { setSelectedTeacher(teacher); setIsModalOpen(true); }}
+                      onClick={() => {
+                        setSelectedTeacherIdForChat(teacher.id);
+                        setActiveModal('message');
+                      }}
                       className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <td className="py-3.5 flex items-center gap-3 font-bold text-slate-800 dark:text-white text-sm">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={teacher.avatar} />
-                          <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white">
-                            {teacher.name.split(' ').map((n: string) => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{teacher.name}</span>
+                      <td className="py-3.5 flex items-center gap-3 text-slate-800 dark:text-white text-sm">
+                        <div className="relative shrink-0">
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage src={teacher.avatar} />
+                            <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white">
+                              {teacher.name.split(' ').map((n: string) => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className={cn(
+                            "absolute bottom-0 right-0 w-2.5 h-2.5 border border-white dark:border-zinc-900 rounded-full",
+                            (presenceData[teacher.id] ?? teacher.isOnline) ? "bg-green-500" : "bg-gray-300"
+                          )} />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold truncate">{teacher.name}</span>
+                          {lastMessages[teacher.id] && (
+                            <span className={cn(
+                              "text-xs truncate max-w-[200px] mt-0.5",
+                              (!lastMessages[teacher.id].is_read && lastMessages[teacher.id].sender_id !== user?.id)
+                                ? "text-slate-900 dark:text-white font-bold"
+                                : "text-gray-400 font-normal"
+                            )}>
+                              {lastMessages[teacher.id].sender_id === user?.id ? "You: " : ""}
+                              {lastMessages[teacher.id].attachment_type === 'image' ? '📷 Image' :
+                               lastMessages[teacher.id].attachment_type === 'audio' ? '🎤 Voice note' :
+                               lastMessages[teacher.id].message}
+                            </span>
+                          )}
+                        </div>
+                        {lastMessages[teacher.id] && !lastMessages[teacher.id].is_read && lastMessages[teacher.id].sender_id !== user?.id && (
+                          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full shrink-0 ml-auto mr-2 shadow-sm animate-pulse" />
+                        )}
                       </td>
                       <td className="py-3.5 text-slate-700 dark:text-slate-200 text-xs font-bold">
                         {teacher.subjects && teacher.subjects.length > 0
@@ -898,6 +1009,14 @@ const StudentDashboard = () => {
         teacher={selectedTeacher}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onMessage={(teacherId) => {
+          setSelectedTeacherIdForChat(teacherId);
+          setActiveModal('message');
+        }}
+        onBook={(teacherId) => {
+          setSelectedTeacherIdForBooking(teacherId);
+          setActiveModal('book-class');
+        }}
       />
 
       <JoinClassModal 
@@ -906,10 +1025,18 @@ const StudentDashboard = () => {
         className={nextClass ? nextClass.title : 'Spanish Conversation'} 
         teacherName={nextClass?.teacherName} 
       />
-      <BookClassModal isOpen={activeModal === 'book-class'} onClose={() => setActiveModal(null)} />
+      <BookClassModal 
+        isOpen={activeModal === 'book-class'} 
+        onClose={() => { setActiveModal(null); setSelectedTeacherIdForBooking(undefined); }} 
+        teacherId={selectedTeacherIdForBooking}
+      />
       <AIStudyBuddyModal isOpen={activeModal === 'ai-buddy'} onClose={() => setActiveModal(null)} />
       <AssignmentsModal isOpen={activeModal === 'assignments'} onClose={() => setActiveModal(null)} />
-      <MessageTeacherModal isOpen={activeModal === 'message'} onClose={() => setActiveModal(null)} />
+      <MessageTeacherModal 
+        isOpen={activeModal === 'message'} 
+        onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 
+        recipientId={selectedTeacherIdForChat}
+      />
 
       {/* Rate Session Modal */}
       {isRatingModalOpen && selectedBookingToRate && (

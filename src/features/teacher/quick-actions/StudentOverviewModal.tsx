@@ -22,21 +22,18 @@ export const StudentOverviewModal = ({ isOpen, onClose }: StudentOverviewModalPr
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
 
-                const { data: bookings } = await supabase
-                    .from('bookings')
-                    .select('student:profiles!bookings_student_id_fkey(*)')
+                const { data: links } = await supabase
+                    .from('teacher_student_links')
+                    .select('student:profiles!teacher_student_links_student_id_fkey(*)')
                     .eq('teacher_id', user.id)
-                    .eq('status', 'confirmed');
+                    .eq('status', 'accepted');
 
-                if (bookings) {
-                    const uniqueStudentsMap = new Map();
-                    bookings.forEach((b: any) => {
-                        if (b.student) {
-                            uniqueStudentsMap.set(b.student.id, b.student);
-                        }
-                    });
+                if (links) {
+                    const uniqueStudents = links
+                        .map((l: any) => l.student)
+                        .filter(Boolean);
 
-                    const list = Array.from(uniqueStudentsMap.values()).map((s: any) => {
+                    const list = uniqueStudents.map((s: any) => {
                         const name = s.full_name || 'Unknown Student';
                         const initials = name.split(' ').map((n: any) => n[0]).join('');
                         return {

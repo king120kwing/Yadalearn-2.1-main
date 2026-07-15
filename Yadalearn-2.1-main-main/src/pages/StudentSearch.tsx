@@ -495,9 +495,9 @@ const StudentSearch = () => {
                                         onChange={(e) => setBookingTime(e.target.value)}
                                         className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white"
                                     >
-                                        <option value="">Select a time</option>
+                                        <option value="" className="bg-white dark:bg-zinc-900 text-slate-800 dark:text-white">Select a time</option>
                                         {selectedTeacher.availability.times.map((t: string) => (
-                                            <option key={t} value={t}>{t}</option>
+                                            <option key={t} value={t} className="bg-white dark:bg-zinc-900 text-slate-800 dark:text-white">{t}</option>
                                         ))}
                                     </select>
                                 </div>

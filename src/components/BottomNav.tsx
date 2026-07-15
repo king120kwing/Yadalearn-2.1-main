@@ -79,8 +79,12 @@ export const BottomNav = () => {
               className={cn(
                 "flex flex-col items-center gap-1 transition-all p-2 rounded-lg min-w-[60px] active:scale-95",
                 isActive
-                  ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                  ? isTeacherDashboard
+                    ? "text-[#FF7D46] bg-[#FF7D46]/10 dark:bg-[#FF7D46]/20 shadow-sm font-bold"
+                    : "text-[#5B4A9F] bg-[#5B4A9F]/10 dark:bg-[#5B4A9F]/20 shadow-sm font-bold"
+                  : isTeacherDashboard
+                    ? "text-gray-500 dark:text-gray-450 hover:text-[#FF7D46] hover:bg-[#FF7D46]/5 dark:hover:bg-[#FF7D46]/10"
+                    : "text-gray-500 dark:text-gray-450 hover:text-[#5B4A9F] hover:bg-[#5B4A9F]/5 dark:hover:bg-[#5B4A9F]/10"
               )}
             >
               <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />

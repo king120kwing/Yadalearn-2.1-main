@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { cn } from "@/lib/utils";
-import { format, addDays, startOfWeek, getDate, getDay, isSameDay } from 'date-fns';
+import { format, addDays, startOfWeek, getDate, isSameDay } from 'date-fns';
 import { Plus } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 const StudentCalendar = () => {
+    const { user } = useAuth();
+    const userId = user?.id;
+
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-
-    // Dynamic Days Generation (Current Week)
     const [days, setDays] = useState<{ day: string; date: number; fullDate: Date }[]>([]);
+    const [events, setEvents] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
 
+    // Dynamic Days Generation (Surrounding selected date)
     useEffect(() => {
-        const today = new Date();
-        const start = startOfWeek(today, { weekStartsOn: 0 }); // Sunday start
+        const start = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday start
         const weekDays = [];
         for (let i = 0; i < 7; i++) {
             const currentDate = addDays(start, i);
@@ -23,21 +28,82 @@ const StudentCalendar = () => {
             });
         }
         setDays(weekDays);
-    }, []);
+    }, [selectedDate]);
 
-    // Mock State for Events (Data still mocked, but logic is dynamic)
-    const [events, setEvents] = useState([
-        { id: 1, time: '08:00 AM', endTime: '09:00 AM', title: 'Team meeting', location: 'Meeting room level 9', date: format(new Date(), 'MMMM d, yyyy'), status: 'completed' },
-        { id: 2, time: '09:00 AM', endTime: '10:00 AM', title: 'Present a plan', location: 'Meeting room level 9', date: format(new Date(), 'MMMM d, yyyy'), status: 'active' },
-        { id: 3, time: '10:00 AM', endTime: '11:00 AM', title: 'Meeting summary', location: 'Meeting room level 9', date: format(new Date(), 'MMMM d, yyyy'), status: 'upcoming' },
-    ]);
+    // Fetch dynamic student bookings from Supabase
+    useEffect(() => {
+        if (!userId) return;
+        async function fetchBookings() {
+            setLoading(true);
+            try {
+                const dbDateStr = format(selectedDate, 'yyyy-MM-dd');
+                const { data, error } = await supabase
+                    .from('bookings')
+                    .select('*, teacher:profiles!bookings_teacher_id_fkey(*)')
+                    .eq('student_id', userId)
+                    .eq('date', dbDateStr);
+
+                if (error) throw error;
+                if (data) {
+                    const mapped = data.map((b: any) => {
+                        const startStr = b.time; // e.g. "09:00 AM"
+                        let endStr = '10:00 AM';
+                        try {
+                            const match = startStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+                            if (match) {
+                                let hrs = parseInt(match[1]);
+                                const mins = match[2];
+                                const ampm = match[3].toUpperCase();
+                                hrs = hrs + 1;
+                                let newAmpm = ampm;
+                                if (hrs === 12) {
+                                    newAmpm = ampm === 'AM' ? 'PM' : 'AM';
+                                } else if (hrs > 12) {
+                                    hrs = hrs - 12;
+                                }
+                                endStr = `${String(hrs).padStart(2, '0')}:${mins} ${newAmpm}`;
+                            }
+                        } catch (e) {}
+
+                        return {
+                            id: b.id,
+                            time: b.time,
+                            endTime: endStr,
+                            title: `Class with ${b.teacher?.full_name || 'Teacher'}`,
+                            location: 'Yadalearn Live Room',
+                            date: format(new Date(b.date + 'T12:00:00'), 'MMMM d, yyyy'),
+                            status: b.status // confirmed, pending, completed
+                        };
+                    });
+                    setEvents(mapped);
+                }
+            } catch (err) {
+                console.error('Error loading student calendar events:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchBookings();
+    }, [selectedDate, userId]);
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [newEventTitle, setNewEventTitle] = useState('');
     const [newEventTime, setNewEventTime] = useState('12:00 PM');
 
-    const handleDelete = (id: number) => {
-        setEvents(events.filter(e => e.id !== id));
+    const handleDelete = async (id: string | number) => {
+        try {
+            if (typeof id === 'string') {
+                const { error } = await supabase
+                    .from('bookings')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+            }
+            setEvents(events.filter(e => e.id !== id));
+        } catch (err) {
+            console.error('Error deleting calendar event:', err);
+            alert('Failed to delete booking.');
+        }
     };
 
     const handleAddEvent = () => {
@@ -62,10 +128,23 @@ const StudentCalendar = () => {
             <div className="bg-white dark:bg-zinc-900 rounded-b-[40px] shadow-sm px-6 pt-6 pb-8 mb-6 relative z-10">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-xl font-bold">Appointment date</h1>
-                    <button className="flex items-center gap-1 px-4 py-2 border border-gray-100 dark:border-zinc-700 rounded-full bg-white dark:bg-zinc-800 text-sm font-bold shadow-sm">
-                        {format(selectedDate, 'MMMM')}
-                        <span className="material-symbols-outlined text-sm">expand_more</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setSelectedDate(prev => addDays(prev, -7))}
+                            className="size-8 rounded-full border border-gray-150 dark:border-zinc-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-zinc-800"
+                        >
+                            <span className="material-symbols-outlined text-sm font-bold">chevron_left</span>
+                        </button>
+                        <button className="flex items-center gap-1 px-4 py-2 border border-gray-100 dark:border-zinc-700 rounded-full bg-white dark:bg-zinc-800 text-sm font-bold shadow-sm">
+                            {format(selectedDate, 'MMMM')}
+                        </button>
+                        <button 
+                            onClick={() => setSelectedDate(prev => addDays(prev, 7))}
+                            className="size-8 rounded-full border border-gray-150 dark:border-zinc-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-zinc-800"
+                        >
+                            <span className="material-symbols-outlined text-sm font-bold">chevron_right</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Days Horizontal Scroll */}

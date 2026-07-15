@@ -2,13 +2,20 @@ import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Logout = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
-  const handleLogout = () => {
-    // TODO: Implement actual logout logic
-    navigate("/welcome");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/welcome");
+    } catch (e) {
+      console.error(e);
+      navigate("/welcome");
+    }
   };
 
   return (

@@ -66,6 +66,7 @@ export function useDashboardData() {
                             avatar_url,
                             subjects,
                             bio,
+                            is_online,
                             teacher_profiles (
                                 rating,
                                 min_rate,
@@ -89,6 +90,7 @@ export function useDashboardData() {
                             avatar_url,
                             subjects,
                             bio,
+                            is_online,
                             teacher_profiles (
                                 rating,
                                 min_rate,
@@ -116,6 +118,7 @@ export function useDashboardData() {
                             avatar_url,
                             subjects,
                             bio,
+                            is_online,
                             teacher_profiles (
                                 rating,
                                 min_rate,
@@ -135,13 +138,13 @@ export function useDashboardData() {
                         name: t.full_name || 'Unknown Teacher',
                         avatar: t.avatar_url || 'https://i.pravatar.cc/150',
                         subjects: t.subjects || ['General'],
-                        rating: tp.rating ? Number(tp.rating) : 4.8,
+                        rating: tp.rating ? Number(tp.rating) : 0,
                         reviews: 12,
                         rateMin: tp.min_rate || 40,
                         rateMax: tp.max_rate || 80,
                         yearsExperience: 8,
                         bio: t.bio || 'Experienced teacher.',
-                        isOnline: true
+                        isOnline: !!t.is_online
                     };
                 });
 

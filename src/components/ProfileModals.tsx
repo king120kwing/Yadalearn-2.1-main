@@ -12,9 +12,11 @@ interface TeacherProfileModalProps {
   teacher: Teacher | null;
   isOpen: boolean;
   onClose: () => void;
+  onMessage?: (teacherId: string) => void;
+  onBook?: (teacherId: string) => void;
 }
 
-export const TeacherProfileModal = ({ teacher, isOpen, onClose }: TeacherProfileModalProps) => {
+export const TeacherProfileModal = ({ teacher, isOpen, onClose, onMessage, onBook }: TeacherProfileModalProps) => {
   const [showDetails, setShowDetails] = useState(false);
 
   if (!teacher) return null;
@@ -48,14 +50,20 @@ export const TeacherProfileModal = ({ teacher, isOpen, onClose }: TeacherProfile
           {/* Quick Action Bar (WhatsApp Style) */}
           <div className="w-full bg-white/90 dark:bg-zinc-900/90 py-3.5 px-6 flex justify-around items-center border-t border-gray-100 dark:border-zinc-800">
             <button 
-              onClick={() => alert(`Starting chat with ${teacher.name}`)}
+              onClick={() => {
+                if (onMessage) onMessage(teacher.id);
+                onClose();
+              }}
               className="text-purple-600 hover:scale-110 active:scale-95 transition-transform size-10 rounded-full flex items-center justify-center hover:bg-purple-50 dark:hover:bg-purple-950/20"
               title="Message"
             >
               <span className="material-symbols-outlined text-2xl">mail</span>
             </button>
             <button 
-              onClick={() => alert(`Booking session with ${teacher.name}`)}
+              onClick={() => {
+                if (onBook) onBook(teacher.id);
+                onClose();
+              }}
               className="text-purple-600 hover:scale-110 active:scale-95 transition-transform size-10 rounded-full flex items-center justify-center hover:bg-purple-50 dark:hover:bg-purple-950/20"
               title="Book Session"
             >
@@ -115,9 +123,11 @@ interface StudentProfileModalProps {
   student: Student | null;
   isOpen: boolean;
   onClose: () => void;
+  onMessage?: (studentId: string) => void;
+  onSchedule?: (studentId: string) => void;
 }
 
-export const StudentProfileModal = ({ student, isOpen, onClose }: StudentProfileModalProps) => {
+export const StudentProfileModal = ({ student, isOpen, onClose, onMessage, onSchedule }: StudentProfileModalProps) => {
   const [showDetails, setShowDetails] = useState(false);
   const { user } = useAuth();
   const userId = user?.id;
@@ -286,14 +296,20 @@ export const StudentProfileModal = ({ student, isOpen, onClose }: StudentProfile
           {/* Quick Action Bar (WhatsApp Style) */}
           <div className="w-full bg-white/90 dark:bg-zinc-900/90 py-3.5 px-6 flex justify-around items-center border-t border-gray-100 dark:border-zinc-800">
             <button 
-              onClick={() => alert(`Starting chat with ${student.name}`)}
+              onClick={() => {
+                if (onMessage) onMessage(student.id);
+                onClose();
+              }}
               className="text-orange-500 hover:scale-110 active:scale-95 transition-transform size-10 rounded-full flex items-center justify-center hover:bg-orange-50 dark:hover:bg-orange-950/20"
               title="Message"
             >
               <span className="material-symbols-outlined text-2xl">mail</span>
             </button>
             <button 
-              onClick={() => alert(`Scheduling session with ${student.name}`)}
+              onClick={() => {
+                if (onSchedule) onSchedule(student.id);
+                onClose();
+              }}
               className="text-orange-500 hover:scale-110 active:scale-95 transition-transform size-10 rounded-full flex items-center justify-center hover:bg-orange-50 dark:hover:bg-orange-950/20"
               title="Schedule"
             >
