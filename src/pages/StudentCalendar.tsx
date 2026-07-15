@@ -182,7 +182,7 @@ const StudentCalendar = () => {
             <div className="px-6 relative">
                 <div className="absolute left-[88px] top-0 bottom-0 w-[2px] bg-gray-200 dark:bg-zinc-800 z-0"></div>
 
-                <div className="space-y-6 pb-20">
+                <div className="space-y-6 pb-32">
                     {/* Check if events exist for selected date */}
                     {events.filter(e => e.date === format(selectedDate, 'MMMM d, yyyy')).length > 0 ? (
                         events.filter(e => e.date === format(selectedDate, 'MMMM d, yyyy')).map((event, index) => {
@@ -266,7 +266,7 @@ const StudentCalendar = () => {
             {/* Floating Add Plan Button */}
             <button
                 onClick={() => setShowAddModal(true)}
-                className="fixed bottom-24 right-6 w-16 h-16 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full shadow-xl shadow-gray-400/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
+                className="fixed bottom-28 right-6 w-16 h-16 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full shadow-xl shadow-gray-400/30 flex items-center justify-center hover:scale-105 transition-transform z-40 active:scale-95"
             >
                 <Plus className="h-6 w-6" />
             </button>
