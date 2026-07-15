@@ -6,6 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { Send, Smile, Check, CheckCheck, Trash2, Edit2, Camera, Mic, Square, X, Play, Pause, Paperclip, FileText, ChevronLeft } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
+import { AudioRecorder } from 'react-audio-voice-recorder';
 
 const AudioBubblePlayer = ({ src }: { src: string }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -471,7 +472,17 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const handleSendRichMessage = async (text: string | null, attachmentType?: 'image' | 'audio' | 'document', attachmentUrl?: string) => {
+    
+    const handleAudioComplete = (blob) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = async () => {
+            const base64Data = reader.result;
+            await handleSendRichMessage(null, 'audio', base64Data);
+        };
+    };
+
+    const handleSendRichMessage = async (text: string | null, attachmentType?: 'image' | 'audio' | 'file', attachmentUrl?: string) => {
         if (!userId || !selectedPartnerId) return;
 
         try {
@@ -559,7 +570,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         const reader = new FileReader();
         reader.onloadend = async () => {
             const base64Data = reader.result as string;
-            await handleSendRichMessage(file.name, 'document', base64Data);
+            await handleSendRichMessage(file.name, 'file', base64Data);
         };
         reader.readAsDataURL(file);
     };
@@ -794,10 +805,10 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                                     {msg.attachment_type === 'audio' && (
                                                                         <AudioBubblePlayer src={msg.attachment_url} />
                                                                     )}
-                                                                    {msg.attachment_type === 'document' && (
+                                                                    {msg.attachment_type === 'file' && (
                                                                         <a 
                                                                             href={msg.attachment_url} 
-                                                                            download={msg.message || 'document'}
+                                                                            download={msg.message || 'Document'}
                                                                             className="flex items-center gap-2.5 p-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors border border-black/5 dark:border-white/5 mb-1 text-left min-w-[200px]"
                                                                         >
                                                                             <div className="h-9 w-9 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center text-blue-500 dark:text-blue-400 shrink-0">
@@ -813,7 +824,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                                             </div>
                                                                         </a>
                                                                     )}
-                                                                    {msg.message && msg.attachment_type !== 'document' && (
+                                                                    {msg.message && msg.attachment_type !== 'file' && (
                                                                         <p className="text-sm font-medium leading-relaxed break-words">
                                                                             {msg.message}
                                                                         </p>
@@ -904,26 +915,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
                                 {/* Message Compose Form Input */}
                                 <form onSubmit={handleSendMessage} className="p-2 sm:p-3 border-t border-gray-100 dark:border-zinc-800 flex items-end gap-2 shrink-0 bg-[#F0F2F5] dark:bg-zinc-900/90 relative">
-                                    {isRecording ? (
-                                        <div className="flex-1 bg-white dark:bg-zinc-800 rounded-full h-[44px] px-5 flex items-center justify-between shadow-sm animate-pulse">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping shrink-0" />
-                                                <span className="text-sm font-semibold text-red-500">
-                                                    {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => stopRecording(true)}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-                                                >
-                                                    <Trash2 className="h-5 w-5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex-1 bg-white dark:bg-zinc-800 rounded-[22px] min-h-[44px] flex items-end overflow-hidden shadow-sm">
+                                    <div className="flex-1 bg-white dark:bg-zinc-800 rounded-[22px] min-h-[44px] flex items-end overflow-hidden shadow-sm">
                                             <button 
                                                 type="button" 
                                                 onClick={() => setShowEmojiBar(!showEmojiBar)}
@@ -956,33 +948,20 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                 <Camera className="h-5 w-5" />
                                             </button>
                                         </div>
-                                    )}
 
                                     {/* Mic / Send Button */}
                                     {!newMessageText.trim() && !editingMessage ? (
-                                        isRecording ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => stopRecording(false)}
-                                                className={cn(
-                                                    "h-[44px] w-[44px] rounded-full flex items-center justify-center text-white transition-all shadow-sm shrink-0",
-                                                    role === 'teacher' ? "bg-[#FF7D46] hover:bg-[#e06530]" : "bg-[#5B4A9F] hover:bg-[#473980]"
-                                                )}
-                                            >
-                                                <Send className="h-5 w-5 ml-0.5" />
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={startRecording}
-                                                className={cn(
-                                                    "h-[44px] w-[44px] rounded-full flex items-center justify-center text-white transition-all shadow-sm shrink-0",
-                                                    role === 'teacher' ? "bg-[#FF7D46] hover:bg-[#e06530]" : "bg-[#5B4A9F] hover:bg-[#473980]"
-                                                )}
-                                            >
-                                                <Mic className="h-5 w-5" />
-                                            </button>
-                                        )
+                                        <div className="flex items-center justify-center shrink-0">
+                                            <AudioRecorder 
+                                              onRecordingComplete={handleAudioComplete}
+                                              audioTrackConstraints={{
+                                                noiseSuppression: true,
+                                                echoCancellation: true,
+                                              }} 
+                                              downloadOnSavePress={false}
+                                              downloadFileExtension="webm"
+                                            />
+                                        </div>
                                     ) : (
                                         <button
                                             type="submit"
