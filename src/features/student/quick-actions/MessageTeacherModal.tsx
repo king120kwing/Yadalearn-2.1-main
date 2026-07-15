@@ -110,6 +110,47 @@ interface MessageTeacherModalProps {
     recipientId?: string;
 }
 
+
+const getAuthToken = async () => {
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    try {
+        const sessionData = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise(r => setTimeout(() => r({ data: { session: null } }), 1500))
+        ]);
+        return sessionData?.data?.session?.access_token || supabaseKey;
+    } catch {
+        return supabaseKey;
+    }
+};
+
+const rawFetchGlobal = async (table, queryStr, method = 'GET', body = null) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    const token = await getAuthToken();
+    
+    const headers = {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${token}`
+    };
+    if (body) {
+        headers['Content-Type'] = 'application/json';
+        if (method === 'POST' || method === 'PATCH') headers['Prefer'] = 'return=representation';
+    }
+    
+    const url = `${supabaseUrl}/rest/v1/${table}${queryStr ? '?' + queryStr : ''}`;
+    
+    const res = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+    });
+    
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ` + await res.text());
+    if (res.status === 204) return null;
+    return res.json();
+};
+
 export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTeacherModalProps) => {
     const { user, userRole: role } = useAuth();
     const userId = user?.id;
@@ -124,6 +165,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessageText, setNewMessageText] = useState('');
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Editing message state
     const [editingMessage, setEditingMessage] = useState<any | null>(null);
@@ -214,24 +256,31 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
     useEffect(() => {
         if (!isOpen || !userId || !role) return;
 
+        setIsLoading(true);
         const fetchPartners = async () => {
+            console.log("fetchPartners init - role:", role, "userId:", userId, "recipientId:", recipientId);
             try {
+                // Completely bypass Supabase JS internal queues by using native fetch!
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || '';
+                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+                
+                const sessionData = await Promise.race([
+                    supabase.auth.getSession(),
+                    new Promise<any>(r => setTimeout(() => r({ data: { session: null } }), 1500))
+                ]);
+                const token = sessionData?.data?.session?.access_token || supabaseKey;
+
+                const rawFetch = rawFetchGlobal;
+
                 let list: any[] = [];
                 let hasActiveConnections = false;
 
                 if (role === 'student') {
-                    // Fetch accepted teachers
-                    const { data: linkData } = await supabase
-                        .from('teacher_student_links')
-                        .select('teacher:profiles!teacher_student_links_teacher_id_fkey(id, full_name, avatar_url, subjects, is_online, last_active_at)')
-                        .eq('student_id', userId)
-                        .eq('status', 'accepted');
-
-                    // Fetch booked teachers
-                    const { data: bookingData } = await supabase
-                        .from('bookings')
-                        .select('teacher:profiles!bookings_teacher_id_fkey(id, full_name, avatar_url, subjects, is_online, last_active_at)')
-                        .eq('student_id', userId);
+                    console.log("Fetching student links natively...");
+                    const linkData = await rawFetch('teacher_student_links', `student_id=eq.${userId}&status=eq.accepted&select=teacher:profiles!teacher_student_links_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
+                    
+                    console.log("Fetching student bookings natively...");
+                    const bookingData = await rawFetch('bookings', `student_id=eq.${userId}&select=teacher:profiles!bookings_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
 
                     const linkList = linkData ? linkData.map((item: any) => item.teacher).filter(Boolean) : [];
                     const bookingList = bookingData ? bookingData.map((item: any) => item.teacher).filter(Boolean) : [];
@@ -240,36 +289,20 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     linkList.forEach((t: any) => mergedMap.set(t.id, t));
                     bookingList.forEach((t: any) => mergedMap.set(t.id, t));
 
-                    if (linkList.length > 0 || bookingList.length > 0) {
-                        hasActiveConnections = true;
-                    }
+                    if (linkList.length > 0 || bookingList.length > 0) hasActiveConnections = true;
 
-                    // If a recipientId is passed but not in list, fetch their profile and add them
                     if (recipientId && !mergedMap.has(recipientId)) {
-                        const { data: recipientProfile } = await supabase
-                            .from('profiles')
-                            .select('id, full_name, avatar_url, subjects, is_online, last_active_at')
-                            .eq('id', recipientId)
-                            .maybeSingle();
-                        if (recipientProfile) {
-                            mergedMap.set(recipientId, recipientProfile);
-                        }
+                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,subjects,is_online,last_active_at`).then(d => d[0]).catch(() => null);
+                        if (recipientProfile) mergedMap.set(recipientId, recipientProfile);
                     }
 
                     list = Array.from(mergedMap.values());
                 } else {
-                    // Fetch accepted students for teacher
-                    const { data: linkData } = await supabase
-                        .from('teacher_student_links')
-                        .select('student:profiles!teacher_student_links_student_id_fkey(id, full_name, avatar_url, country, is_online, last_active_at)')
-                        .eq('teacher_id', userId)
-                        .eq('status', 'accepted');
-
-                    // Fetch booked students
-                    const { data: bookingData } = await supabase
-                        .from('bookings')
-                        .select('student:profiles!bookings_student_id_fkey(id, full_name, avatar_url, country, is_online, last_active_at)')
-                        .eq('teacher_id', userId);
+                    console.log("Fetching teacher links natively...");
+                    const linkData = await rawFetch('teacher_student_links', `teacher_id=eq.${userId}&status=eq.accepted&select=student:profiles!teacher_student_links_student_id_fkey(id,full_name,avatar_url,country,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
+                    
+                    console.log("Fetching teacher bookings natively...");
+                    const bookingData = await rawFetch('bookings', `teacher_id=eq.${userId}&select=student:profiles!bookings_student_id_fkey(id,full_name,avatar_url,country,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
 
                     const linkList = linkData ? linkData.map((item: any) => item.student).filter(Boolean) : [];
                     const bookingList = bookingData ? bookingData.map((item: any) => item.student).filter(Boolean) : [];
@@ -278,63 +311,41 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     linkList.forEach((s: any) => mergedMap.set(s.id, s));
                     bookingList.forEach((s: any) => mergedMap.set(s.id, s));
 
-                    if (linkList.length > 0 || bookingList.length > 0) {
-                        hasActiveConnections = true;
-                    }
+                    if (linkList.length > 0 || bookingList.length > 0) hasActiveConnections = true;
 
-                    // If a recipientId is passed but not in list, fetch their profile and add them
                     if (recipientId && !mergedMap.has(recipientId)) {
-                        const { data: recipientProfile } = await supabase
-                            .from('profiles')
-                            .select('id, full_name, avatar_url, country, is_online, last_active_at')
-                            .eq('id', recipientId)
-                            .maybeSingle();
-                        if (recipientProfile) {
-                            mergedMap.set(recipientId, recipientProfile);
-                        }
+                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,country,is_online,last_active_at`).then(d => d[0]).catch(() => null);
+                        if (recipientProfile) mergedMap.set(recipientId, recipientProfile);
                     }
 
                     list = Array.from(mergedMap.values());
                 }
 
-                // If no active connections found, fetch all registered profiles of the opposite role
-                if (list.length === 0) {
-                    const oppositeRole = role === 'student' ? 'teacher' : 'student';
-                    const { data: fallbackProfiles } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, avatar_url, country, subjects, is_online, last_active_at')
-                        .eq('role', oppositeRole)
-                        .limit(50);
+                console.log("Active connections list:", list.length);
 
-                    if (fallbackProfiles) {
-                        list = fallbackProfiles;
-                    }
-                    setIsFallbackMode(true);
-                } else {
-                    setIsFallbackMode(false);
-                }
+                setIsFallbackMode(false); // Backend strictness: Never show random fallback profiles!
 
-                // Ensure recipientId is always included in the list and selected if provided
                 if (recipientId && !list.some(p => p.id === recipientId)) {
-                    const { data: recipientProfile } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, avatar_url, country, subjects, is_online, last_active_at')
-                        .eq('id', recipientId)
-                        .maybeSingle();
-                    if (recipientProfile) {
-                        list = [recipientProfile, ...list];
-                    }
+                    const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,country,subjects,is_online,last_active_at`).then(d => d[0]).catch(() => null);
+                    if (recipientProfile) list = [recipientProfile, ...list];
                 }
 
+                console.log("Final compiled partners list length:", list.length);
                 setPartners(list);
 
                 if (recipientId && list.some(p => p.id === recipientId)) {
                     setSelectedPartnerId(recipientId);
+                    console.log("Selected partner set to recipientId:", recipientId);
                 } else if (list.length > 0) {
                     setSelectedPartnerId(list[0].id);
+                    console.log("Selected partner auto-set to first in list:", list[0].id);
+                } else {
+                    console.warn("List is empty! Partner cannot be auto-selected.");
                 }
             } catch (err) {
-                console.error("Error loading chat partners:", err);
+                console.error("CRITICAL ERROR loading chat partners:", err);
+            } finally {
+                setIsLoading(false);
             }
         };
 
@@ -364,13 +375,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         const fetchMessages = async () => {
             setLoadingMessages(true);
             try {
-                const { data, error } = await supabase
-                    .from('chat_messages')
-                    .select('*')
-                    .or(`and(sender_id.eq.${userId},receiver_id.eq.${selectedPartnerId}),and(sender_id.eq.${selectedPartnerId},receiver_id.eq.${userId})`)
-                    .order('created_at', { ascending: true });
-
-                if (error) throw error;
+                const data = await rawFetchGlobal('chat_messages', `or=(and(sender_id.eq.${userId},receiver_id.eq.${selectedPartnerId}),and(sender_id.eq.${selectedPartnerId},receiver_id.eq.${userId}))&order=created_at.asc`);
                 setMessages(data || []);
             } catch (err) {
                 console.error("Error loading chat messages:", err);
@@ -455,12 +460,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         const markAsRead = async () => {
             const unread = messages.filter(m => m.sender_id === selectedPartnerId && !m.is_read);
             if (unread.length > 0) {
-                await supabase
-                    .from('chat_messages')
-                    .update({ is_read: true })
-                    .eq('sender_id', selectedPartnerId)
-                    .eq('receiver_id', userId)
-                    .eq('is_read', false);
+                await rawFetchGlobal('chat_messages', `sender_id=eq.${selectedPartnerId}&receiver_id=eq.${userId}&is_read=eq.false`, 'PATCH', { is_read: true }).catch(console.error);
             }
         };
         markAsRead();
@@ -475,19 +475,15 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         if (!userId || !selectedPartnerId) return;
 
         try {
-            const { data, error } = await supabase
-                .from('chat_messages')
-                .insert({
+            const body = {
                     sender_id: userId,
                     receiver_id: selectedPartnerId,
                     message: text || '',
                     attachment_type: attachmentType || null,
                     attachment_url: attachmentUrl || null
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
+                };
+            const dataList = await rawFetchGlobal('chat_messages', '', 'POST', body);
+            const data = dataList[0];
             
             setMessages(prev => {
                 if (prev.find(m => m.id === data.id)) return prev;
@@ -525,12 +521,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
         try {
             if (editingMessage) {
-                const { error } = await supabase
-                    .from('chat_messages')
-                    .update({ message: textToSend, is_edited: true })
-                    .eq('id', editingMessage.id);
-
-                if (error) throw error;
+                await rawFetchGlobal('chat_messages', `id=eq.${editingMessage.id}`, 'PATCH', { message: textToSend, is_edited: true });
                 setEditingMessage(null);
             } else {
                 await handleSendRichMessage(textToSend);
@@ -543,11 +534,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     const handleDeleteMessage = async (msgId: string) => {
         try {
-            const { error } = await supabase
-                .from('chat_messages')
-                .delete()
-                .eq('id', msgId);
-            if (error) throw error;
+            await rawFetchGlobal('chat_messages', `id=eq.${msgId}`, 'DELETE');
         } catch (err) {
             console.error("Error deleting message:", err);
         }
@@ -640,7 +627,12 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                             )}
                         </div>
                         <div className="flex-1 overflow-y-auto p-3 space-y-1.5 no-scrollbar">
-                            {partners.length > 0 ? (
+                            {isLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+                                    <span className="text-xs font-semibold">Connecting to database...</span>
+                                </div>
+                            ) : partners.length > 0 ? (
                                 partners.map(p => {
                                     const isSelected = p.id === selectedPartnerId;
                                     return (

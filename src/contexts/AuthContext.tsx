@@ -30,6 +30,45 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+
+const rawFetchAuth = async (table, queryStr, method = 'GET', body = null, token = null) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    
+    // If token is not provided, try to get it
+    if (!token) {
+        try {
+            const sessionData = await Promise.race([
+                supabase.auth.getSession(),
+                new Promise(r => setTimeout(() => r({ data: { session: null } }), 1000))
+            ]);
+            token = sessionData?.data?.session?.access_token || supabaseKey;
+        } catch {
+            token = supabaseKey;
+        }
+    }
+    
+    const headers = {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${token}`
+    };
+    if (body) {
+        headers['Content-Type'] = 'application/json';
+        if (method === 'POST' || method === 'PATCH') headers['Prefer'] = 'return=representation';
+    }
+    
+    const url = `${supabaseUrl}/rest/v1/${table}${queryStr ? '?' + queryStr : ''}`;
+    const res = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+    });
+    
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ` + await res.text());
+    if (res.status === 204) return null;
+    return res.json();
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('yadalearn-user');
@@ -322,11 +361,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         console.log('AuthContext: Fetching profile for id:', u.id);
         
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role, onboarding_completed, subjects, avatar_url, full_name, bio, country')
-          .eq('id', u.id)
-          .single();
+        let profile = null; let error = null;
+        try {
+            const data = await rawFetchAuth('profiles', `id=eq.${u.id}&select=role,onboarding_completed,subjects,avatar_url,full_name,bio,country`, 'GET', null, session?.access_token);
+            profile = data[0] || null;
+        } catch (e) { error = e; }
 
         if (error) {
           console.warn('AuthContext: Profile fetch returned error:', error);

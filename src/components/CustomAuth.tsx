@@ -218,6 +218,7 @@ export default function CustomAuth() {
           transition: all 0.3s;
           margin: 15px 0;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+          white-space: nowrap;
         }
 
         .google-btn:hover {
@@ -369,6 +370,51 @@ export default function CustomAuth() {
           letter-spacing: 0.3px;
           margin: 20px 0;
         }
+
+        /* Mobile Layout Fix */
+        @media (max-width: 768px) {
+          .container {
+            min-height: 550px;
+            display: flex;
+            flex-direction: column;
+            width: 90% !important;
+            margin: 20px auto;
+          }
+          .form-container {
+            width: 100%;
+            height: auto;
+            position: relative;
+            opacity: 1;
+            z-index: 5;
+            transition: none;
+            transform: none !important;
+            padding: 40px 0;
+          }
+          .sign-up {
+            display: ${isActive ? 'block' : 'none'};
+          }
+          .sign-in {
+            display: ${isActive ? 'none' : 'block'};
+          }
+          .toggle-container {
+            display: none !important;
+          }
+          .mobile-toggle {
+            display: block;
+            margin-top: 25px;
+            font-size: 13px;
+            color: #512da8;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+            text-align: center;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-toggle {
+            display: none;
+          }
+        }
       `}</style>
 
       {/* ... rest of your UI ... */}
@@ -413,6 +459,9 @@ export default function CustomAuth() {
               <button type="submit" disabled={isLoading}>
                 {isLoading ? "Signing in..." : "Sign In"}
               </button>
+              <div className="mobile-toggle" onClick={() => setIsActive(true)}>
+                Don't have an account? Sign Up
+              </div>
             </form>
           </div>
 
@@ -472,6 +521,9 @@ export default function CustomAuth() {
                 <button type="submit" disabled={isLoading}>
                   {isLoading ? "Creating Account..." : "Sign Up"}
                 </button>
+                <div className="mobile-toggle" onClick={() => setIsActive(false)}>
+                  Already have an account? Sign In
+                </div>
               </form>
             )}
           </div>
