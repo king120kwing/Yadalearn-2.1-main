@@ -22,7 +22,7 @@ import { removeImageBackground } from '@/utils/imageProcessor';
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -519,7 +519,10 @@ const StudentDashboard = () => {
             <span>Settings</span>
           </button>
           <button
-            onClick={() => { navigate('/logout'); }}
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
             className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <Avatar className="h-6 w-6">
@@ -1036,6 +1039,7 @@ const StudentDashboard = () => {
         isOpen={activeModal === 'message'} 
         onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 
         recipientId={selectedTeacherIdForChat}
+        role="student"
       />
 
       {/* Rate Session Modal */}

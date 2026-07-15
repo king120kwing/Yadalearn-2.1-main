@@ -501,7 +501,10 @@ const TeacherDashboard = () => {
             <span>Settings</span>
           </button>
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
             className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <Avatar className="h-6 w-6">
@@ -1057,6 +1060,7 @@ const TeacherDashboard = () => {
         isOpen={activeModal === 'message'}
         onClose={() => { setActiveModal(null); setSelectedStudentIdForChat(undefined); }}
         recipientId={selectedStudentIdForChat}
+        role="teacher"
       />
 
       {/* Teacher Quick Action Modals */}
