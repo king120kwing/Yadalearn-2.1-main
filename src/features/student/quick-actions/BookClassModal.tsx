@@ -26,32 +26,63 @@ export const BookClassModal = ({ isOpen, onClose, teacherId }: BookClassModalPro
     useEffect(() => {
         if (isOpen && userId) {
             const fetchTeachers = async () => {
-                const { data, error } = await supabase
-                    .from('teacher_student_links')
-                    .select('teacher:profiles!teacher_student_links_teacher_id_fkey(id, full_name, subjects, avatar_url, teacher_profiles(min_rate))')
-                    .eq('student_id', userId)
-                    .eq('status', 'accepted');
-                
-                if (error) {
-                    console.error('Error loading teachers:', error);
-                    return;
-                }
-                
-                if (data) {
-                    const mapped = data.map((item: any) => {
-                        const t = item.teacher;
-                        if (!t) return null;
-                        const minRate = t.teacher_profiles?.min_rate || (Array.isArray(t.teacher_profiles) ? t.teacher_profiles[0]?.min_rate : null) || 45;
-                        return ({
-                            id: t.id,
-                            name: t.subjects?.[0] || 'General Studies',
-                            teacher: t.full_name,
-                            avatar: t.avatar_url || 'https://i.pravatar.cc/150?u=' + t.id,
-                            color: 'from-purple-400 to-indigo-400',
-                            rate: minRate
+                try {
+                    // 1. Fetch from teacher_student_links
+                    const { data: linksData } = await supabase
+                        .from('teacher_student_links')
+                        .select('teacher_id')
+                        .eq('student_id', userId)
+                        .eq('status', 'accepted');
+
+                    // 2. Fetch from bookings
+                    const { data: bookingsData } = await supabase
+                        .from('bookings')
+                        .select('teacher_id')
+                        .eq('student_id', userId);
+
+                    const teacherIds = Array.from(new Set([
+                        ...(linksData?.map(l => l.teacher_id) || []),
+                        ...(bookingsData?.map(b => b.teacher_id) || [])
+                    ].filter(Boolean)));
+
+                    let profilesToMap = [];
+
+                    if (teacherIds.length === 0) {
+                        // Match the dashboard fallback logic!
+                        const { data: fallbackProfiles } = await supabase
+                            .from('profiles')
+                            .select('id, full_name, subjects, avatar_url, teacher_profiles(min_rate)')
+                            .eq('role', 'teacher')
+                            .eq('onboarding_completed', true)
+                            .limit(5);
+                        profilesToMap = fallbackProfiles || [];
+                    } else {
+                        // 3. Fetch profiles for these teachers
+                        const { data: profiles, error } = await supabase
+                            .from('profiles')
+                            .select('id, full_name, subjects, avatar_url, teacher_profiles(min_rate)')
+                            .in('id', teacherIds);
+
+                        if (error) throw error;
+                        profilesToMap = profiles || [];
+                    }
+
+                    if (profilesToMap.length > 0) {
+                        const mapped = profilesToMap.map((t: any) => {
+                            const minRate = t.teacher_profiles?.min_rate || (Array.isArray(t.teacher_profiles) ? t.teacher_profiles[0]?.min_rate : null) || 45;
+                            return ({
+                                id: t.id,
+                                name: t.subjects?.[0] || 'General Studies',
+                                teacher: t.full_name,
+                                avatar: t.avatar_url || 'https://i.pravatar.cc/150?u=' + t.id,
+                                color: 'from-purple-400 to-indigo-400',
+                                rate: minRate
+                            });
                         });
-                    }).filter(Boolean);
-                    setTopics(mapped);
+                        setTopics(mapped);
+                    }
+                } catch (error) {
+                    console.error('Error loading teachers:', error);
                 }
             };
             fetchTeachers();
@@ -138,38 +169,44 @@ export const BookClassModal = ({ isOpen, onClose, teacherId }: BookClassModalPro
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Select a Teacher</h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Choose a teacher you are registered with</p>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {topics.map((t) => (
-                                    <div
-                                        key={t.id}
-                                        className={`relative p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${selectedTopic === t.id
-                                                ? 'border-[#5B4A9F] bg-purple-50 dark:bg-purple-950/20 shadow-lg shadow-purple-100 dark:shadow-purple-900/20'
-                                                : 'border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 hover:shadow-md'
-                                            }`}
-                                        onClick={() => setSelectedTopic(t.id)}
-                                    >
-                                        <div className="flex flex-col items-center text-center gap-3">
-                                            <div className={`relative size-16 rounded-full bg-gradient-to-br ${t.color} p-0.5`}>
-                                                <Avatar className="size-full border-2 border-white dark:border-zinc-900">
-                                                    <AvatarImage src={t.avatar} />
-                                                    <AvatarFallback className="bg-white dark:bg-zinc-800">{t.teacher[0]}</AvatarFallback>
-                                                </Avatar>
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900 dark:text-white text-base">{t.name}</p>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{t.teacher}</p>
-                                            </div>
-                                            {selectedTopic === t.id && (
-                                                <div className="absolute top-3 right-3">
-                                                    <div className="size-6 rounded-full bg-[#5B4A9F] flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-white text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
-                                                    </div>
+                            {topics.length === 0 ? (
+                                <div className="text-center py-10">
+                                    <p className="text-gray-500 dark:text-gray-400">You are not currently registered with any teachers.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {topics.map((t) => (
+                                        <div
+                                            key={t.id}
+                                            className={`relative p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${selectedTopic === t.id
+                                                    ? 'border-[#5B4A9F] bg-purple-50 dark:bg-purple-950/20 shadow-lg shadow-purple-100 dark:shadow-purple-900/20'
+                                                    : 'border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 hover:shadow-md'
+                                                }`}
+                                            onClick={() => setSelectedTopic(t.id)}
+                                        >
+                                            <div className="flex flex-col items-center text-center gap-3">
+                                                <div className={`relative size-16 rounded-full bg-gradient-to-br ${t.color} p-0.5`}>
+                                                    <Avatar className="size-full border-2 border-white dark:border-zinc-900">
+                                                        <AvatarImage src={t.avatar} />
+                                                        <AvatarFallback className="bg-white dark:bg-zinc-800">{t.teacher[0]}</AvatarFallback>
+                                                    </Avatar>
                                                 </div>
-                                            )}
+                                                <div>
+                                                    <p className="font-bold text-gray-900 dark:text-white text-base">{t.name}</p>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{t.teacher}</p>
+                                                </div>
+                                                {selectedTopic === t.id && (
+                                                    <div className="absolute top-3 right-3">
+                                                        <div className="size-6 rounded-full bg-[#5B4A9F] flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-white text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

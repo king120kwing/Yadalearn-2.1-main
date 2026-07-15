@@ -82,13 +82,7 @@ const Welcome = () => {
                   onClick={() => navigate('/login')}
                   className="w-full bg-black text-white text-lg font-semibold px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => navigate('/signup')}
-                  className="w-full rounded-full border-2 border-black bg-white text-black text-lg font-semibold px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                >
-                  Sign Up
+                  Get Started
                 </button>
               </div>
             </div>

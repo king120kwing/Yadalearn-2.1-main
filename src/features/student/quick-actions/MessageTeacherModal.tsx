@@ -188,7 +188,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     // Typing indicator state
     const [typingStatus, setTypingStatus] = useState<string | null>(null);
-    const typingTimeoutRef = useRef<any>(null);
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
     const typingChannelRef = useRef<any>(null);
 
     useEffect(() => {
@@ -446,11 +446,60 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         
         typingChannelRef.current = typingChannel;
 
+        // Fetch unread counts globally
+        const fetchUnread = async () => {
+            try {
+                const data = await rawFetchGlobal('chat_messages', `receiver_id=eq.${userId}&is_read=eq.false&select=sender_id`);
+                if (data) {
+                    const counts = data.reduce((acc: any, msg: any) => {
+                        acc[msg.sender_id] = (acc[msg.sender_id] || 0) + 1;
+                        return acc;
+                    }, {});
+                    setUnreadCounts(counts);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchUnread();
+
+        // Subscribe to global unread incoming
+        const unreadChannel = supabase.channel('global-unread-teacher-modal')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'chat_messages',
+                filter: `receiver_id=eq.${userId}`
+            }, (payload) => {
+                const newMsg = payload.new;
+                if (newMsg.sender_id !== selectedPartnerId) {
+                    setUnreadCounts(prev => ({
+                        ...prev,
+                        [newMsg.sender_id]: (prev[newMsg.sender_id] || 0) + 1
+                    }));
+                }
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'chat_messages',
+                filter: `receiver_id=eq.${userId}`
+            }, (payload) => {
+                const msg = payload.new;
+                if (msg.is_read) {
+                    setUnreadCounts(prev => ({
+                        ...prev,
+                        [msg.sender_id]: Math.max(0, (prev[msg.sender_id] || 0) - 1)
+                    }));
+                }
+            })
+            .subscribe();
+
         return () => {
             supabase.removeChannel(channel);
             supabase.removeChannel(presenceChannel);
             supabase.removeChannel(typingChannel);
-            typingChannelRef.current = null;
+            supabase.removeChannel(unreadChannel);
         };
     }, [userId, selectedPartnerId]);
 
@@ -462,6 +511,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
             const unread = messages.filter(m => m.sender_id === selectedPartnerId && !m.is_read);
             if (unread.length > 0) {
                 await rawFetchGlobal('chat_messages', `sender_id=eq.${selectedPartnerId}&receiver_id=eq.${userId}&is_read=eq.false`, 'PATCH', { is_read: true }).catch(console.error);
+                setUnreadCounts(prev => ({ ...prev, [selectedPartnerId]: 0 }));
             }
         };
         markAsRead();
@@ -670,7 +720,14 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                 )} />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm truncate font-bold">{p.full_name}</p>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-sm truncate font-bold">{p.full_name}</p>
+                                                    {unreadCounts[p.id] > 0 && (
+                                                        <div className="bg-[#5B4A9F] dark:bg-purple-500 text-white text-[10px] font-bold px-1.5 py-0 rounded-full">
+                                                            {unreadCounts[p.id]}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-gray-400 truncate mt-0.5">
                                                     {role === 'student'
                                                         ? (p.subjects?.join(', ') || 'General Studies')
