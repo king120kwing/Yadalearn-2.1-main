@@ -28,7 +28,7 @@ export const BookClassModal = ({ isOpen, onClose, teacherId }: BookClassModalPro
             const fetchTeachers = async () => {
                 const { data, error } = await supabase
                     .from('teacher_student_links')
-                    .select('teacher:profiles(id, full_name, subjects, avatar_url, teacher_profiles(min_rate))')
+                    .select('teacher:profiles!teacher_student_links_teacher_id_fkey(id, full_name, subjects, avatar_url, teacher_profiles(min_rate))')
                     .eq('student_id', userId)
                     .eq('status', 'accepted');
                 
