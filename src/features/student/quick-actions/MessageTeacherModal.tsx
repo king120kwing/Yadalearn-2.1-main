@@ -143,6 +143,11 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
     // Scroll ref
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Typing indicator state
+    const [typingStatus, setTypingStatus] = useState<string | null>(null);
+    const typingTimeoutRef = useRef<any>(null);
+    const typingChannelRef = useRef<any>(null);
+
     useEffect(() => {
         if (isRecording) {
             setRecordingSeconds(0);
@@ -417,9 +422,29 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
             })
             .subscribe();
 
+        // Subscribe to typing presence
+        const roomName = [userId, selectedPartnerId].sort().join('-');
+        const typingChannel = supabase.channel(`typing_${roomName}`, {
+            config: { presence: { key: userId } }
+        });
+
+        typingChannel.on('presence', { event: 'sync' }, () => {
+            const state = typingChannel.presenceState();
+            const partnerState = state[selectedPartnerId];
+            if (partnerState && (partnerState[0] as any)?.isTyping) {
+                setTypingStatus('typing...');
+            } else {
+                setTypingStatus(null);
+            }
+        }).subscribe();
+        
+        typingChannelRef.current = typingChannel;
+
         return () => {
             supabase.removeChannel(channel);
             supabase.removeChannel(presenceChannel);
+            supabase.removeChannel(typingChannel);
+            typingChannelRef.current = null;
         };
     }, [userId, selectedPartnerId]);
 
@@ -474,6 +499,19 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         }
     };
 
+    const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setNewMessageText(e.target.value);
+        if (typingChannelRef.current) {
+            typingChannelRef.current.track({ isTyping: true });
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                if (typingChannelRef.current) {
+                    typingChannelRef.current.track({ isTyping: false });
+                }
+            }, 2000);
+        }
+    };
+
     // 4. Send/Edit Message function
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -481,6 +519,9 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
         const textToSend = newMessageText.trim();
         setNewMessageText(''); // Clear input immediately for responsive UX
+        if (typingChannelRef.current) {
+            typingChannelRef.current.track({ isTyping: false });
+        }
 
         try {
             if (editingMessage) {
@@ -870,101 +911,96 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                 />
 
                                 {/* Message Compose Form Input */}
-                                <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-100 dark:border-zinc-800 flex items-center gap-3 shrink-0 bg-white dark:bg-zinc-900">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setShowEmojiBar(!showEmojiBar)}
-                                        className={cn(
-                                            "h-11 w-11 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0",
-                                            showEmojiBar && "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20"
-                                        )}
-                                    >
-                                        <Smile className="h-5 w-5" />
-                                    </button>
-
-                                    <button 
-                                        type="button" 
-                                        onClick={() => fileInputRef.current?.click()}
-                                        title="Attach Photo"
-                                        className="h-11 w-11 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0"
-                                    >
-                                        <Camera className="h-5 w-5" />
-                                    </button>
-
-                                    <button 
-                                        type="button" 
-                                        onClick={() => documentInputRef.current?.click()}
-                                        title="Attach Document"
-                                        className="h-11 w-11 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors shrink-0"
-                                    >
-                                        <Paperclip className="h-5 w-5" />
-                                    </button>
-
+                                <form onSubmit={handleSendMessage} className="p-2 sm:p-3 border-t border-gray-100 dark:border-zinc-800 flex items-end gap-2 shrink-0 bg-[#F0F2F5] dark:bg-zinc-900/90 relative">
                                     {isRecording ? (
-                                        <div className="flex-1 bg-red-50 dark:bg-red-950/10 rounded-2xl px-5 py-3 text-sm font-semibold text-red-600 dark:text-red-400 flex items-center justify-between transition-all animate-pulse">
+                                        <div className="flex-1 bg-white dark:bg-zinc-800 rounded-full h-[44px] px-5 flex items-center justify-between shadow-sm animate-pulse">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 bg-red-650 rounded-full animate-ping shrink-0" />
-                                                <span>Recording voice note... {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}</span>
+                                                <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping shrink-0" />
+                                                <span className="text-sm font-semibold text-red-500">
+                                                    {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     type="button"
                                                     onClick={() => stopRecording(true)}
-                                                    title="Cancel Recording"
-                                                    className="p-1 text-red-400 hover:text-red-600 hover:bg-red-100/50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
                                                 >
-                                                    <X className="h-4.5 w-4.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => stopRecording(false)}
-                                                    title="Save/Send Voice Note"
-                                                    className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100/50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                >
-                                                    <Square className="h-4 w-4 fill-red-600" />
+                                                    <Trash2 className="h-5 w-5" />
                                                 </button>
                                             </div>
                                         </div>
                                     ) : (
-                                        <input
-                                            type="text"
-                                            value={newMessageText}
-                                            onChange={(e) => setNewMessageText(e.target.value)}
-                                            placeholder="Type a message..."
-                                            className={cn(
-                                                "flex-1 bg-gray-50 dark:bg-zinc-800 border-0 rounded-2xl px-5 py-3 text-sm font-medium focus:ring-2 focus:bg-white dark:focus:bg-zinc-800 outline-none text-gray-900 dark:text-white placeholder-gray-400 transition-all",
-                                                role === 'teacher' ? "focus:ring-[#FF7D46]" : "focus:ring-[#5B4A9F]"
-                                            )}
-                                        />
+                                        <div className="flex-1 bg-white dark:bg-zinc-800 rounded-[22px] min-h-[44px] flex items-end overflow-hidden shadow-sm">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setShowEmojiBar(!showEmojiBar)}
+                                                className="h-[44px] w-11 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors shrink-0"
+                                            >
+                                                <Smile className="h-6 w-6" />
+                                            </button>
+                                            
+                                            <input
+                                                type="text"
+                                                value={newMessageText}
+                                                onChange={handleTyping}
+                                                placeholder="Message"
+                                                className="flex-1 bg-transparent border-0 h-[44px] px-1 text-[15px] focus:ring-0 outline-none text-gray-900 dark:text-white placeholder-gray-500"
+                                            />
+                                            
+                                            <button 
+                                                type="button" 
+                                                onClick={() => documentInputRef.current?.click()}
+                                                className="h-[44px] w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors shrink-0"
+                                            >
+                                                <Paperclip className="h-5 w-5 -rotate-45" />
+                                            </button>
+                                            
+                                            <button 
+                                                type="button" 
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="h-[44px] w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors shrink-0 mr-1"
+                                            >
+                                                <Camera className="h-5 w-5" />
+                                            </button>
+                                        </div>
                                     )}
 
-                                    {/* Mic/Send button toggler (mic if text is empty and not editing, else send) */}
-                                    {!newMessageText.trim() && !editingMessage && !isRecording ? (
-                                        <button
-                                            type="button"
-                                            onClick={startRecording}
-                                            title="Record Voice Note"
-                                            className={cn(
-                                                "h-11 w-11 rounded-full flex items-center justify-center text-white transition-all shadow-md active:scale-95 shrink-0",
-                                                role === 'teacher' 
-                                                    ? "bg-[#FF7D46] hover:bg-[#e06530]" 
-                                                    : "bg-[#5B4A9F] hover:bg-[#473980]"
-                                            )}
-                                        >
-                                            <Mic className="h-4.5 w-4.5" />
-                                        </button>
+                                    {/* Mic / Send Button */}
+                                    {!newMessageText.trim() && !editingMessage ? (
+                                        isRecording ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => stopRecording(false)}
+                                                className={cn(
+                                                    "h-[44px] w-[44px] rounded-full flex items-center justify-center text-white transition-all shadow-sm shrink-0",
+                                                    role === 'teacher' ? "bg-[#FF7D46] hover:bg-[#e06530]" : "bg-[#5B4A9F] hover:bg-[#473980]"
+                                                )}
+                                            >
+                                                <Send className="h-5 w-5 ml-0.5" />
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={startRecording}
+                                                className={cn(
+                                                    "h-[44px] w-[44px] rounded-full flex items-center justify-center text-white transition-all shadow-sm shrink-0",
+                                                    role === 'teacher' ? "bg-[#FF7D46] hover:bg-[#e06530]" : "bg-[#5B4A9F] hover:bg-[#473980]"
+                                                )}
+                                            >
+                                                <Mic className="h-5 w-5" />
+                                            </button>
+                                        )
                                     ) : (
                                         <button
                                             type="submit"
                                             disabled={!newMessageText.trim()}
                                             className={cn(
-                                                "h-11 w-11 rounded-full flex items-center justify-center text-white transition-all shadow-md active:scale-95 shrink-0 disabled:opacity-50 disabled:scale-100",
-                                                role === 'teacher' 
-                                                    ? "bg-[#FF7D46] hover:bg-[#e06530]" 
-                                                    : "bg-[#5B4A9F] hover:bg-[#473980]"
+                                                "h-[44px] w-[44px] rounded-full flex items-center justify-center text-white transition-all shadow-sm shrink-0 disabled:opacity-50",
+                                                role === 'teacher' ? "bg-[#FF7D46] hover:bg-[#e06530]" : "bg-[#5B4A9F] hover:bg-[#473980]"
                                             )}
                                         >
-                                            <Send className="h-4.5 w-4.5" />
+                                            <Send className="h-5 w-5 ml-0.5" />
                                         </button>
                                     )}
                                 </form>
