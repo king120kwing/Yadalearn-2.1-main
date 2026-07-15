@@ -450,7 +450,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         if (!userId || !selectedPartnerId) return;
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('chat_messages')
                 .insert({
                     sender_id: userId,
@@ -458,9 +458,16 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     message: text || '',
                     attachment_type: attachmentType || null,
                     attachment_url: attachmentUrl || null
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
+            
+            setMessages(prev => {
+                if (prev.find(m => m.id === data.id)) return prev;
+                return [...prev, data];
+            });
         } catch (err) {
             console.error("Failed to send rich message:", err);
             alert("Failed to send message.");
@@ -573,7 +580,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="!max-w-5xl mx-auto bg-white dark:bg-zinc-900 text-gray-900 dark:text-white border-0 p-0 overflow-hidden rounded-[2.5rem] h-[85vh] flex flex-col shadow-2xl w-[95vw] md:w-full">
+            <DialogContent className="!max-w-full !w-screen !h-screen !m-0 !p-0 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white border-0 overflow-hidden rounded-none flex flex-col shadow-none [&>button.absolute]:hidden">
                 <DialogTitle className="sr-only">Messages</DialogTitle>
                 <DialogDescription className="sr-only">Real-time messenger conversation thread.</DialogDescription>
 
