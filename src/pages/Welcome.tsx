@@ -150,13 +150,7 @@ const Welcome = () => {
                   onClick={() => navigate('/login')}
                   className="w-full rounded-full bg-black px-12 py-4 font-semibold text-white text-lg shadow-lg hover:scale-105 hover:bg-gray-900 transition-all active:scale-95"
                 >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => navigate('/signup')}
-                  className="w-full rounded-full border-2 border-black bg-white px-12 py-4 font-semibold text-black text-lg shadow-lg hover:scale-105 hover:bg-gray-50 transition-all active:scale-95"
-                >
-                  Sign Up
+                  Get Started
                 </button>
               </div>
             </div>

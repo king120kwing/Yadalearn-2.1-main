@@ -521,7 +521,6 @@ const StudentDashboard = () => {
           <button
             onClick={() => {
               logout();
-              navigate('/login');
             }}
             className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
           >

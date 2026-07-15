@@ -14,8 +14,8 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (!user) {
-        // Redirect to login but save the attempted location
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        // Redirect to welcome but save the attempted location
+        return <Navigate to="/welcome" state={{ from: location }} replace />;
     }
 
     // If they have a role but haven't completed onboarding, and aren't on onboarding, force them there

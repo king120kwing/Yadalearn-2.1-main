@@ -472,23 +472,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 
   const logout = async () => {
-    if (user?.id) {
-      try {
-        await supabase
-          .from('profiles')
-          .update({ is_online: false, last_active_at: new Date().toISOString() })
-          .eq('id', user.id);
-      } catch (err) {
-        console.error("Failed to update status on logout:", err);
-      }
-    }
-    await supabase.auth.signOut();
+    const currentUserId = user?.id;
+    // Immediately clear state for snappy UI and trigger ProtectedRoute to /welcome
     setUser(null);
     setUserRoleState(null);
     setOnboardingCompletedState(false);
     setSubjectsState([]);
     localStorage.removeItem('yadalearn-user-role');
     localStorage.removeItem('yadalearn-onboarding-completed');
+
+    if (currentUserId) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ is_online: false, last_active_at: new Date().toISOString() })
+          .eq('id', currentUserId);
+      } catch (err) {
+        console.error("Failed to update status on logout:", err);
+      }
+    }
+    await supabase.auth.signOut();
     fetchingUserIdRef.current = null;
     fetchedUserIdRef.current = null;
   };
