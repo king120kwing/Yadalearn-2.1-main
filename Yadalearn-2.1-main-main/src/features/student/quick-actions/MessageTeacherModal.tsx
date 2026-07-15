@@ -207,7 +207,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     // 1. Fetch active chat partners (teachers if student, students if teacher)
     useEffect(() => {
-        if (!isOpen || !userId) return;
+        if (!isOpen || !userId || !role) return;
 
         const fetchPartners = async () => {
             try {
@@ -307,6 +307,18 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     setIsFallbackMode(true);
                 } else {
                     setIsFallbackMode(false);
+                }
+
+                // Ensure recipientId is always included in the list and selected if provided
+                if (recipientId && !list.some(p => p.id === recipientId)) {
+                    const { data: recipientProfile } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, avatar_url, country, subjects, is_online, last_active_at')
+                        .eq('id', recipientId)
+                        .maybeSingle();
+                    if (recipientProfile) {
+                        list = [recipientProfile, ...list];
+                    }
                 }
 
                 setPartners(list);

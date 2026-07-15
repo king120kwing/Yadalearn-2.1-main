@@ -34,3 +34,9 @@ test_*.cjs
 test_*.js
 run_schema.cjs
 run_schema.js
+check_db*
+check_join*
+db_output.json
+src/scratch_inspect.js
+task.md
+walkthrough.md
