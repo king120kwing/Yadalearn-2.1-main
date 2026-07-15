@@ -68,6 +68,7 @@ const StudentDashboard = () => {
   }, []);
 
   const [lastMessages, setLastMessages] = useState<Record<string, any>>({});
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!user?.id) return;
@@ -81,6 +82,7 @@ const StudentDashboard = () => {
 
       if (data) {
         const mapping: any = {};
+        const counts: Record<string, number> = {};
         data.forEach((m: any) => {
           const partnerId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
           mapping[partnerId] = {
@@ -90,8 +92,12 @@ const StudentDashboard = () => {
             created_at: m.created_at,
             attachment_type: m.attachment_type
           };
+          if (!m.is_read && m.receiver_id === user.id) {
+            counts[partnerId] = (counts[partnerId] || 0) + 1;
+          }
         });
         setLastMessages(mapping);
+        setUnreadCounts(counts);
       }
     };
     fetchLastMessages();
@@ -555,21 +561,26 @@ const StudentDashboard = () => {
           </div>
 
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
-            <div className="relative w-12 h-12 rounded-full border border-white/30 bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md shadow-sm overflow-hidden flex items-center justify-center select-none">
-              {(processedImageUrl || user?.imageUrl) ? (
-                <>
-                  <img
-                    src={processedImageUrl || user?.imageUrl}
-                    alt={userName}
-                    className="w-full h-full object-cover object-center pointer-events-none"
-                  />
-                  {/* Frosted glass highlight overlay */}
-                  <div className="absolute inset-0 border border-white/25 rounded-full bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/15 dark:bg-zinc-900/10 rounded-full">
-                  <span className="material-symbols-outlined text-xl text-slate-500">person</span>
-                </div>
+            <div className="relative">
+              <div className="relative w-12 h-12 rounded-full border border-white/30 bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md shadow-sm overflow-hidden flex items-center justify-center select-none">
+                {(processedImageUrl || user?.imageUrl) ? (
+                  <>
+                    <img
+                      src={processedImageUrl || user?.imageUrl}
+                      alt={userName}
+                      className="w-full h-full object-cover object-center pointer-events-none"
+                    />
+                    {/* Frosted glass highlight overlay */}
+                    <div className="absolute inset-0 border border-white/25 rounded-full bg-gradient-to-tr from-white/10 via-transparent to-white/5 pointer-events-none" />
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-white/15 dark:bg-zinc-900/10 rounded-full">
+                    <span className="material-symbols-outlined text-xl text-slate-500">person</span>
+                  </div>
+                )}
+              </div>
+              {Object.values(lastMessages).some((msg: any) => !msg.is_read && msg.sender_id !== user?.id) && (
+                <div className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 border-2 border-white dark:border-zinc-900 rounded-full animate-pulse z-20" />
               )}
             </div>
           </div>
@@ -957,6 +968,12 @@ const StudentDashboard = () => {
                             "absolute bottom-0 right-0 w-2.5 h-2.5 border border-white dark:border-zinc-900 rounded-full",
                             (presenceData[teacher.id] ?? teacher.isOnline) ? "bg-green-500" : "bg-gray-300"
                           )} />
+                          {/* Unread Message Badge on Avatar */}
+                          {unreadCounts[teacher.id] > 0 && (
+                            <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center border border-white dark:border-zinc-900 shadow-sm animate-pulse z-10">
+                              {unreadCounts[teacher.id]}
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="font-bold truncate">{teacher.name}</span>

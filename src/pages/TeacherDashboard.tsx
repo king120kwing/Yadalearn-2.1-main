@@ -189,24 +189,23 @@ const TeacherDashboard = () => {
   }, []);
 
   const [lastMessages, setLastMessages] = useState<Record<string, any>>({});
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('yadalearn-user');
-    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-    const userId = user?.id || parsedUser?.id;
-    if (!userId) return;
+    if (!user?.id) return;
 
     const fetchLastMessages = async () => {
       const { data } = await supabase
         .from('chat_messages')
         .select('*')
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: true });
 
       if (data) {
         const mapping: any = {};
+        const counts: Record<string, number> = {};
         data.forEach((m: any) => {
-          const partnerId = m.sender_id === userId ? m.receiver_id : m.sender_id;
+          const partnerId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
           mapping[partnerId] = {
             message: m.message,
             sender_id: m.sender_id,
@@ -214,8 +213,12 @@ const TeacherDashboard = () => {
             created_at: m.created_at,
             attachment_type: m.attachment_type
           };
+          if (!m.is_read && m.receiver_id === user.id) {
+            counts[partnerId] = (counts[partnerId] || 0) + 1;
+          }
         });
         setLastMessages(mapping);
+        setUnreadCounts(counts);
       }
     };
     fetchLastMessages();
@@ -988,6 +991,12 @@ const TeacherDashboard = () => {
                             "absolute bottom-0 right-0 w-2.5 h-2.5 border border-white dark:border-zinc-900 rounded-full",
                             (presenceData[student.id] ?? (student.lastActive === 'Active now')) ? "bg-green-500" : "bg-gray-300"
                           )} />
+                          {/* Unread Message Badge on Avatar */}
+                          {unreadCounts[student.id] > 0 && (
+                            <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center border border-white dark:border-zinc-900 shadow-sm animate-pulse z-10">
+                              {unreadCounts[student.id]}
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="font-bold truncate">{student.name}</span>
