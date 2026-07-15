@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { Send, Smile, Check, CheckCheck, Trash2, Edit2, Camera, Mic, Square, X, Play, Pause, Paperclip, FileText } from 'lucide-react';
+import { Send, Smile, Check, CheckCheck, Trash2, Edit2, Camera, Mic, Square, X, Play, Pause, Paperclip, FileText, ChevronLeft } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
 const AudioBubblePlayer = ({ src }: { src: string }) => {
@@ -567,7 +567,10 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
                 <div className="flex-1 flex overflow-hidden">
                     {/* Left Sidebar: Conversations list */}
-                    <div className="w-80 border-r border-gray-100 dark:border-zinc-800 flex flex-col bg-gray-50/50 dark:bg-zinc-950/20 shrink-0">
+                    <div className={cn(
+                        "w-full md:w-80 border-r border-gray-100 dark:border-zinc-800 flex flex-col bg-gray-50/50 dark:bg-zinc-950/20 shrink-0",
+                        selectedPartnerId ? "hidden md:flex" : "flex"
+                    )}>
                         <div className="p-5 border-b border-gray-100 dark:border-zinc-800 shrink-0">
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Conversations</h2>
                             {isFallbackMode && (
@@ -624,12 +627,23 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     </div>
 
                     {/* Right Panel: Active Chat Thread */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900 relative">
+                    <div className={cn(
+                        "flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900 relative",
+                        selectedPartnerId ? "flex" : "hidden md:flex"
+                    )}>
                         {selectedPartner ? (
                             <>
                                 {/* Chat Header */}
                                 <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
                                     <div className="flex items-center gap-3">
+                                        {/* Back Button for mobile */}
+                                        <button 
+                                            onClick={() => setSelectedPartnerId('')}
+                                            className="md:hidden p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-850 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors mr-1 shrink-0"
+                                            title="Back to conversations"
+                                        >
+                                            <ChevronLeft className="h-5 w-5" />
+                                        </button>
                                         <div className="relative">
                                             <Avatar className="h-10 w-10 border border-gray-200 dark:border-zinc-850">
                                                 <AvatarImage src={selectedPartner.avatar_url || `https://i.pravatar.cc/150?u=${selectedPartner.id}`} />
