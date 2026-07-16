@@ -1,14 +1,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Welcome = () => {
+  const { user, isLoaded: isAuthLoaded, userRole, onboardingCompleted } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [imageVisible, setImageVisible] = useState(false);
   const [titleVisible, setTitleVisible] = useState(false);
   const [sloganVisible, setSloganVisible] = useState(false);
   const [buttonVisible, setButtonVisible] = useState(false);
   const navigate = useNavigate();
+
+  // Auto-redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (isAuthLoaded && user) {
+      if (onboardingCompleted) {
+        if (userRole === 'teacher') navigate('/teacher-dashboard');
+        else if (userRole === 'student') navigate('/student-dashboard');
+        else navigate('/role-selection');
+      } else {
+        if (userRole) navigate('/onboarding', { state: { role: userRole } });
+        else navigate('/role-selection');
+      }
+    }
+  }, [isAuthLoaded, user, userRole, onboardingCompleted, navigate]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 100);
