@@ -122,7 +122,6 @@ const StudentDashboard = () => {
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
   const [detectedCountryName, setDetectedCountryName] = useState<string | null>(null);
 
@@ -186,25 +185,7 @@ const StudentDashboard = () => {
     detectGeo();
   }, [user?.id]);
 
-  useEffect(() => {
-    async function processDefaultImage() {
-      if (user?.imageUrl && user.id) {
-        try {
-          const processed = await removeImageBackground(user.imageUrl);
-          setProcessedImageUrl(processed);
-          if (processed !== user.imageUrl) {
-            await supabase
-              .from('profiles')
-              .update({ avatar_url: processed })
-              .eq('id', user.id);
-          }
-        } catch (e) {
-          console.error("Error processing default image:", e);
-        }
-      }
-    }
-    processDefaultImage();
-  }, [user?.imageUrl, user?.id]);
+
   const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -531,7 +512,7 @@ const StudentDashboard = () => {
             className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <Avatar className="h-6 w-6">
-              <AvatarImage src={processedImageUrl || user?.imageUrl} />
+              <AvatarImage src={user?.imageUrl} />
               <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
                 {userName ? userName.split(' ').map((n: string) => n[0]).join('') : 'S'}
               </AvatarFallback>
@@ -563,10 +544,10 @@ const StudentDashboard = () => {
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/settings')}>
             <div className="relative">
               <div className="relative w-12 h-12 rounded-full border border-white/30 bg-white/10 dark:bg-zinc-950/15 backdrop-blur-md shadow-sm overflow-hidden flex items-center justify-center select-none">
-                {(processedImageUrl || user?.imageUrl) ? (
+                {user?.imageUrl ? (
                   <>
                     <img
-                      src={processedImageUrl || user?.imageUrl}
+                      src={user?.imageUrl}
                       alt={userName}
                       className="w-full h-full object-cover object-center pointer-events-none"
                     />
@@ -593,14 +574,14 @@ const StudentDashboard = () => {
             {/* Soft, organic localized lavender glow behind the portrait (circular aura, no clipping) */}
             <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] md:w-[640px] md:h-[640px] bg-[radial-gradient(circle,rgba(143,129,214,0.85)_0%,rgba(175,160,250,0.45)_50%,transparent_75%)] blur-[60px] pointer-events-none z-0" />
             
-            {(processedImageUrl || user?.imageUrl) ? (
+            {user?.imageUrl ? (
               <div className="relative">
                 <div 
                   className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(91,74,159,0.15)] flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(91,74,159,0.25)]" 
                   onClick={handleImageClick}
                 >
                   <img
-                    src={processedImageUrl || user?.imageUrl}
+                    src={user?.imageUrl}
                     alt={userName}
                     className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
                   />
