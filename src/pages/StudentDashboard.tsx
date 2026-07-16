@@ -365,37 +365,52 @@ const StudentDashboard = () => {
     });
   };
 
+  const [uploading, setUploading] = useState(false);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Data = reader.result as string;
-      try {
-        // Resize and compress raw upload to prevent net::ERR_CONNECTION_CLOSED
-        const resizedImage = await resizeProfileImage(base64Data);
-        const processedImage = await removeImageBackground(resizedImage);
+    const savedUser = localStorage.getItem('yadalearn-user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    const userId = user?.id || parsedUser?.id;
 
-        // 1. Update profiles table in database directly
-        const { error: dbError } = await supabase
+    if (!userId) {
+      console.error("Upload failed: User not identified.");
+      alert("User not identified. Please try logging in again.");
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        const processedImage = await removeImageBackground(base64String);
+        const { error } = await supabase
           .from('profiles')
           .update({ avatar_url: processedImage })
-          .eq('id', user?.id);
-        if (dbError) throw dbError;
+          .eq('id', userId);
 
-        // 2. Update processedImageUrl state immediately
-        setProcessedImageUrl(processedImage);
-        
-        // 3. Call refreshUser to sync the AuthContext/Cache
-        if (refreshUser) {
-          await refreshUser();
+        if (error) {
+          console.error('Error saving image in profiles table:', error);
+          alert('Failed to save image: ' + error.message);
+        } else {
+          // Update cached user locally to prevent reload flickering and empty placeholder
+          const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
+          savedUser.imageUrl = processedImage;
+          localStorage.setItem('yadalearn-user', JSON.stringify(savedUser));
+          
+          // Refresh user context state dynamically without reloading the page!
+          if (refreshUser) {
+            await refreshUser();
+          }
         }
-
-        alert("Profile picture updated successfully!");
-      } catch (error: any) {
-        console.error("Error updating profile photo:", error);
-        alert("Failed to update profile photo: " + error.message);
+      } catch (err) {
+        console.error('CRITICAL: Image processing/upload failed:', err);
+        alert('Image upload failed: ' + (err as Error).message);
+      } finally {
+        setUploading(false);
       }
     };
     reader.readAsDataURL(file);
