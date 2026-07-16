@@ -367,6 +367,7 @@ const StudentDashboard = () => {
   };
 
   const [uploading, setUploading] = useState(false);
+  const [localImage, setLocalImage] = useState<string | null>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -399,6 +400,9 @@ const StudentDashboard = () => {
           console.error('Error saving image in profiles table:', error);
           alert('Failed to save image: ' + error.message);
         } else {
+          // Immediately update local UI state so the change is instant without a refresh
+          setLocalImage(processedImage);
+          
           // Update cached user locally to prevent reload flickering and empty placeholder
           const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
           savedUser.imageUrl = processedImage;
@@ -530,7 +534,7 @@ const StudentDashboard = () => {
             className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-[#F43F5E] hover:bg-white/40 dark:hover:bg-zinc-800/30 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <Avatar className="h-6 w-6">
-              <AvatarImage src={user?.imageUrl} />
+              <AvatarImage src={localImage || user?.imageUrl} />
               <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
                 {userName ? userName.split(' ').map((n: string) => n[0]).join('') : 'S'}
               </AvatarFallback>
@@ -565,7 +569,7 @@ const StudentDashboard = () => {
                 {user?.imageUrl ? (
                   <>
                     <img
-                      src={user?.imageUrl}
+                      src={localImage || user?.imageUrl}
                       alt={userName}
                       className="w-full h-full object-cover object-center pointer-events-none"
                     />
@@ -599,7 +603,7 @@ const StudentDashboard = () => {
                   onClick={handleImageClick}
                 >
                   <img
-                    src={user?.imageUrl}
+                    src={localImage || user?.imageUrl}
                     alt={userName}
                     className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
                   />

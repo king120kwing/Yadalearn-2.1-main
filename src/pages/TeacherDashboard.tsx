@@ -246,10 +246,10 @@ const TeacherDashboard = () => {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
+  const [uploading, setUploading] = useState(false);
+  const [localImage, setLocalImage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-
   const handleImageClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -326,6 +326,9 @@ const TeacherDashboard = () => {
           console.error('Error saving image in profiles table:', error);
           alert('Failed to save image: ' + error.message);
         } else {
+          // Immediately update local UI state so the change is instant
+          setLocalImage(processedImage);
+          
           // Update cached user locally to prevent reload flickering and empty placeholder
           const savedUser = JSON.parse(localStorage.getItem('yadalearn-user') || '{}');
           savedUser.imageUrl = processedImage;
@@ -551,7 +554,7 @@ const TeacherDashboard = () => {
             className="flex items-center gap-3.5 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-2xl font-semibold transition-all text-left w-full"
           >
             <Avatar className="h-6 w-6">
-              <AvatarImage src={currentUser?.avatarUrl || currentUser?.imageUrl} />
+              <AvatarImage src={localImage || currentUser?.avatarUrl || currentUser?.imageUrl} />
               <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
                 {currentUser?.name ? currentUser.name.split(' ').map((n: string) => n[0]).join('') : 'T'}
               </AvatarFallback>
@@ -603,7 +606,7 @@ const TeacherDashboard = () => {
                  >
                    {/* Photograph processed with blurred background and sharp individual */}
                    <img
-                     src={currentUser.imageUrl}
+                     src={localImage || currentUser.imageUrl}
                      alt="Teacher Portrait"
                      className="w-full h-full object-cover select-none transition-transform duration-300 group-hover:scale-[1.01]"
                    />
