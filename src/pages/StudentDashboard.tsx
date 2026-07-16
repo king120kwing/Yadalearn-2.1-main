@@ -326,44 +326,6 @@ const StudentDashboard = () => {
   const nextEvent = getNextUpcomingEvent(studentSchedule);
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const resizeProfileImage = (base64Str: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = base64Str;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(base64Str);
-          return;
-        }
-
-        const targetWidth = 250;
-        const targetHeight = 300;
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        // Draw image keeping proportions
-        const imgRatio = img.width / img.height;
-        const targetRatio = targetWidth / targetHeight;
-        let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
-
-        if (imgRatio > targetRatio) {
-          sWidth = img.height * targetRatio;
-          sx = (img.width - sWidth) / 2;
-        } else {
-          sHeight = img.width / targetRatio;
-          sy = (img.height - sHeight) / 2;
-        }
-
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
-        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Compact size, high quality
-      };
-      img.onerror = () => {
-        resolve(base64Str);
-      };
-    });
-  };
 
   const resizeProfileImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -633,7 +595,7 @@ const StudentDashboard = () => {
             {user?.imageUrl ? (
               <div className="relative">
                 <div 
-                  className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(91,74,159,0.15)] flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(91,74,159,0.25)]" 
+                  className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-2xl shadow-slate-300/40 dark:shadow-black/40 flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-400/50 dark:hover:shadow-black/60" 
                   onClick={handleImageClick}
                 >
                   <img
@@ -645,8 +607,8 @@ const StudentDashboard = () => {
                   {/* Dark overlay mask that dims the image on hover to signal editability */}
                   <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none rounded-[2rem] z-16" />
 
-                  {/* Frosted glass highlight overlay over the portrait */}
-                  <div className="absolute inset-0 border border-white/20 bg-gradient-to-tr from-white/10 via-white/5 to-transparent pointer-events-none rounded-[2rem] z-15 backdrop-blur-[0.5px]" />
+                  {/* Frosted glass highlight overlay over the portrait (removed backdrop-blur to prevent obscuring subject) */}
+                  <div className="absolute inset-0 border border-white/30 dark:border-white/20 bg-gradient-to-br from-white/20 via-white/5 to-transparent pointer-events-none rounded-[2rem] z-15" />
                 </div>
 
                 {/* Country Geolocation Flag Badge (Circular Flag, bottom-right edge corner overlap) */}

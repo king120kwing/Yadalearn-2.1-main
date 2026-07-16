@@ -598,7 +598,7 @@ const TeacherDashboard = () => {
              {currentUser?.imageUrl ? (
                <div className="relative">
                  <div 
-                   className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-[0_20px_50px_rgba(255,125,70,0.15)] flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(255,125,70,0.25)]" 
+                   className="w-64 h-80 md:w-72 md:h-96 rounded-[2rem] border border-white/40 bg-white/20 dark:bg-zinc-900/30 backdrop-blur-xl shadow-2xl shadow-slate-300/40 dark:shadow-black/40 flex items-center justify-center relative cursor-pointer overflow-hidden z-10 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-400/50 dark:hover:shadow-black/60" 
                    onClick={handleImageClick}
                  >
                    {/* Photograph processed with blurred background and sharp individual */}
