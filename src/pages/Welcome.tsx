@@ -44,128 +44,74 @@ const Welcome = () => {
   console.log('Welcome: Rendering...', { isLoaded });
 
   return (
-    <div className="min-h-screen w-full gradient-welcome relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 gradient-mesh opacity-30"></div>
+    <div className="min-h-screen w-full gradient-welcome relative overflow-hidden flex bg-[#f8f9ff]">
+      {/* Animated background mesh overlay for premium feel */}
+      <div className="absolute inset-0 gradient-mesh opacity-30 pointer-events-none"></div>
 
-      {/* Main Content Container */}
-      <div className={`min-h-screen w-full relative z-10`}>
+      {/* 
+        Video Background Element (Left Side) 
+        Takes up about 65% of width on desktop, 100% on mobile.
+        Uses nested CSS masks to softly fade the video into the background 
+        on the right edge and bottom edge without harsh borders.
+      */}
+      <div 
+        className="absolute top-0 left-0 w-full lg:w-[65%] h-full z-0 pointer-events-none"
+        style={{
+          // Horizontal fade mask (fades out into the text area on the right)
+          WebkitMaskImage: 'linear-gradient(to right, black 50%, transparent 95%)',
+          maskImage: 'linear-gradient(to right, black 50%, transparent 95%)'
+        }}
+      >
+        <div 
+          className="w-full h-full"
+          style={{
+            // Vertical fade mask (strongest fade at the lower portion as requested)
+            WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
+            maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)'
+          }}
+        >
+          <video
+            src="/learning-video.mp4"
+            className="w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+          {/* Subtle overlay to ensure the video isn't overwhelmingly bright, preserving text readability if it overlaps */}
+          <div className="absolute inset-0 bg-black/5" />
+        </div>
+      </div>
 
-        {/* Desktop Layout - Enhanced */}
-        <div className="hidden lg:flex justify-center items-center min-h-screen">
-          <div className="flex items-center gap-12 max-w-7xl mx-auto">
-            {/* Left side - Enhanced Hero Video with 3D Effects */}
-            <div className="relative animate-fade-in-scale">
-              {/* Enhanced 3D cutout shape with multiple shadow layers */}
-              <div
-                className={`bg-gradient-to-br from-purple-200 to-purple-300 transition-all duration-1000 ease-out ${imageVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                  }`}
-                style={{
-                  width: 'clamp(480px, 45vw, 620px)',
-                  height: 'clamp(600px, 55vw, 720px)',
-                  borderRadius: '20px',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  boxShadow: '0 8px 25px rgba(168, 85, 247, 0.15)'
-                }}
-              >
-                <video
-                  src="/learning-video.mp4"
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              </div>
-            </div>
+      {/* Main Content Container (Right Side) */}
+      <div className="relative z-10 w-full min-h-screen flex flex-col justify-center items-center lg:items-end px-8 md:px-16 lg:px-[10%] max-w-[1800px] mx-auto pointer-events-none">
+        
+        <div 
+          className={`w-full lg:w-[45%] xl:w-[40%] flex flex-col items-center lg:items-start text-center lg:text-left transition-all duration-1000 ease-out delay-300 pointer-events-auto ${
+            isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          {/* YadaLearn Logo/Title */}
+          <h1 className="text-6xl md:text-7xl lg:text-[5.5rem] font-extrabold text-[#1a202c] mb-6 tracking-tight leading-tight drop-shadow-sm">
+            YadaLearn
+          </h1>
+          
+          {/* Tagline */}
+          <p className="text-xl md:text-2xl text-slate-600 mb-14 font-medium max-w-lg">
+            Every Lesson a Treasure
+          </p>
 
-            {/* Right side - Enhanced Text and Authentication */}
-            <div className="animate-fade-in-up max-w-md">
-              <h1 className="text-fluid-display font-bold text-gray-800 mb-6 leading-tight">
-                YadaLearn
-              </h1>
-              <p className="text-fluid-subheading text-gray-600 mb-12 leading-relaxed">
-                Every Lesson a Treasure
-              </p>
-
-              {/* Authentication Section */}
-              <div className="space-y-4">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="w-full bg-black text-white text-lg font-semibold px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                >
-                  Get Started
-                </button>
-              </div>
-            </div>
+          {/* Authentication CTA */}
+          <div className="w-full max-w-sm flex flex-col items-center lg:items-start">
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full sm:w-auto bg-black text-white text-lg md:text-xl font-semibold px-12 py-4 rounded-full shadow-2xl hover:shadow-black/20 hover:-translate-y-1 active:translate-y-0 active:scale-95 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            >
+              Get Started
+            </button>
           </div>
         </div>
 
-        {/* Mobile Layout */}
-        <div className="md:hidden min-h-screen flex flex-col items-center justify-center px-6 py-12">
-          {/* Hero Video with Complex Shadow - Mobile */}
-          <div className="mb-8">
-            <div
-              className={`bg-gradient-to-br from-purple-200 to-purple-300 transition-all duration-1000 ease-out ${imageVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                }`}
-              style={{
-                width: 'min(85vw, 340px)',
-                height: 'min(110vw, 440px)',
-                borderRadius: '20px',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                boxShadow: '0 8px 20px rgba(168, 85, 247, 0.15)'
-              }}
-            >
-              <video
-                src="/learning-video.mp4"
-                className="w-full h-full object-cover"
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            </div>
-          </div>
-
-          {/* Text and Authentication - Mobile */}
-          <div className="text-center space-y-4 w-full max-w-sm">
-            <h1
-              className={`text-4xl sm:text-5xl font-bold text-gray-800 transition-all duration-700 ease-out ${titleVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                }`}
-            >
-              YadaLearn
-            </h1>
-            <p
-              className={`text-lg sm:text-xl text-gray-600 transition-all duration-700 ease-out delay-200 ${sloganVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                }`}
-            >
-              Every Lesson a Treasure
-            </p>
-
-            {/* Authentication Section - Mobile */}
-            <div
-              className={`transition-all duration-700 ease-out pt-4 ${buttonVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                }`}
-            >
-              <div className="space-y-3 w-full">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="w-full rounded-full bg-black px-12 py-4 font-semibold text-white text-lg shadow-lg hover:scale-105 hover:bg-gray-900 transition-all active:scale-95"
-                >
-                  Get Started
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
