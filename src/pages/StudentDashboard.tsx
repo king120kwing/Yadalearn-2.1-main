@@ -365,6 +365,45 @@ const StudentDashboard = () => {
     });
   };
 
+  const resizeProfileImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(base64Str);
+          return;
+        }
+
+        const targetWidth = 250;
+        const targetHeight = 300;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        // Draw image keeping proportions
+        const imgRatio = img.width / img.height;
+        const targetRatio = targetWidth / targetHeight;
+        let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+        if (imgRatio > targetRatio) {
+          sWidth = img.height * targetRatio;
+          sx = (img.width - sWidth) / 2;
+        } else {
+          sHeight = img.width / targetRatio;
+          sy = (img.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+        resolve(canvas.toDataURL('image/png')); 
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   const [uploading, setUploading] = useState(false);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -386,7 +425,9 @@ const StudentDashboard = () => {
     reader.onloadend = async () => {
       const base64String = reader.result as string;
       try {
-        const processedImage = await removeImageBackground(base64String);
+        const resizedImage = await resizeProfileImage(base64String);
+        const processedImage = await removeImageBackground(resizedImage);
+        
         const { error } = await supabase
           .from('profiles')
           .update({ avatar_url: processedImage })
