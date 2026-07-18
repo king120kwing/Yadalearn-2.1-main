@@ -624,7 +624,7 @@ const ParentDashboard = () => {
       </main>
 
       <BottomNav />
-      {isScanModalOpen && <ScanQRModal onClose={() => { setIsScanModalOpen(false); window.location.reload(); }} />}
+      {isScanModalOpen && <ScanQRModal onClose={() => setIsScanModalOpen(false)} />}
       <MessageTeacherModal 
         isOpen={activeModal === 'message'} 
         onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 

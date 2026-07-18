@@ -14,7 +14,7 @@ interface ScanQRModalProps {
 const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
   const { user } = useAuth();
   const [manualCode, setManualCode] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScanning, setIsScanning] = useState(true);
   const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [linkedStudentData, setLinkedStudentData] = useState<any>(null);
