@@ -639,9 +639,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshUser = async () => {
     if (user?.id) {
-      fetchingUserIdRef.current = null; // reset to allow fetching
-      const { data: { session } } = await supabase.auth.getSession();
-      await handleSession(session);
+      console.log('AuthContext: refreshUser called, fetching profile manually to avoid logout risk');
+      fetchingUserIdRef.current = null;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.warn('AuthContext: refreshUser found no session, aborting refresh to prevent accidental logout');
+          return;
+        }
+        const data = await rawFetchAuth('profiles', `id=eq.${user.id}&select=role,onboarding_completed,subjects,avatar_url,full_name,bio,country`, 'GET', null, session.access_token);
+        const profile = data?.[0];
+        
+        if (profile) {
+          if (profile.role) {
+            setUserRoleState(profile.role as 'teacher' | 'student');
+            localStorage.setItem('yadalearn-user-role', profile.role);
+          }
+          setOnboardingCompletedState(!!profile.onboarding_completed);
+          localStorage.setItem('yadalearn-onboarding-completed', String(!!profile.onboarding_completed));
+          setSubjectsState(profile.subjects || []);
+          
+          const updatedUserObj = {
+            id: user.id,
+            email: user.email || '',
+            name: profile.full_name || user.name,
+            imageUrl: profile.avatar_url || user.imageUrl,
+            bio: profile.bio,
+            country: profile.country
+          };
+          localStorage.setItem('yadalearn-user', JSON.stringify(updatedUserObj));
+          setUser(updatedUserObj);
+        }
+      } catch (err) {
+        console.error('AuthContext: refreshUser failed:', err);
+      }
     }
   };
 
