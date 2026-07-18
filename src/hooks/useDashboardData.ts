@@ -32,103 +32,121 @@ export function useDashboardData(studentId?: string) {
             }
 
             try {
-                // Fetch the student's profile to get their selected subjects if they aren't fully loaded yet
+                // Fetch subjects and all bookings in parallel
                 let currentSubjects = studentSubjects || [];
-                if (currentSubjects.length === 0) {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('subjects')
-                        .eq('id', userId)
-                        .single();
-                    if (profile && profile.subjects) {
-                        currentSubjects = profile.subjects;
+                const profilePromise = currentSubjects.length === 0 
+                    ? supabase.from('profiles').select('subjects').eq('id', userId).single()
+                    : Promise.resolve({ data: { subjects: currentSubjects } });
+
+                const bookingsPromise = supabase
+                    .from('bookings')
+                    .select(`
+                        id,
+                        subject,
+                        date,
+                        time,
+                        rating,
+                        status,
+                        teacher_id,
+                        teacher:profiles!bookings_teacher_id_fkey(id, full_name, avatar_url)
+                    `)
+                    .eq('student_id', userId);
+
+                const [profileRes, bookingsRes] = await Promise.all([profilePromise, bookingsPromise]);
+
+                if (currentSubjects.length === 0 && profileRes.data?.subjects) {
+                    currentSubjects = profileRes.data.subjects;
+                }
+
+                const allBookings = bookingsRes.data || [];
+                
+                // Process upcoming and unrated classes
+                const now = new Date();
+                const parseBookingDateTime = (dateStr: string, timeStr: string) => {
+                    try {
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+                        let hours = 0; let minutes = 0;
+                        if (match) {
+                            hours = Number(match[1]);
+                            minutes = Number(match[2]);
+                            const ampm = match[3].toUpperCase();
+                            if (ampm === 'PM' && hours < 12) hours += 12;
+                            if (ampm === 'AM' && hours === 12) hours = 0;
+                        }
+                        return new Date(year, month - 1, day, hours, minutes);
+                    } catch (e) { return new Date(0); }
+                };
+
+                const upcoming = [];
+                const unratedPast = [];
+                const teacherIds = new Set<string>();
+
+                for (const b of allBookings) {
+                    if (b.teacher_id) teacherIds.add(b.teacher_id);
+                    
+                    if (b.status === 'confirmed') {
+                        const bookingTime = parseBookingDateTime(b.date, b.time);
+                        if (bookingTime > now) {
+                            upcoming.push({
+                                id: b.id,
+                                title: b.subject,
+                                day: `${b.date} ${b.time}`,
+                                time: b.time,
+                                isQuiz: b.subject.toLowerCase().includes('quiz'),
+                                teacherName: b.teacher?.full_name || 'Teacher'
+                            });
+                        } else if (b.rating === null) {
+                            unratedPast.push({
+                                id: b.id,
+                                title: b.subject,
+                                date: b.date,
+                                time: b.time,
+                                teacherId: b.teacher?.id,
+                                teacherName: b.teacher?.full_name || 'Teacher',
+                                teacherAvatar: b.teacher?.avatar_url || 'https://i.pravatar.cc/150'
+                            });
+                        }
                     }
                 }
 
-                // Step 1: Query bookings to get teacherIds that this student has signed up with
-                const { data: studentBookings } = await supabase
-                    .from('bookings')
-                    .select('teacher_id')
-                    .eq('student_id', userId);
+                setUpcomingClasses(upcoming);
+                localStorage.setItem('yadalearn-cached-classes', JSON.stringify(upcoming));
+                setUnratedClasses(unratedPast);
 
-                const teacherIds = studentBookings
-                    ? Array.from(new Set(studentBookings.map((b: any) => b.teacher_id).filter(Boolean)))
-                    : [];
-
+                // Fetch teachers
                 let finalTeachersData = [];
+                const tIds = Array.from(teacherIds);
 
-                if (teacherIds.length > 0) {
-                    const { data: bookedTeachers } = await supabase
+                if (tIds.length > 0) {
+                    const { data } = await supabase
                         .from('profiles')
-                        .select(`
-                            id,
-                            full_name,
-                            avatar_url,
-                            subjects,
-                            bio,
-                            is_online,
-                            teacher_profiles (
-                                rating,
-                                min_rate,
-                                max_rate
-                            )
-                        `)
-                        .in('id', teacherIds)
+                        .select(`id, full_name, avatar_url, subjects, bio, is_online, teacher_profiles (rating, min_rate, max_rate)`)
+                        .in('id', tIds)
                         .eq('role', 'teacher')
                         .eq('onboarding_completed', true);
-                    
-                    finalTeachersData = bookedTeachers || [];
+                    finalTeachersData = data || [];
                 }
 
-                // Step 2: Fallback to interested subjects overlap query if no bookings exist yet
                 if (finalTeachersData.length === 0) {
                     let query = supabase
                         .from('profiles')
-                        .select(`
-                            id,
-                            full_name,
-                            avatar_url,
-                            subjects,
-                            bio,
-                            is_online,
-                            teacher_profiles (
-                                rating,
-                                min_rate,
-                                max_rate
-                            )
-                        `)
+                        .select(`id, full_name, avatar_url, subjects, bio, is_online, teacher_profiles (rating, min_rate, max_rate)`)
                         .eq('role', 'teacher')
                         .eq('onboarding_completed', true);
-
-                    if (currentSubjects.length > 0) {
-                        query = query.overlaps('subjects', currentSubjects);
-                    }
-
-                    const { data: teachersData } = await query.limit(5);
-                    finalTeachersData = teachersData || [];
+                    if (currentSubjects.length > 0) query = query.overlaps('subjects', currentSubjects);
+                    const { data } = await query.limit(5);
+                    finalTeachersData = data || [];
                 }
 
-                // Fallback: If still empty, query any onboarded teachers
                 if (finalTeachersData.length === 0) {
-                    const { data: fallbackTeachers } = await supabase
+                    const { data } = await supabase
                         .from('profiles')
-                        .select(`
-                            id,
-                            full_name,
-                            avatar_url,
-                            subjects,
-                            bio,
-                            is_online,
-                            teacher_profiles (
-                                rating,
-                                min_rate,
-                                max_rate
-                            )
-                        `)
+                        .select(`id, full_name, avatar_url, subjects, bio, is_online, teacher_profiles (rating, min_rate, max_rate)`)
                         .eq('role', 'teacher')
                         .eq('onboarding_completed', true)
                         .limit(5);
-                    finalTeachersData = fallbackTeachers || [];
+                    finalTeachersData = data || [];
                 }
 
                 const teachers = finalTeachersData.map((t: any) => {
@@ -151,75 +169,6 @@ export function useDashboardData(studentId?: string) {
                 setTopTeachers(teachers);
                 localStorage.setItem('yadalearn-cached-teachers', JSON.stringify(teachers));
 
-                // Fetch confirmed bookings from database (representing classes scheduled from the calendar)
-                const { data: bookings, error: bookingsError } = await supabase
-                    .from('bookings')
-                    .select(`
-                        id,
-                        subject,
-                        date,
-                        time,
-                        rating,
-                        teacher:profiles!bookings_teacher_id_fkey(id, full_name, avatar_url)
-                    `)
-                    .eq('student_id', userId)
-                    .eq('status', 'confirmed');
-
-                if (bookingsError) {
-                    console.error('Error fetching bookings for dashboard:', bookingsError);
-                }
-
-                const now = new Date();
-                const parseBookingDateTime = (dateStr: string, timeStr: string) => {
-                    try {
-                        const [year, month, day] = dateStr.split('-').map(Number);
-                        const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
-                        let hours = 0;
-                        let minutes = 0;
-                        if (match) {
-                            hours = Number(match[1]);
-                            minutes = Number(match[2]);
-                            const ampm = match[3].toUpperCase();
-                            if (ampm === 'PM' && hours < 12) hours += 12;
-                            if (ampm === 'AM' && hours === 12) hours = 0;
-                        }
-                        return new Date(year, month - 1, day, hours, minutes);
-                    } catch (e) {
-                        return new Date(0);
-                    }
-                };
-
-                const dbBookings = bookings || [];
-                const upcoming = [];
-                const unratedPast = [];
-
-                for (const b of dbBookings) {
-                    const bookingTime = parseBookingDateTime(b.date, b.time);
-                    if (bookingTime > now) {
-                        upcoming.push({
-                            id: b.id,
-                            title: b.subject,
-                            day: `${b.date} ${b.time}`,
-                            time: b.time,
-                            isQuiz: b.subject.toLowerCase().includes('quiz'),
-                            teacherName: b.teacher?.full_name || 'Teacher'
-                        });
-                    } else if (b.rating === null) {
-                        unratedPast.push({
-                            id: b.id,
-                            title: b.subject,
-                            date: b.date,
-                            time: b.time,
-                            teacherId: b.teacher?.id,
-                            teacherName: b.teacher?.full_name || 'Teacher',
-                            teacherAvatar: b.teacher?.avatar_url || 'https://i.pravatar.cc/150'
-                        });
-                    }
-                }
-
-                setUpcomingClasses(upcoming);
-                localStorage.setItem('yadalearn-cached-classes', JSON.stringify(upcoming));
-                setUnratedClasses(unratedPast);
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);
             } finally {
