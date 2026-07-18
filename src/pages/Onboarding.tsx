@@ -101,52 +101,12 @@ const Onboarding = () => {
     return 9;
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
     const maxStep = getMaxStep();
     if (currentStep < maxStep) {
       setCurrentStep(prev => prev + 1);
     } else {
-      const userName = answers.userName || (role === 'teacher' ? 'Teacher' : 'Student');
-      const defaultUser = {
-        email: 'onboarding@yadalearn.com',
-        name: userName,
-        firstName: userName.split(' ')[0],
-        lastName: userName.split(' ').slice(1).join(' ') || '',
-        imageUrl: ''
-      };
-      localStorage.setItem('yadalearn-user', JSON.stringify(defaultUser));
-      localStorage.setItem('yadalearn-user-role', role);
-      localStorage.setItem('yadalearn-lang', language);
-      localStorage.setItem('yadalearn-onboarding-answers', JSON.stringify(answers));
-
-      // Extract selected subjects & languages
-      const selectedSubjectsList: string[] = [];
-      const selectedLanguagesList: string[] = [];
-      if (role === 'student') {
-        if (answers.studyPath === 'Languages') {
-          if (answers.selectedLanguages) {
-            selectedLanguagesList.push(...answers.selectedLanguages);
-            selectedSubjectsList.push(...answers.selectedLanguages);
-          }
-        } else if (answers.studyPath === 'IGCSE') {
-          if (answers.selectedSubjects) selectedSubjectsList.push(...answers.selectedSubjects);
-        }
-      } else { // teacher
-        if (answers.languageSpecialization) {
-          selectedLanguagesList.push(...answers.languageSpecialization);
-          selectedSubjectsList.push(...answers.languageSpecialization);
-        }
-        if (answers.subjectSpecialization) selectedSubjectsList.push(...answers.subjectSpecialization);
-      }
-
-      setUserRole?.(role);
-      await setOnboardingCompleted?.(true, selectedSubjectsList, selectedLanguagesList, answers, role);
-      await refreshUser?.();
-
-      const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : role === 'parent' ? '/parent-dashboard' : '/student-dashboard';
-      setTimeout(() => {
-        navigate(dashboardPath, { replace: true });
-      }, 100);
+      await handleFinish();
     }
   };
 
