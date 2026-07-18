@@ -26,6 +26,9 @@ import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import ParentDashboard from "./pages/ParentDashboard";
 import ParentProgress from "./pages/ParentProgress";
+import ParentAssignments from "./pages/ParentAssignments";
+import ParentClasses from "./pages/ParentClasses";
+import ParentPerformance from "./pages/ParentPerformance";
 import MobileScreensShowcase from "./pages/MobileScreensShowcase";
 import Meeting from "./pages/Meeting";
 import LinkTeacher from "./pages/LinkTeacher";
@@ -70,6 +73,9 @@ const App = () => {
             {/* Parent Routes */}
             <Route path="/parent-dashboard" element={<ProtectedRoute><ParentDashboard /></ProtectedRoute>} />
             <Route path="/child-progress" element={<ProtectedRoute><ParentProgress /></ProtectedRoute>} />
+            <Route path="/parent/assignments" element={<ProtectedRoute><ParentAssignments /></ProtectedRoute>} />
+            <Route path="/parent/classes" element={<ProtectedRoute><ParentClasses /></ProtectedRoute>} />
+            <Route path="/parent/performance" element={<ProtectedRoute><ParentPerformance /></ProtectedRoute>} />
 
             <Route path="/learning-class" element={<ProtectedRoute><LearningClass /></ProtectedRoute>} />
             <Route path="/ai-features" element={<ProtectedRoute><AIFeatures /></ProtectedRoute>} />

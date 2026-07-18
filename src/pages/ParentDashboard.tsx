@@ -9,11 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { removeImageBackground } from '@/utils/imageProcessor';
 import ScanQRModal from '@/features/parent/ScanQRModal';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
-import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsModal';
-import StudentDashboard from '@/pages/StudentDashboard';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { ClassesModal } from '@/features/parent/ClassesModal';
-import { PerformanceModal } from '@/features/parent/PerformanceModal';
 
 const ParentDashboard = () => {
   const navigate = useNavigate();
@@ -504,7 +500,7 @@ const ParentDashboard = () => {
                 </div>
 
                 <div 
-                  onClick={() => setActiveModal('assignments')}
+                  onClick={() => navigate('/parent/assignments', { state: { studentId: selectedChild?.id, childrenList: linkedChildren } })}
                   className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -514,7 +510,7 @@ const ParentDashboard = () => {
                 </div>
 
                 <div 
-                  onClick={() => setActiveModal('performance')}
+                  onClick={() => navigate('/parent/performance', { state: { studentId: selectedChild?.id, childrenList: linkedChildren } })}
                   className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -524,7 +520,7 @@ const ParentDashboard = () => {
                 </div>
 
                 <div 
-                  onClick={() => setActiveModal('classes')}
+                  onClick={() => navigate('/parent/classes', { state: { studentId: selectedChild?.id, childrenList: linkedChildren } })}
                   className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -534,7 +530,7 @@ const ParentDashboard = () => {
                 </div>
 
                 <div 
-                  onClick={() => setActiveModal('history')}
+                  onClick={() => navigate('/parent/classes', { state: { studentId: selectedChild?.id, childrenList: linkedChildren } })}
                   className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -680,15 +676,7 @@ const ParentDashboard = () => {
         onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 
         recipientId={selectedTeacherIdForChat} 
       />
-      {activeModal === 'assignments' && (
-        <AssignmentsModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild?.id} childrenList={linkedChildren} />
-      )}
-      {(activeModal === 'classes' || activeModal === 'history') && (
-        <ClassesModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild?.id} studentName={selectedChild?.name} childrenList={linkedChildren} />
-      )}
-      {activeModal === 'performance' && (
-        <PerformanceModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild?.id} studentName={selectedChild?.name} childrenList={linkedChildren} />
-      )}
+
 
       {activeModal && !['message', 'scan', 'assignments', 'classes', 'history', 'performance'].includes(activeModal) && (
         <Dialog open={true} onOpenChange={() => setActiveModal(null)}>
