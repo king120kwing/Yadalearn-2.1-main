@@ -258,13 +258,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // Fallback timer: in case OAuth parsing fails or takes too long, set isLoaded to true after 2 seconds
+    // Fallback timer: in case OAuth parsing fails or takes too long, set isLoaded to true after 15 seconds
     if (hasHashToken) {
       oauthTimeoutRef.current = setTimeout(() => {
-        console.log('AuthContext: OAuth fallback timer fired, setting isLoaded to true');
+        console.warn('AuthContext: OAuth fallback timer fired (15s), setting isLoaded to true');
         initialCheckCompletedRef.current = true;
         setIsLoaded(true);
-      }, 2000);
+      }, 15000);
     }
 
     return () => {
