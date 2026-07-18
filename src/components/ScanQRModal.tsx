@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, QrCode, Loader2 } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { supabase } from '@/lib/supabase';
 
 interface ScanQRModalProps {
@@ -28,41 +28,9 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-
-    if (isOpen && !scannedId && isScanning) {
-      html5QrCode = new Html5Qrcode("teacher-qr-reader");
-
-      html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 }
-        },
-        async (decodedText) => {
-          setIsScanning(false);
-          if (html5QrCode && html5QrCode.isScanning) {
-            await html5QrCode.stop().catch(console.error);
-          }
-          handleScan(decodedText);
-        },
-        (error) => {
-          // Ignore frequent scan errors when no QR is in frame
-        }
-      ).catch((err) => {
-        console.error("Camera start error", err);
-        setError("Could not start camera. Please ensure permissions are granted.");
-        setIsScanning(false);
-      });
-    }
-
-    return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(console.error);
-      }
-    };
-  }, [isOpen, scannedId, isScanning]);
+  // We do not need the complex manual html5-qrcode setup anymore, 
+  // react-qr-scanner handles mounting and unmounting automatically.
+  // We can just rely on the onDecode callback in the component.
 
   const handleScan = async (decodedText: string) => {
     if (loading) return;
@@ -130,14 +98,29 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
 
           {!scannedId ? (
               <div className="flex flex-col items-center">
-                  <div className="relative rounded-2xl overflow-hidden bg-black w-full aspect-square flex items-center justify-center border-4 border-slate-100 dark:border-zinc-800">
-                    <div id="teacher-qr-reader" className="w-full h-full [&_video]:object-cover" />
-                    <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
-                       <div className="w-full h-full border-2 border-dashed border-purple-500 relative">
-                         <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
-                       </div>
+                    <div className="w-full h-full overflow-hidden rounded-2xl relative bg-black">
+                        {isScanning && (
+                            <Scanner 
+                                onScan={(result) => {
+                                    if (result && result.length > 0) {
+                                        setIsScanning(false);
+                                        handleScan(result[0].rawValue);
+                                    }
+                                }}
+                                onError={(err) => {
+                                    console.error("Scanner error:", err);
+                                    setError("Camera error. Please ensure permissions are granted.");
+                                }}
+                                formats={['qr_code']}
+                                styles={{ container: { width: '100%', height: '100%' } }}
+                            />
+                        )}
+                        <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
+                            <div className="w-full h-full border-2 border-dashed border-purple-500 relative">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                            </div>
+                        </div>
                     </div>
-                  </div>
                   {error && <p className="text-red-500 font-bold mt-4 text-center text-sm">{error}</p>}
                   <p className="text-center text-sm text-slate-500 dark:text-zinc-400 mt-6 font-medium">
                       Point your camera at a YadaLearn QR code.

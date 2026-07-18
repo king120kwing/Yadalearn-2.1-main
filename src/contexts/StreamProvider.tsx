@@ -64,7 +64,7 @@ export const StreamProvider = ({ children }: { children: React.ReactNode }) => {
           user: {
             id: user.id,
             name: user.name || 'User',
-            image: user.avatar || '',
+            image: (user.imageUrl || user.avatar_url)?.startsWith('data:') ? '' : (user.imageUrl || user.avatar_url || ''),
           },
           token,
         });

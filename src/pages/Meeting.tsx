@@ -104,12 +104,29 @@ const Meeting = () => {
   }, [client, isStreamReady, id, isWaiting]);
 
   const handleAdmit = async (studentId: string) => {
-    const channel = supabase.channel(`room-${id}`);
-    await channel.send({
-      type: 'broadcast',
-      event: 'admit',
-      payload: { studentId }
-    });
+    // We already have a subscribed channel in this component, but Supabase Realtime requires
+    // broadcasting on the exact same instance. We can fetch the active channel:
+    const activeChannel = supabase.getChannels().find(c => c.topic === `realtime:room-${id}`);
+    if (activeChannel) {
+        await activeChannel.send({
+            type: 'broadcast',
+            event: 'admit',
+            payload: { studentId }
+        });
+    } else {
+        // Fallback just in case
+        const tempChannel = supabase.channel(`room-${id}`);
+        await tempChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                tempChannel.send({
+                    type: 'broadcast',
+                    event: 'admit',
+                    payload: { studentId }
+                });
+                setTimeout(() => supabase.removeChannel(tempChannel), 1000);
+            }
+        });
+    }
     setWaitingStudents(prev => prev.filter(s => s.id !== studentId));
   };
 
@@ -178,7 +195,7 @@ const Meeting = () => {
   const role = user?.role || localStorage.getItem('yadalearn-user-role');
 
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-zinc-950 flex flex-col z-[100] overflow-hidden">
+    <div className="fixed inset-0 w-screen h-[100dvh] bg-zinc-950 flex flex-col z-[100] overflow-hidden">
       {/* Top Bar */}
       <div className="absolute top-0 w-full z-50 bg-gradient-to-b from-black/80 to-transparent p-4 md:p-6 shrink-0 transition-opacity">
         <div className="flex items-center justify-between">
@@ -237,7 +254,7 @@ const Meeting = () => {
             <StreamTheme className="h-full w-full custom-stream-theme">
               {/* Internal layout container */}
               <div className="absolute inset-0 flex flex-col">
-                <div className="flex-1 p-2 md:p-4 overflow-hidden">
+                <div className="flex-1 overflow-hidden">
                   <SpeakerLayout participantsBarPosition="bottom" />
                 </div>
                 

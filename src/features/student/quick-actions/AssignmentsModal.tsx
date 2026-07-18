@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, isPast, isToday, isThisWeek, parseISO } from 'date-fns';
-import { seedDatabase } from '@/utils/seedData';
 interface AssignmentsModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -372,15 +371,6 @@ export const AssignmentsModal = ({ isOpen, onClose, studentId }: AssignmentsModa
                                 {assignments.length === 0 && (
                                     <div className="flex flex-col items-center justify-center mt-10 gap-4">
                                         <p className="text-center text-sm text-gray-550">No assignments found.</p>
-                                        <button
-                                            onClick={async () => {
-                                                if (userId) await seedDatabase(userId, 'student');
-                                            }}
-                                            className="text-xs px-4 py-2 rounded-lg border border-dashed border-indigo-500 text-indigo-650 hover:bg-indigo-50 transition-colors flex items-center gap-2"
-                                        >
-                                            <span className="material-symbols-outlined text-sm">database</span>
-                                            Load Demo Assignments
-                                        </button>
                                     </div>
                                 )}
                             </div>

@@ -684,8 +684,9 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     const handleDeleteMessage = async (msgId: string) => {
         try {
-            const { error } = await supabase.from('chat_messages').delete().eq('id', msgId);
-            if (error) throw error;
+            await rawFetchGlobal('chat_messages', `id=eq.${msgId}`, 'DELETE');
+            // Update UI state immediately
+            setMessages(prev => prev.filter(msg => msg.id !== msgId));
         } catch (err) {
             console.error("Error deleting message:", err);
             alert("Failed to delete message. You may not have permission.");

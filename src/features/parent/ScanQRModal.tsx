@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Camera, X, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -19,47 +19,7 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [linkedStudentData, setLinkedStudentData] = useState<any>(null);
 
-  useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-
-    if (isScanning) {
-      html5QrCode = new Html5Qrcode("qr-reader");
-
-      html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 }
-        },
-        async (decodedText) => {
-          setIsScanning(false);
-          if (html5QrCode && html5QrCode.isScanning) {
-            await html5QrCode.stop().catch(console.error);
-          }
-          let targetUrl = decodedText.trim();
-          let id = targetUrl;
-          if (targetUrl.includes('/link/')) {
-              id = targetUrl.split('/link/')[1];
-          }
-          await linkStudent(id);
-        },
-        (error) => {
-          // Ignore frequent scan errors when no QR is in frame
-        }
-      ).catch((err) => {
-        console.error("Camera start error", err);
-        setErrorMessage("Could not start camera. Please ensure permissions are granted.");
-        setScanStatus("error");
-        setIsScanning(false);
-      });
-    }
-
-    return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(console.error);
-      }
-    };
-  }, [isScanning]);
+  // We use react-qr-scanner which mounts itself automatically
 
   const linkStudent = async (studentId: string) => {
     try {
@@ -123,7 +83,7 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
       <Card className="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up">
         <CardHeader className="border-b border-gray-100 flex flex-row justify-between items-center p-6">
           <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
-            <span className="material-symbols-outlined mr-2 text-orange-500">qr_code_scanner</span>
+            <span className="material-symbols-outlined mr-2 text-emerald-500">qr_code_scanner</span>
             Link a Child
           </CardTitle>
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-8 w-8 text-gray-500">
@@ -152,7 +112,7 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full mt-2">Student Profile</span>
               </div>
 
-              <Button onClick={onClose} className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-6 font-bold shadow-md">
+              <Button onClick={onClose} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-6 font-bold shadow-md">
                 Back to Dashboard
               </Button>
             </div>
@@ -163,7 +123,7 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Link Failed</h3>
               <p className="text-gray-500 mb-6">{errorMessage}</p>
-              <Button onClick={() => setScanStatus('idle')} className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-6 mb-3">
+              <Button onClick={() => setScanStatus('idle')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-6 mb-3">
                 Try Again
               </Button>
             </div>
@@ -172,11 +132,11 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
               {!isScanning ? (
                 <>
                   <div className="text-center p-8 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50">
-                    <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Camera className="h-10 w-10 text-orange-500" />
+                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Camera className="h-10 w-10 text-emerald-500" />
                     </div>
                     <p className="text-gray-600 mb-4 font-medium">Scan your child's QR code from their profile</p>
-                    <Button onClick={() => setIsScanning(true)} className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-6">
+                    <Button onClick={() => setIsScanning(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-6">
                       Start Camera
                     </Button>
                   </div>
@@ -195,7 +155,7 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
                       placeholder="Enter 6-digit code or ID" 
                       value={manualCode}
                       onChange={(e) => setManualCode(e.target.value)}
-                      className="rounded-xl border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                      className="rounded-xl border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
                     />
                     <Button type="submit" disabled={!manualCode.trim()} className="bg-gray-900 text-white hover:bg-gray-800 rounded-xl">
                       Link
@@ -204,7 +164,35 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
                 </>
               ) : (
                 <div className="space-y-4">
-                  <div id="qr-reader" className="rounded-2xl overflow-hidden border-2 border-orange-500" />
+                  <div className="rounded-2xl overflow-hidden border-2 border-emerald-500 relative bg-black aspect-square">
+                    {isScanning && (
+                      <Scanner 
+                          onScan={(result) => {
+                              if (result && result.length > 0) {
+                                  setIsScanning(false);
+                                  let targetUrl = result[0].rawValue.trim();
+                                  let id = targetUrl;
+                                  if (targetUrl.includes('/link/')) {
+                                      id = targetUrl.split('/link/')[1];
+                                  }
+                                  linkStudent(id);
+                              }
+                          }}
+                          onError={(err) => {
+                              console.error("Scanner error:", err);
+                              setErrorMessage("Camera error. Please ensure permissions are granted.");
+                              setScanStatus("error");
+                          }}
+                          formats={['qr_code']}
+                          styles={{ container: { width: '100%', height: '100%' } }}
+                      />
+                    )}
+                    <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
+                       <div className="w-full h-full border-2 border-dashed border-emerald-500 relative">
+                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                       </div>
+                    </div>
+                  </div>
                   <Button variant="outline" onClick={() => setIsScanning(false)} className="w-full rounded-xl">
                     Cancel Scan
                   </Button>

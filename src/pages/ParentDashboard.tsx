@@ -321,7 +321,7 @@ const ParentDashboard = () => {
 
       {/* Main Content Area */}
       <main className="relative flex-1 overflow-y-auto px-4 md:px-10 py-10 pb-28 lg:pb-10 w-full bg-transparent overflow-x-hidden">
-        {/* Soft floating background blobs for glassmorphism refraction (Emerald/Lime version) */}
+        {/* Soft floating background blobs for glassmorphism refraction (emerald/lime version) */}
         <div className="absolute top-[0%] left-[10%] w-[50%] h-[50%] bg-emerald-200/40 dark:bg-emerald-900/10 blur-[120px] rounded-full pointer-events-none z-0" />
         <div className="absolute bottom-[20%] right-[-10%] w-[60%] h-[60%] bg-lime-200/40 dark:bg-lime-900/10 blur-[150px] rounded-full pointer-events-none z-0" />
 
