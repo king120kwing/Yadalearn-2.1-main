@@ -38,12 +38,26 @@ export const StreamProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initStream = async () => {
       try {
-        // Fetch secure token from our Vite proxy API
+        // Fetch secure token from our Vite proxy API or Netlify function
         const response = await fetch(`/api/get-stream-token?user_id=${user.id}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch Stream token');
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          console.warn('Stream API returned HTML instead of JSON. The Netlify function might still be deploying.');
+          return; // Gracefully abort without crashing
         }
-        const { token } = await response.json();
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Stream token: ${response.statusText}`);
+        }
+        
+        const text = await response.text();
+        if (text.startsWith('<')) {
+          console.warn('Stream API returned HTML markup. The serverless function is not reachable.');
+          return; // Gracefully abort without crashing
+        }
+
+        const { token } = JSON.parse(text);
 
         streamClient = new StreamVideoClient({
           apiKey,
