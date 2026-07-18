@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, QrCode, Loader2 } from 'lucide-react';
-import { Scanner } from '@yudiel/react-qr-scanner';
+import { Html5Qrcode } from 'html5-qrcode';
 import { supabase } from '@/lib/supabase';
 
 interface ScanQRModalProps {
@@ -15,6 +15,7 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isScanning, setIsScanning] = useState(true);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -23,15 +24,50 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
       setProfile(null);
       setError('');
       setLoading(false);
+      setIsScanning(true);
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    let html5QrCode: Html5Qrcode | null = null;
 
-  const handleScan = async (detectedCodes: any[]) => {
-    if (scannedId || loading || detectedCodes.length === 0) return;
+    if (isOpen && !scannedId && isScanning) {
+      html5QrCode = new Html5Qrcode("teacher-qr-reader");
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        async (decodedText) => {
+          setIsScanning(false);
+          if (html5QrCode && html5QrCode.isScanning) {
+            await html5QrCode.stop().catch(console.error);
+          }
+          handleScan(decodedText);
+        },
+        (error) => {
+          // Ignore frequent scan errors when no QR is in frame
+        }
+      ).catch((err) => {
+        console.error("Camera start error", err);
+        setError("Could not start camera. Please ensure permissions are granted.");
+        setIsScanning(false);
+      });
+    }
+
+    return () => {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(console.error);
+      }
+    };
+  }, [isOpen, scannedId, isScanning]);
+
+  const handleScan = async (decodedText: string) => {
+    if (loading) return;
     
-    let targetUrl = detectedCodes[0].rawValue.trim();
+    let targetUrl = decodedText.trim();
     let id = targetUrl;
     
     // Extract ID if a full URL is scanned
@@ -67,15 +103,18 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
     setScannedId(null);
     setProfile(null);
     setError('');
+    setIsScanning(true);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 md:p-8">
+        <div className="p-6 md:p-8 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
               <QrCode className="w-8 h-8 text-purple-500" />
@@ -90,21 +129,19 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
           </div>
 
           {!scannedId ? (
-              <div className="relative rounded-2xl overflow-hidden bg-black aspect-square flex items-center justify-center border-4 border-slate-100 dark:border-zinc-800">
-                <Scanner 
-                    onScan={handleScan} 
-                    formats={['qr_code']}
-                    components={{
-                        audio: false,
-                        zoom: false,
-                        finder: false,
-                    }}
-                />
-                <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
-                   <div className="w-full h-full border-2 border-dashed border-purple-500 relative">
-                     <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
-                   </div>
-                </div>
+              <div className="flex flex-col items-center">
+                  <div className="relative rounded-2xl overflow-hidden bg-black w-full aspect-square flex items-center justify-center border-4 border-slate-100 dark:border-zinc-800">
+                    <div id="teacher-qr-reader" className="w-full h-full [&_video]:object-cover" />
+                    <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
+                       <div className="w-full h-full border-2 border-dashed border-purple-500 relative">
+                         <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                       </div>
+                    </div>
+                  </div>
+                  {error && <p className="text-red-500 font-bold mt-4 text-center text-sm">{error}</p>}
+                  <p className="text-center text-sm text-slate-500 dark:text-zinc-400 mt-6 font-medium">
+                      Point your camera at a YadaLearn QR code.
+                  </p>
               </div>
           ) : (
               <div className="bg-slate-50 dark:bg-zinc-950 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 flex flex-col items-center text-center">
@@ -115,7 +152,7 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
                       </div>
                   )}
                   
-                  {error && (
+                  {error && !loading && (
                       <div className="flex flex-col items-center py-6">
                           <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-4">
                               <X className="w-8 h-8" />
@@ -152,12 +189,6 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
                       </div>
                   )}
               </div>
-          )}
-          
-          {!scannedId && (
-            <p className="text-center text-sm text-slate-500 dark:text-zinc-400 mt-6 font-medium">
-                Point your camera at a YadaLearn QR code.
-            </p>
           )}
         </div>
       </div>

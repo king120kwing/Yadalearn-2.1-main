@@ -1342,8 +1342,7 @@ const TeacherDashboard = () => {
                   variant="outline"
                   className="w-full border-2 border-gray-300 hover:border-gray-400 py-3 rounded-lg"
                   onClick={() => {
-                    alert(`📱 QR Code Generated!\n\nStudents can scan this to link with you.\nURL: ${window.location.origin}/link/${user?.id}`);
-                    setActiveModal(null);
+                    setActiveModal('show-qr');
                   }}
                 >
                   <span className="material-symbols-outlined mr-2">qr_code_2</span>
@@ -1354,6 +1353,34 @@ const TeacherDashboard = () => {
               <div className="text-xs text-gray-500 text-center">
                 Students will join via WebRTC-based video hosting (like Google Meet)
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeModal === 'show-qr' && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-[2rem] border-0 shadow-2xl animate-in zoom-in-95 duration-200">
+            <CardHeader className="text-center pt-8">
+              <CardTitle className="text-2xl font-bold text-slate-800 dark:text-white">Your QR Code</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-6 pb-8">
+              <div className="bg-white p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/link/' + user?.id)}`}
+                  alt="Your unique QR Code"
+                  className="w-48 h-48 md:w-56 md:h-56 object-contain"
+                />
+              </div>
+              <p className="text-sm text-slate-500 dark:text-zinc-400 text-center px-4 font-medium leading-relaxed">
+                Students can scan this personalized QR code to instantly link with you.
+              </p>
+              <Button 
+                onClick={() => setActiveModal(null)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-6 font-bold shadow-lg shadow-indigo-200 dark:shadow-none"
+              >
+                Close
+              </Button>
             </CardContent>
           </Card>
         </div>
