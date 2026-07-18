@@ -36,7 +36,12 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
           if (html5QrCode && html5QrCode.isScanning) {
             await html5QrCode.stop().catch(console.error);
           }
-          await linkStudent(decodedText);
+          let targetUrl = decodedText.trim();
+          let id = targetUrl;
+          if (targetUrl.includes('/link/')) {
+              id = targetUrl.split('/link/')[1];
+          }
+          await linkStudent(id);
         },
         (error) => {
           // Ignore frequent scan errors when no QR is in frame

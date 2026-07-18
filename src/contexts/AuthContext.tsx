@@ -434,7 +434,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         window.location.search.includes('code=') ||
         window.location.search.includes('access_token=');
         
-      if (!hasOAuthToken || initialCheckCompletedRef.current) {
+      if (!hasOAuthToken) {
         setIsLoaded(true);
       } else {
         console.log('AuthContext: Skipping setIsLoaded(true) during OAuth initialization');
