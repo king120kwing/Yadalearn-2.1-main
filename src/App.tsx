@@ -70,7 +70,6 @@ const App = () => {
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/logout" element={<ProtectedRoute><Logout /></ProtectedRoute>} />
 
-            <Route path="*" element={<NotFound />} />
             {/* Catch-all route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
