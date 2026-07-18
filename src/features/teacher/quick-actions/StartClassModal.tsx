@@ -1,23 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
-import { LiveKitRoom, VideoConference } from '@livekit/components-react';
-import '@livekit/components-styles';
+import { useStream } from '@/contexts/StreamProvider';
+import { useNavigate } from 'react-router-dom';
 
 interface StartClassModalProps {
     isOpen: boolean;
     onClose: () => void;
+    session?: any;
 }
 
-export const StartClassModal = ({ isOpen, onClose }: StartClassModalProps) => {
+export const StartClassModal = ({ isOpen, onClose, session }: StartClassModalProps) => {
     const [sessionStatus, setSessionStatus] = useState<'pre-live' | 'live'>('pre-live');
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
 
-    // LiveKit States
-    const [livekitToken, setLivekitToken] = useState<string>('');
-    const [livekitUrl, setLivekitUrl] = useState<string>(import.meta.env.VITE_LIVEKIT_URL || '');
-    const [roomId, setRoomId] = useState<string>('');
+    const navigate = useNavigate();
+    const { client, isStreamReady } = useStream();
 
     const [students, setStudents] = useState<any[]>([]);
     const [loadingStudents, setLoadingStudents] = useState(true);
@@ -215,32 +214,30 @@ export const StartClassModal = ({ isOpen, onClose }: StartClassModalProps) => {
             streamRef.current = null;
         }
 
-        // Try LiveKit initialization if URL is set
-        if (livekitUrl) {
-            try {
-                const roomName = `class-${user.id}-${Date.now()}`;
-                setRoomId(roomName);
+        if (!client || !isStreamReady) {
+            alert('Video client is not ready. Please check your credentials.');
+            return;
+        }
 
-                // Fetch LiveKit room token from Supabase Edge Function
-                const { data, error } = await supabase.functions.invoke('livekit-token', {
-                    body: { roomName, participantName: user.email || 'Teacher' }
-                });
+        try {
+            const roomName = `class-${user.id}-${Date.now()}`;
+            
+            // Insert into live_classes table
+            await supabase.from('live_classes').insert({
+                teacher_id: user.id,
+                room_id: roomName,
+                status: 'active',
+                scheduled_at: new Date().toISOString(),
+                title: session?.title || 'Ad-Hoc Session',
+                subject: session?.subject || 'General'
+            });
 
-                if (error) throw error;
-                if (data && data.token) {
-                    setLivekitToken(data.token);
-                    
-                    // Insert into live_classes table
-                    await supabase.from('live_classes').insert({
-                        teacher_id: user.id,
-                        room_id: roomName,
-                        status: 'active',
-                        scheduled_start: new Date().toISOString()
-                    });
-                }
-            } catch (err) {
-                console.warn("LiveKit Token negotiation failed, running local simulator:", err);
-            }
+            // Close the modal and navigate to the meeting page
+            onClose();
+            navigate(`/meeting/${roomName}`);
+        } catch (err) {
+            console.error("Failed to start session:", err);
+            alert("Failed to start session. Check console for details.");
         }
     };
 
@@ -250,24 +247,10 @@ export const StartClassModal = ({ isOpen, onClose }: StartClassModalProps) => {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
-        
-        // Terminate active live class session in Supabase if LiveKit was running
-        if (roomId) {
-            try {
-                await supabase
-                    .from('live_classes')
-                    .update({ status: 'completed', ended_at: new Date().toISOString() })
-                    .eq('room_id', roomId);
-            } catch (err) {
-                console.warn('Error ending class in database:', err);
-            }
-        }
-
-        setLivekitToken('');
-        setRoomId('');
+        // Since we are navigating away to the Meeting page when it goes live, 
+        // End session from this modal is mostly for the pre-live simulation.
         setSessionStatus('pre-live');
         onClose();
-        alert('Live class ended successfully.');
     };
 
     const handleMuteAll = () => {
@@ -291,209 +274,11 @@ export const StartClassModal = ({ isOpen, onClose }: StartClassModalProps) => {
                 }
             >
                 {sessionStatus === 'live' ? (
-                    livekitToken ? (
-                        <LiveKitRoom
-                            video={!isVideoOff}
-                            audio={!isMuted}
-                            token={livekitToken}
-                            serverUrl={livekitUrl}
-                            connect={true}
-                            onDisconnected={handleEndSession}
-                            className="flex-1 flex flex-col md:flex-row overflow-hidden bg-zinc-950 text-white relative h-full"
-                        >
-                            <div className="flex-grow flex items-center justify-center p-4 relative bg-zinc-900">
-                                <VideoConference />
-                            </div>
-                            {/* Subtitles Overlay */}
-                            {showSubtitles && subtitlesText && (
-                                <div className="absolute bottom-24 left-1/2 translate-x-[-50%] z-50 bg-black/85 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 max-w-[80%] text-center">
-                                    <p className="text-sm font-medium text-orange-400 font-mono tracking-tight">
-                                        [Subtitles ({subtitleLang.toUpperCase()})]: {subtitlesText}
-                                    </p>
-                                </div>
-                            )}
-                        </LiveKitRoom>
-                    ) : (
-                        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-zinc-950 text-white relative h-full">
-                            {/* Left: Video & Controls */}
-                            <div className="flex-1 flex flex-col relative bg-zinc-900/60 h-full justify-between">
-                                {/* Top Bar overlay */}
-                                <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between pointer-events-none">
-                                    <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl flex items-center gap-3 border border-white/10 pointer-events-auto">
-                                        <span className="relative flex h-2.5 w-2.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                        </span>
-                                        <span className="text-xs font-bold text-white tracking-wider">REC 00:04:12</span>
-                                        <div className="h-3 w-px bg-white/20"></div>
-                                        <span className="text-xs text-gray-300 font-medium">Calculus Intro</span>
-                                    </div>
+                    <div className="flex-1 flex flex-col items-center justify-center bg-zinc-950 text-white">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+                        <p>Redirecting to secure classroom...</p>
+                    </div>
 
-                                    <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl flex items-center gap-2 border border-white/10 pointer-events-auto">
-                                        <span className="material-symbols-outlined text-green-500 text-[18px]">verified_user</span>
-                                        <span className="text-xs text-white font-bold">Secure HD Call</span>
-                                    </div>
-                                </div>
-
-                                {/* Main Video Feed */}
-                                <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
-                                    {cameraError || isVideoOff ? (
-                                        <div className="flex flex-col items-center justify-center text-center p-8 bg-zinc-950/80 rounded-3xl border border-white/5 max-w-md w-full aspect-video shadow-2xl">
-                                            <span className="material-symbols-outlined text-zinc-600 text-5xl mb-3">videocam_off</span>
-                                            <p className="text-base font-bold text-zinc-300">
-                                                {isVideoOff ? 'Video Paused' : 'Webcam Stream Offline'}
-                                            </p>
-                                            <p className="text-xs text-zinc-500 mt-2 max-w-[280px]">
-                                                {isVideoOff 
-                                                    ? 'Your camera feed is turned off. Toggle the camera icon below to resume.' 
-                                                    : 'Please ensure camera access is enabled in your browser settings to transmit live HD video.'}
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <video
-                                            ref={setVideoRef}
-                                            autoPlay
-                                            playsInline
-                                            muted
-                                            className="w-full h-full max-h-[80vh] object-cover rounded-3xl shadow-2xl border border-white/10"
-                                        />
-                                    )}
-
-                                    {/* Subtitles Overlay */}
-                                    {showSubtitles && subtitlesText && (
-                                        <div className="absolute bottom-6 left-1/2 translate-x-[-50%] z-45 bg-black/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 max-w-[80%] text-center">
-                                            <p className="text-sm font-medium text-orange-400 font-mono tracking-tight">
-                                                [Subtitles ({subtitleLang.toUpperCase()})]: {subtitlesText}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Zoom Bottom Control Bar */}
-                                <div className="bg-zinc-950/90 border-t border-white/5 p-4 flex items-center justify-between z-40 shrink-0">
-                                    {/* Left Controls */}
-                                    <div className="flex items-center gap-3">
-                                        <button 
-                                            onClick={() => setIsMuted(!isMuted)}
-                                            className={`size-12 rounded-xl flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                                        >
-                                            <span className="material-symbols-outlined">{isMuted ? 'mic_off' : 'mic'}</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => setIsVideoOff(!isVideoOff)}
-                                            className={`size-12 rounded-xl flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                                        >
-                                            <span className="material-symbols-outlined">{isVideoOff ? 'videocam_off' : 'videocam'}</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => setShowSubtitles(!showSubtitles)}
-                                            className={`size-12 rounded-xl flex items-center justify-center transition-all ${showSubtitles ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                                            title="Toggle Subtitles"
-                                        >
-                                            <span className="material-symbols-outlined text-[22px]">{showSubtitles ? 'subtitles' : 'subtitles_off'}</span>
-                                        </button>
-                                    </div>
-
-                                    {/* Center Controls (Screen Share & Translation) */}
-                                    <div className="flex items-center gap-4">
-                                        <button 
-                                            onClick={() => setIsSharing(!isSharing)}
-                                            className={`px-5 h-12 rounded-xl flex items-center gap-2 font-bold text-sm transition-all ${isSharing ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                                        >
-                                            <span className="material-symbols-outlined text-[20px]">screen_share</span>
-                                            {isSharing ? 'Sharing Screen' : 'Share Screen'}
-                                        </button>
-
-                                        <div className="flex items-center bg-white/10 rounded-xl px-3 border border-white/10">
-                                            <span className="material-symbols-outlined text-gray-400 text-[20px] mr-1.5">translate</span>
-                                            <select 
-                                                value={subtitleLang}
-                                                onChange={(e) => setSubtitleLang(e.target.value)}
-                                                className="bg-transparent text-white font-bold text-xs h-12 outline-none cursor-pointer pr-4 border-0"
-                                            >
-                                                <option value="en" className="bg-zinc-950 text-white">English Sub</option>
-                                                <option value="fr" className="bg-zinc-950 text-white">French Sub</option>
-                                                <option value="es" className="bg-zinc-950 text-white">Spanish Sub</option>
-                                                <option value="zh" className="bg-zinc-950 text-white">Mandarin Sub</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    {/* Right Controls */}
-                                    <button 
-                                        onClick={handleEndSession}
-                                        className="px-6 h-12 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-sm transition-all shadow-lg shadow-red-600/20"
-                                    >
-                                        End Session
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Right: Zoom Participants Sidebar */}
-                            <div className="w-full md:w-80 border-l border-white/5 bg-zinc-950 flex flex-col h-full shrink-0">
-                                <div className="p-4 border-b border-white/5">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-bold text-white text-base">Participants ({classParticipants.length})</h3>
-                                        <div className="flex gap-2">
-                                            <button 
-                                                onClick={handleMuteAll}
-                                                className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all"
-                                            >
-                                                Mute All
-                                            </button>
-                                            <button 
-                                                onClick={handleUnmuteAll}
-                                                className="px-2.5 py-1 rounded bg-[#FF7D46] hover:bg-[#e06634] text-white text-[11px] font-bold transition-all"
-                                            >
-                                                Unmute All
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                    {classParticipants.map(participant => (
-                                        <div key={participant.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="relative">
-                                                    {participant.avatar ? (
-                                                        <img className="size-9 rounded-full object-cover border border-white/10" src={participant.avatar} alt={participant.name} />
-                                                    ) : (
-                                                        <div className="size-9 rounded-full bg-[#FF7D46]/20 flex items-center justify-center text-[#FF7D46] font-bold text-sm border border-white/10">
-                                                            {participant.name[0]}
-                                                        </div>
-                                                    )}
-                                                    <div className="absolute bottom-0 right-0 size-2.5 bg-green-500 rounded-full border border-zinc-950"></div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-white truncate max-w-[120px]">{participant.name}</div>
-                                                    <div className="text-[10px] text-zinc-500">Connected</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-1.5">
-                                                {/* Audio status visualizer */}
-                                                {!participant.isMuted && (
-                                                    <div className="flex gap-0.5 items-end h-2.5 mr-1">
-                                                        <div className="w-0.5 bg-green-500 h-[30%] rounded-sm animate-pulse"></div>
-                                                        <div className="w-0.5 bg-green-500 h-[60%] rounded-sm animate-pulse"></div>
-                                                        <div className="w-0.5 bg-green-500 h-[90%] rounded-sm animate-pulse"></div>
-                                                    </div>
-                                                )}
-
-                                                <button 
-                                                    onClick={() => handleToggleMuteParticipant(participant.id)}
-                                                    className={`size-7 rounded-lg flex items-center justify-center transition-all ${participant.isMuted ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                                                >
-                                                    <span className="material-symbols-outlined text-[16px]">{participant.isMuted ? 'mic_off' : 'mic'}</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )
                 ) : (
                     <>
                         {/* Top Navigation */}
@@ -505,7 +290,7 @@ export const StartClassModal = ({ isOpen, onClose }: StartClassModalProps) => {
                                 >
                                     <span className="material-symbols-outlined">arrow_back</span>
                                 </button>
-                                <h2 className="text-lg font-bold leading-tight tracking-tight">Math 101</h2>
+                                <h2 className="text-lg font-bold leading-tight tracking-tight">{session?.subject || 'Ad-Hoc Class'}</h2>
                                 <div className="size-10"></div>
                             </div>
                         </div>
@@ -517,14 +302,23 @@ export const StartClassModal = ({ isOpen, onClose }: StartClassModalProps) => {
                                 <div className="space-y-6">
                                     {/* Session Header */}
                                     <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="px-2.5 py-0.5 rounded-full bg-[#FF7D46]/10 dark:bg-[#FF7D46]/20 text-[#FF7D46] text-xs font-bold uppercase tracking-wider">Session 12</span>
-                                            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                                <span className="material-symbols-outlined text-[14px]">schedule</span> 45 min
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <span className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full tracking-wider">
+                                                {session?.time ? `Scheduled ${session.time}` : 'Instant Session'}
                                             </span>
+                                            {session?.time && (
+                                                <span className="text-sm font-semibold text-slate-500 dark:text-zinc-400 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[16px]">schedule</span>
+                                                    {session.date}
+                                                </span>
+                                            )}
                                         </div>
-                                        <h1 className="text-2xl md:text-3xl font-bold leading-tight tracking-tight mb-1 text-gray-900 dark:text-white font-serif">Calculus Intro</h1>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Pre-flight checks & student admission.</p>
+                                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1] mb-2 font-display">
+                                            {session?.title || 'Ad-Hoc Class Session'}
+                                        </h1>
+                                        <p className="text-slate-500 dark:text-zinc-400 font-medium">
+                                            Pre-flight checks & student admission.
+                                        </p>
                                     </div>
 
                                     {/* AV Diagnostics Card */}

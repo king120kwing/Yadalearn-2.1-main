@@ -6,6 +6,7 @@ import type { Student } from '@/types/schema';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeacherDashboardData } from '@/hooks/useTeacherDashboardData';
 import { removeImageBackground } from '@/utils/imageProcessor';
+import { ScanQRModal } from '@/components/ScanQRModal';
 import { seedDatabase } from '@/utils/seedData'; // Import seed utility
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +35,8 @@ import {
   StudentOverviewModal,
   QuickAnnouncementModal,
   ClassLinkModal,
-  UploadMaterialsModal
+  UploadMaterialsModal,
+  RateStudentModal
 } from '@/features/teacher/quick-actions';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 import { cn } from '@/lib/utils';
@@ -115,15 +117,19 @@ const TeacherDashboard = () => {
       const month = parseInt(parts[1], 10) - 1;
       const day = parseInt(parts[2], 10);
 
-      const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+      const match12 = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+      const match24 = timeStr.match(/^(\d+):(\d+)$/);
       let hours = 0;
       let minutes = 0;
-      if (match) {
-        hours = parseInt(match[1], 10);
-        minutes = parseInt(match[2], 10);
-        const ampm = match[3].toUpperCase();
+      if (match12) {
+        hours = parseInt(match12[1], 10);
+        minutes = parseInt(match12[2], 10);
+        const ampm = match12[3].toUpperCase();
         if (ampm === 'PM' && hours < 12) hours += 12;
         if (ampm === 'AM' && hours === 12) hours = 0;
+      } else if (match24) {
+        hours = parseInt(match24[1], 10);
+        minutes = parseInt(match24[2], 10);
       }
       return new Date(year, month, day, hours, minutes);
     } catch (e) {
@@ -145,13 +151,17 @@ const TeacherDashboard = () => {
     return upcoming.length > 0 ? upcoming[0] : null;
   };
 
-  const nextEvent = getNextUpcomingEvent(teacherSchedule);
-
+  const [nextEvent, setNextEvent] = useState<any>(null);
+  const [activeSessionInfo, setActiveSessionInfo] = useState<{ room_id: string; title: string } | null>(null);
+  const [isScanQRModalOpen, setIsScanQRModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedStudentIdForChat, setSelectedStudentIdForChat] = useState<string | undefined>(undefined);
   const [presenceData, setPresenceData] = useState<Record<string, boolean>>({});
+  
+  const isSaturday = new Date().getDay() === 6;
+  const [isRateStudentModalOpen, setIsRateStudentModalOpen] = useState(false);
 
   useEffect(() => {
     // Fetch initial presence
@@ -372,6 +382,22 @@ const TeacherDashboard = () => {
     } catch (err) {
       console.error('Error rejecting booking:', err);
       alert('Failed to reject booking request.');
+    }
+  };
+
+  const handleCancelClass = async (classId: string) => {
+    if (!confirm('Are you sure you want to cancel this class?')) return;
+    try {
+      const { error } = await supabase
+        .from('live_classes')
+        .update({ status: 'cancelled' })
+        .eq('id', classId);
+      if (error) throw error;
+      alert('Class cancelled successfully.');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error cancelling class:', err);
+      alert('Failed to cancel class.');
     }
   };
 
@@ -685,10 +711,26 @@ const TeacherDashboard = () => {
 
           <div className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-8 pt-6 w-full text-center md:text-left">
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-white tracking-tight mb-1 font-serif">
-                {currentUser?.name || 'Teacher'}
-              </h1>
-              <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Welcome Back,</p>
+              <h2 className="text-gray-900 dark:text-white text-[28px] font-black tracking-[-0.03em] leading-none">
+                Welcome back, {currentUser?.name?.split(' ')[0] || 'Teacher'}
+              </h2>
+              <p className="text-gray-500 dark:text-zinc-400 font-medium text-lg tracking-[-0.01em]">
+                You have {stats.activeCourses ? 'a session coming up' : `${pendingBookings.length} pending bookings`} today.
+              </p>
+              {isSaturday && (
+                <div 
+                  onClick={() => setIsRateStudentModalOpen(true)}
+                  className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 cursor-pointer hover:shadow-lg transition-all text-white flex items-center justify-between group"
+                >
+                  <div>
+                    <h3 className="font-bold text-lg">Weekly Student Review</h3>
+                    <p className="text-orange-50 text-sm">It's Saturday! Time to rate your students' progress for the week.</p>
+                  </div>
+                  <div className="bg-white/20 p-2 rounded-full group-hover:bg-white/30 transition-colors">
+                    <span className="material-symbols-outlined">star</span>
+                  </div>
+                </div>
+              )}
               
               {currentUser?.bio && (
                 <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400 mt-2 mb-6 max-w-md italic leading-relaxed border-l-2 border-purple-500/35 pl-3 text-left">
@@ -843,6 +885,8 @@ const TeacherDashboard = () => {
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">Review Assignments</p>
               </div>
 
+
+
               <div
                 onClick={() => setActiveModal('student-overview')}
                 className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
@@ -950,14 +994,20 @@ const TeacherDashboard = () => {
                                 <span className="font-bold text-[10px] text-purple-650 dark:text-purple-400 whitespace-nowrap">{session.time}</span>
                                 <span className="text-xs font-bold text-slate-850 dark:text-white truncate flex-1">{session.title}</span>
                                 <span className="bg-purple-500 text-white text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full tracking-wider animate-pulse shrink-0">Next Up</span>
+                                <button onClick={() => handleCancelClass(session.id)} className="shrink-0 text-slate-400 hover:text-red-500 transition-colors ml-1" title="Cancel Class">
+                                  <span className="material-symbols-outlined text-[14px]">cancel</span>
+                                </button>
                               </div>
                             );
                           }
                           
                           return (
-                            <div key={session.id} className="flex items-center gap-3 p-2.5 bg-blue-50/60 dark:bg-blue-950/10 border-l-4 border-blue-500 rounded-r-xl border border-y-blue-100/30 dark:border-y-transparent">
+                            <div key={session.id} className="flex items-center gap-3 p-2.5 bg-blue-50/60 dark:bg-blue-950/10 border-l-4 border-blue-500 rounded-r-xl border border-y-blue-100/30 dark:border-y-transparent group">
                               <span className="font-bold text-[10px] text-blue-600 dark:text-blue-400 whitespace-nowrap">{session.time}</span>
                               <span className="text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate flex-1">{session.title}</span>
+                              <button onClick={() => handleCancelClass(session.id)} className="shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all ml-1" title="Cancel Class">
+                                <span className="material-symbols-outlined text-[14px]">cancel</span>
+                              </button>
                             </div>
                           );
                         });
@@ -1116,9 +1166,17 @@ const TeacherDashboard = () => {
       />
 
       {/* Teacher Quick Action Modals */}
+      {/* Rate Student Modal */}
+      <RateStudentModal
+        isOpen={isRateStudentModalOpen}
+        onClose={() => setIsRateStudentModalOpen(false)}
+        students={topStudents}
+      />
+
       <StartClassModal
         isOpen={activeModal === 'start-class'}
         onClose={() => setActiveModal(null)}
+        session={nextEvent}
       />
       <CreateSessionModal
         isOpen={activeModal === 'create-session'}
@@ -1139,6 +1197,11 @@ const TeacherDashboard = () => {
       <UploadMaterialsModal
         isOpen={activeModal === 'upload-materials'}
         onClose={() => setActiveModal(null)}
+      />
+      
+      <ScanQRModal 
+        isOpen={isScanQRModalOpen}
+        onClose={() => setIsScanQRModalOpen(false)}
       />
 
       {/* Legacy Modals (kept from original implementation) */}
@@ -1279,7 +1342,7 @@ const TeacherDashboard = () => {
                   variant="outline"
                   className="w-full border-2 border-gray-300 hover:border-gray-400 py-3 rounded-lg"
                   onClick={() => {
-                    alert('📱 QR Code Generated!\\n\\nQR Code displayed for students to scan and join the class.');
+                    alert(`📱 QR Code Generated!\n\nStudents can scan this to link with you.\nURL: ${window.location.origin}/link/${user?.id}`);
                     setActiveModal(null);
                   }}
                 >

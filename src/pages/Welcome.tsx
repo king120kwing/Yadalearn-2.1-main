@@ -53,7 +53,9 @@ const Welcome = () => {
 
         {/* Desktop Layout */}
         <div className="hidden lg:flex justify-end items-center min-h-screen relative w-full max-w-[1800px] mx-auto px-12 xl:px-24">
-          
+          {/* White gradient bridge to seamlessly blend the video's white background into the purple page */}
+          <div className="absolute top-0 left-0 h-full w-[65vw] bg-gradient-to-r from-white via-white/90 to-transparent pointer-events-none z-0"></div>
+
           {/* Left side - Full-height cinematic video */}
           <div className="absolute top-0 left-0 h-full w-[55vw] xl:w-[60vw] pointer-events-none z-0">
             <div
@@ -103,7 +105,10 @@ const Welcome = () => {
         </div>
 
         {/* Mobile Layout */}
-        <div className="md:hidden min-h-[100svh] flex flex-col w-full overflow-x-hidden bg-transparent">
+        <div className="lg:hidden min-h-[100svh] flex flex-col w-full overflow-x-hidden bg-transparent">
+          {/* White gradient bridge to seamlessly blend the video's white background into the purple page */}
+          <div className="absolute top-0 left-0 w-full h-[65vh] bg-gradient-to-b from-white via-white/90 to-transparent pointer-events-none z-0"></div>
+
           {/* Hero Video with Fade - Mobile (Top half) */}
           <div className="w-full relative z-0 pointer-events-none flex-shrink-0">
             <div

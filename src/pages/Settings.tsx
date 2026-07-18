@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { removeImageBackground } from "@/utils/imageProcessor";
+import { ScanQRModal } from "@/components/ScanQRModal";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ const Settings = () => {
   const profileInputRef = useRef<HTMLInputElement>(null);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isScanQRModalOpen, setIsScanQRModalOpen] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editCountry, setEditCountry] = useState(user?.country || '');
@@ -275,6 +277,21 @@ const Settings = () => {
 
             <div
               className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
+              onClick={() => setIsScanQRModalOpen(true)}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#10b981]/10 text-[#10b981]">
+                  <span className="material-symbols-outlined">camera_alt</span>
+                </div>
+                <p className="flex-1 truncate text-base font-medium text-text-light dark:text-text-dark">Scan QR Code</p>
+              </div>
+              <div className="shrink-0">
+                <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">chevron_right</span>
+              </div>
+            </div>
+
+            <div
+              className="flex min-h-[3.75rem] items-center justify-between gap-4 rounded-2xl px-1 py-2 active:bg-gray-100 dark:active:bg-gray-700/50 cursor-pointer"
               onClick={() => alert('Change Password - Managed by authentication provider')}
             >
               <div className="flex items-center gap-4">
@@ -437,6 +454,11 @@ const Settings = () => {
       </main>
 
       <BottomNav />
+      
+      <ScanQRModal 
+        isOpen={isScanQRModalOpen}
+        onClose={() => setIsScanQRModalOpen(false)}
+      />
 
       {/* Edit Profile Modal Dialog */}
       {isEditingProfile && (
@@ -476,17 +498,37 @@ const Settings = () => {
               </div>
  
               {userRole === 'teacher' && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Short Bio</label>
-                  <textarea
-                    value={editBio}
-                    onChange={(e) => setEditBio(e.target.value)}
-                    rows={4}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white resize-none"
-                    placeholder="Tell your students a bit about yourself..."
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Short Bio</label>
+                    <textarea
+                      value={editBio}
+                      onChange={(e) => setEditBio(e.target.value)}
+                      rows={4}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-purple-500 focus:bg-white focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white resize-none"
+                      placeholder="Tell your students a bit about yourself..."
+                    />
+                  </div>
                 </div>
               )}
+
+              <div className="mt-4">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Your Unique QR Code</label>
+                <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800">
+                  <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 dark:border-zinc-800 mb-3">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + '/link/' + user?.id)}`} 
+                      alt="Unique QR Code"
+                      className="w-32 h-32 md:w-[150px] md:h-[150px]"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 text-center max-w-[250px]">
+                    {userRole === 'teacher' 
+                      ? "Students can scan this code to instantly link with you and book classes."
+                      : "Teachers can scan this code to connect with you instantly."}
+                  </p>
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <button

@@ -4,3 +4,4 @@ export { ReviewSubmissionsModal } from './ReviewSubmissionsModal';
 export { StudentOverviewModal } from './StudentOverviewModal';
 export { QuickAnnouncementModal } from './QuickAnnouncementModal';
 export { UploadMaterialsModal } from './UploadMaterialsModal';
+export { RateStudentModal } from './RateStudentModal';

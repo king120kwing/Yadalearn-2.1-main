@@ -667,6 +667,28 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     const groupedMessages = groupMessagesByDate(messages);
 
+    const renderMessageText = (text: string) => {
+        const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+        const parts = [];
+        let lastIndex = 0;
+        let match;
+        while ((match = linkRegex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                parts.push(text.substring(lastIndex, match.index));
+            }
+            parts.push(
+                <a key={match.index} href={match[2]} className="inline-flex items-center font-extrabold underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity">
+                    {match[1]}
+                </a>
+            );
+            lastIndex = match.index + match[0].length;
+        }
+        if (lastIndex < text.length) {
+            parts.push(text.substring(lastIndex));
+        }
+        return parts;
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="!max-w-full !w-screen !h-screen !m-0 !p-0 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white border-0 overflow-hidden rounded-none flex flex-col shadow-none [&>button.absolute]:hidden">
@@ -882,8 +904,8 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                                         </a>
                                                                     )}
                                                                     {msg.message && msg.attachment_type !== 'file' && (
-                                                                        <p className="text-sm font-medium leading-relaxed break-words">
-                                                                            {msg.message}
+                                                                        <p className="text-sm font-medium leading-relaxed break-words whitespace-pre-wrap">
+                                                                            {renderMessageText(msg.message)}
                                                                         </p>
                                                                     )}
                                                                     {msg.is_edited && (

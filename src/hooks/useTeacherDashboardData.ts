@@ -168,7 +168,7 @@ export function useTeacherDashboardData() {
 
                 const dbClasses = classes || [];
                 const formattedSchedule = dbClasses.map((b: any) => {
-                    const dateObj = new Date(b.scheduled_at);
+                    const dateObj = new Date(b.scheduled_at || b.scheduled_start);
                     const yyyy = dateObj.getFullYear();
                     const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
                     const dd = String(dateObj.getDate()).padStart(2, '0');
@@ -183,8 +183,8 @@ export function useTeacherDashboardData() {
 
                     return {
                         id: b.id,
-                        title: b.title,
-                        subject: b.subject,
+                        title: b.title || 'Live Session',
+                        subject: b.subject || 'General',
                         date: dateStr,
                         time: timeStr,
                         status: b.status

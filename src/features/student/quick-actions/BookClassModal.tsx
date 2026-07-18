@@ -115,18 +115,27 @@ export const BookClassModal = ({ isOpen, onClose, teacherId }: BookClassModalPro
 
         try {
             const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-            const { error } = await supabase.from('bookings').insert({
+            const { data: newBooking, error } = await supabase.from('bookings').insert({
                 student_id: userId,
                 teacher_id: topicObj.id,
                 subject: topicObj.name,
                 date: formattedDate,
                 time: selectedSlot,
-                status: 'confirmed'
-            });
+                status: 'pending'
+            }).select('id').single();
 
             if (error) throw error;
 
-            alert('Class Booked Successfully! Confirmation has been added to your calendar.');
+            // Send message to teacher
+            const msgContent = `Hi! I would like to request a session for ${topicObj.name} on ${formattedDate} at ${selectedSlot}. Please let me know if you agree or need to reschedule.`;
+            await supabase.from('chat_messages').insert({
+                sender_id: userId,
+                receiver_id: topicObj.id,
+                message: msgContent,
+                is_read: false
+            });
+
+            alert('Booking request sent successfully! The teacher will reply to you shortly.');
             onClose();
             setStep(1);
             window.location.reload();

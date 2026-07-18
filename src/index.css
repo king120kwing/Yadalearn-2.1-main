@@ -822,3 +822,12 @@ Inspired by modern learning applications with soft pastel palette
     font-size: 12pt !important;
   }
 }
+
+/* Hide native video controls aggressively */
+video::-webkit-media-controls {
+  display: none !important;
+}
+video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
+

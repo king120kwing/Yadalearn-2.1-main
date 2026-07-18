@@ -15,6 +15,7 @@ import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsMo
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { supabase } from '@/lib/supabase';
+import { ScanQRModal } from '@/components/ScanQRModal';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { removeImageBackground } from '@/utils/imageProcessor';
@@ -26,11 +27,50 @@ const StudentDashboard = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [isScanQRModalOpen, setIsScanQRModalOpen] = useState(false);
   const [selectedTeacherIdForChat, setSelectedTeacherIdForChat] = useState<string | undefined>(undefined);
   const [selectedTeacherIdForBooking, setSelectedTeacherIdForBooking] = useState<string | undefined>(undefined);
   const [presenceData, setPresenceData] = useState<Record<string, boolean>>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
+  const [liveClassInfo, setLiveClassInfo] = useState<{ room_id: string; teacher_id: string } | null>(null);
+
+  useEffect(() => {
+    // Check for any currently active live class
+    const fetchLiveClass = async () => {
+      const { data } = await supabase
+        .from('live_classes')
+        .select('room_id, teacher_id')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        setLiveClassInfo(data[0]);
+      }
+    };
+    fetchLiveClass();
+
+    // Listen for new classes starting or ending
+    const liveClassChannel = supabase
+      .channel('live-classes-student')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_classes'
+      }, (payload) => {
+        if (payload.new && payload.new.status === 'active') {
+          setLiveClassInfo({ room_id: payload.new.room_id, teacher_id: payload.new.teacher_id });
+        } else if (payload.new && payload.new.status === 'completed') {
+          setLiveClassInfo(null);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(liveClassChannel);
+    };
+  }, []);
 
   useEffect(() => {
     // Fetch initial presence
@@ -202,15 +242,19 @@ const StudentDashboard = () => {
       const month = parseInt(parts[1], 10) - 1;
       const day = parseInt(parts[2], 10);
 
-      const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+      const match12 = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+      const match24 = timeStr.match(/^(\d+):(\d+)$/);
       let hours = 0;
       let minutes = 0;
-      if (match) {
-        hours = parseInt(match[1], 10);
-        minutes = parseInt(match[2], 10);
-        const ampm = match[3].toUpperCase();
+      if (match12) {
+        hours = parseInt(match12[1], 10);
+        minutes = parseInt(match12[2], 10);
+        const ampm = match12[3].toUpperCase();
         if (ampm === 'PM' && hours < 12) hours += 12;
         if (ampm === 'AM' && hours === 12) hours = 0;
+      } else if (match24) {
+        hours = parseInt(match24[1], 10);
+        minutes = parseInt(match24[2], 10);
       }
       return new Date(year, month, day, hours, minutes);
     } catch (e) {
@@ -449,7 +493,7 @@ const StudentDashboard = () => {
       const diffMs = classTime.getTime() - now.getTime();
       const diffMins = Math.round(diffMs / 60000);
       
-      if (diffMins >= -10 && diffMins <= 30) {
+      if (diffMins >= -10 && diffMins <= 15) {
         showJoinCTA = true;
         timeRemainingStr = diffMins > 0 ? `Starts in ${diffMins} mins` : "Active Now";
       }
@@ -798,8 +842,13 @@ const StudentDashboard = () => {
               </div>
 
               <div
-                onClick={() => setActiveModal('join-class')}
-                className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
+                onClick={() => (showJoinCTA || !!liveClassInfo) ? setActiveModal('join-class') : null}
+                className={cn(
+                  "p-5 rounded-[1.5rem] border shadow-sm flex flex-col items-center justify-center gap-2 text-center h-28 transition-all",
+                  (showJoinCTA || !!liveClassInfo)
+                    ? "bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 border-white/60 dark:border-zinc-700/20 cursor-pointer hover:scale-[1.02] active:scale-95"
+                    : "bg-gray-100/30 dark:bg-zinc-900/20 border-gray-200/40 dark:border-zinc-800/20 opacity-50 cursor-not-allowed pointer-events-none grayscale"
+                )}
               >
                 <div className="w-10 h-10 rounded-full bg-[#5B4A9F]/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[#8F81D6] dark:text-purple-400 text-xl">videocam</span>
@@ -816,6 +865,8 @@ const StudentDashboard = () => {
                 </div>
                 <p className="text-xs font-bold text-slate-750 dark:text-zinc-200">AI Buddy</p>
               </div>
+
+
             </div>
           </div>
 
@@ -877,7 +928,17 @@ const StudentDashboard = () => {
                           const hasPassed = sessionTime < now;
                           const isNext = nextEvent && session.id === nextEvent.id;
                           
-                          if (hasPassed) {
+                          if (session.status === 'cancelled') {
+                            return (
+                              <div key={session.id} className="flex items-center gap-3 p-2.5 bg-red-50/50 dark:bg-red-900/10 border-l-4 border-red-300 rounded-r-xl border border-y-red-100/50 border-r-red-100/50 dark:border-y-transparent dark:border-r-transparent opacity-60">
+                                <span className="font-bold text-[10px] text-red-400 dark:text-red-500 whitespace-nowrap line-through">{session.time}</span>
+                                <span className="text-xs font-semibold text-red-500 dark:text-red-400 truncate line-through flex-1">{session.title}</span>
+                                <span className="material-symbols-outlined text-xs text-red-400 shrink-0">cancel</span>
+                              </div>
+                            );
+                          }
+                          
+                          if (hasPassed || session.status === 'completed') {
                             return (
                               <div key={session.id} className="flex items-center gap-3 p-2.5 bg-slate-50/50 dark:bg-zinc-800/10 border-l-4 border-slate-300 rounded-r-xl border border-y-slate-100/50 border-r-slate-100/50 dark:border-y-transparent dark:border-r-transparent opacity-60">
                                 <span className="font-bold text-[10px] text-slate-400 dark:text-zinc-500 whitespace-nowrap line-through">{session.time}</span>
@@ -919,6 +980,28 @@ const StudentDashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Live Class Alert Banner */}
+        {liveClassInfo && (
+          <div className="mx-4 md:mx-6 mt-6 p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl shadow-purple-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              <div>
+                <h3 className="font-bold text-lg">A teacher has started a live session!</h3>
+                <p className="text-purple-100 text-sm">Join now to participate in the real-time class.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => navigate(`/meeting/${liveClassInfo.room_id}`)}
+              className="w-full sm:w-auto px-6 py-2 bg-white text-purple-700 font-bold rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all"
+            >
+              Join Class
+            </button>
+          </div>
+        )}
 
         {/* My Teachers Section */}
         <div className="bg-white/75 dark:bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 shadow-[-12px_24px_50px_-10px_rgba(91,74,159,0.15),_0_8px_24px_rgba(0,0,0,0.02)] border-t-2 border-t-[#E0DAF5] border-l-2 border-l-[#E9E4F9]/65 border-r border-r-slate-200/40 border-b border-b-slate-200/40 mb-10 z-10 relative">
@@ -1059,6 +1142,11 @@ const StudentDashboard = () => {
         onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 
         recipientId={selectedTeacherIdForChat}
         role="student"
+      />
+
+      <ScanQRModal 
+        isOpen={isScanQRModalOpen}
+        onClose={() => setIsScanQRModalOpen(false)}
       />
 
       {/* Rate Session Modal */}

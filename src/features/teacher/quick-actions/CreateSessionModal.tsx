@@ -9,47 +9,82 @@ interface CreateSessionModalProps {
 }
 
 export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps) => {
-    const { user } = useAuth();
+    const { user, subjects } = useAuth();
     const [isScheduling, setIsScheduling] = useState(false);
     const [students, setStudents] = useState<any[]>([]);
+    const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+    const [isEditListOpen, setIsEditListOpen] = useState(false);
+
+    // Helper to get current time rounded to nearest 15 mins
+    const getRoundedTime = () => {
+        const coeff = 1000 * 60 * 15;
+        const date = new Date(Math.round(Date.now() / coeff) * coeff);
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    };
+
+    const primarySubject = subjects && subjects.length > 0 ? subjects[0] : 'Mathematics';
 
     const [formData, setFormData] = useState({
-        title: '',
+        title: `${primarySubject} Class`,
         description: '',
-        subject: 'Mathematics',
-        dateOption: 'today',
-        startTime: '10:00',
+        subject: primarySubject,
+        dateOption: 'today', // 'today', 'tomorrow', 'custom'
+        customDate: new Date().toISOString().split('T')[0],
+        startTime: getRoundedTime(),
         duration: '60 min',
         sessionType: 'group',
         maxCapacity: 15,
         repeatWeekly: false,
     });
 
-    const activeSubjects = [
-        { id: 1, name: 'Mathematics', icon: 'functions' },
-        { id: 2, name: 'Physics', icon: 'blur_on' },
-        { id: 3, name: 'Chemistry', icon: 'science' },
-        { id: 4, name: 'Biology', icon: 'dna' },
-        { id: 5, name: 'English', icon: 'translate' },
-    ];
+    const activeSubjectsMap: Record<string, string> = {
+        'Mathematics': 'functions',
+        'Physics': 'blur_on',
+        'Chemistry': 'science',
+        'Biology': 'dna',
+        'English': 'translate',
+        'Computer Science': 'terminal',
+        'History': 'history_edu'
+    };
 
     // Fetch dynamic students
     useEffect(() => {
         async function fetchStudents() {
             try {
                 if (!user?.id) return;
-                const { data: links } = await supabase
-                    .from('teacher_student_links')
-                    .select('student:profiles!teacher_student_links_student_id_fkey(*)')
-                    .eq('teacher_id', user.id)
-                    .eq('status', 'accepted');
+                
+                // Fetch from both links and bookings
+                const [linksRes, bookingsRes] = await Promise.all([
+                    supabase
+                        .from('teacher_student_links')
+                        .select('student:profiles!teacher_student_links_student_id_fkey(*)')
+                        .eq('teacher_id', user.id)
+                        .eq('status', 'accepted'),
+                    supabase
+                        .from('bookings')
+                        .select('student:profiles!bookings_student_id_fkey(*)')
+                        .eq('teacher_id', user.id)
+                ]);
 
-                if (links) {
-                    const uniqueStudents = links
-                        .map((l: any) => l.student)
-                        .filter(Boolean);
-                    setStudents(uniqueStudents);
+                const studentMap = new Map();
+                
+                if (linksRes.data) {
+                    linksRes.data.forEach((l: any) => {
+                        if (l.student) studentMap.set(l.student.id, l.student);
+                    });
                 }
+                
+                if (bookingsRes.data) {
+                    bookingsRes.data.forEach((b: any) => {
+                        if (b.student) studentMap.set(b.student.id, b.student);
+                    });
+                }
+                
+                const uniqueStudents = Array.from(studentMap.values());
+                setStudents(uniqueStudents);
+                // By default, select all up to max capacity
+                setSelectedStudents(uniqueStudents.map((s: any) => s.id).slice(0, formData.sessionType === 'individual' ? 1 : formData.maxCapacity));
+                
             } catch (err) {
                 console.error("Error fetching students:", err);
             }
@@ -58,6 +93,120 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
             fetchStudents();
         }
     }, [isOpen, user?.id]);
+
+    useEffect(() => {
+        // Enforce capacity limits when type changes
+        if (formData.sessionType === 'individual') {
+            if (selectedStudents.length > 1) {
+                setSelectedStudents(prev => prev.slice(0, 1));
+            }
+        } else {
+            if (selectedStudents.length > formData.maxCapacity) {
+                setSelectedStudents(prev => prev.slice(0, formData.maxCapacity));
+            }
+        }
+    }, [formData.sessionType, formData.maxCapacity]);
+
+    const handleStudentToggle = (id: string) => {
+        setSelectedStudents(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(sId => sId !== id);
+            } else {
+                const limit = formData.sessionType === 'individual' ? 1 : formData.maxCapacity;
+                if (prev.length >= limit) {
+                    if (formData.sessionType === 'individual') {
+                        return [id]; // Swap the selected student for individual
+                    }
+                    return prev; // Ignore if max capacity reached for group
+                }
+                return [...prev, id];
+            }
+        });
+    };
+
+    const handleSchedule = async () => {
+        if (!user?.id) return;
+        
+        if (selectedStudents.length === 0) {
+            alert("Please select at least one student to schedule the class.");
+            return;
+        }
+
+        setIsScheduling(true);
+        try {
+            const getFormattedDate = () => {
+                if (formData.dateOption === 'custom') return formData.customDate;
+                const d = new Date();
+                if (formData.dateOption === 'tomorrow') d.setDate(d.getDate() + 1);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            };
+
+            const sessionDate = getFormattedDate();
+            const scheduledStart = new Date(`${sessionDate}T${formData.startTime}`).toISOString();
+            const roomId = `class-${user.id}-${Date.now()}`;
+
+            // 1. Insert into live_classes
+            const { error: liveClassError } = await supabase.from('live_classes').insert({
+                teacher_id: user.id,
+                room_id: roomId,
+                status: 'scheduled',
+                title: `${formData.subject} Session`,
+                subject: formData.subject,
+                scheduled_at: scheduledStart
+            });
+            
+            if (liveClassError) {
+                console.error("Live Class Insert Error:", liveClassError);
+                throw new Error("Could not save to live_classes: " + liveClassError.message);
+            }
+
+            // 2. Insert bookings and chat messages for each student
+            for (const studentId of selectedStudents) {
+                // Create booking for calendar sync
+                const { data: newBooking, error: bookingError } = await supabase
+                    .from('bookings')
+                    .insert({
+                        student_id: studentId,
+                        teacher_id: user.id,
+                        subject: formData.title || formData.subject,
+                        date: sessionDate,
+                        time: formData.startTime,
+                        status: 'confirmed'
+                    })
+                    .select('id')
+                    .single();
+
+                if (bookingError) throw bookingError;
+
+                if (newBooking) {
+                    const initiated = JSON.parse(localStorage.getItem('initiated_bookings') || '[]');
+                    initiated.push(newBooking.id);
+                    localStorage.setItem('initiated_bookings', JSON.stringify(initiated));
+                }
+
+                // Send automated chat message
+                const msgContent = `Hi! I've scheduled a new session: "${formData.title || formData.subject}". It will start on ${sessionDate} at ${formData.startTime}. [Join Meeting](/meeting/${roomId})`;
+                await supabase.from('chat_messages').insert({
+                    sender_id: user.id,
+                    receiver_id: studentId,
+                    message: msgContent,
+                    is_read: false
+                });
+            }
+
+            alert(`✅ Session "${formData.title || formData.subject}" scheduled successfully with ${selectedStudents.length} student(s)!`);
+            onClose();
+            window.location.reload();
+        } catch (err: any) {
+            console.error("Error scheduling session:", err);
+            alert("Failed to schedule session: " + err.message);
+        } finally {
+            setIsScheduling(false);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -78,7 +227,7 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                 </div>
 
                 {/* Scrollable Form Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-6 pb-28">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* Left Column: Basic Details */}
                         <div className="space-y-6">
@@ -93,7 +242,7 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm font-bold text-gray-500 dark:text-orange-400 ml-1">Description <span className="text-xs opacity-50 font-normal">(Optional)</span></label>
+                                <label className="text-sm font-bold text-gray-500 dark:text-orange-400 ml-1">What is the lesson? <span className="text-xs opacity-50 font-normal">(Optional)</span></label>
                                 <textarea
                                     className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 resize-none transition-all font-semibold"
                                     placeholder="Add details about the session..."
@@ -106,17 +255,17 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                             <div className="space-y-4">
                                 <h3 className="text-gray-900 dark:text-white text-lg font-bold ml-1">Subject</h3>
                                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                                    {activeSubjects.map(subject => (
+                                    {(subjects && subjects.length > 0 ? subjects : ['Mathematics']).map(subject => (
                                         <button
-                                            key={subject.id}
-                                            onClick={() => setFormData({ ...formData, subject: subject.name })}
-                                            className={`flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full pl-4 pr-5 transition-transform active:scale-95 ${formData.subject === subject.name
+                                            key={subject}
+                                            onClick={() => setFormData({ ...formData, subject: subject })}
+                                            className={`flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full pl-4 pr-5 transition-transform active:scale-95 ${formData.subject === subject
                                                     ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                                                    : 'bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/60 text-gray-655 dark:text-zinc-300'
+                                                    : 'bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/60 text-gray-600 dark:text-zinc-300'
                                                 }`}
                                         >
-                                            <span className="material-symbols-outlined text-[20px]">{subject.icon}</span>
-                                            <p className="text-sm font-bold">{subject.name}</p>
+                                            <span className="material-symbols-outlined text-[20px]">{activeSubjectsMap[subject] || 'menu_book'}</span>
+                                            <p className="text-sm font-bold">{subject}</p>
                                         </button>
                                     ))}
                                 </div>
@@ -126,10 +275,12 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                         {/* Right Column: Timing & Logistics */}
                         <div className="space-y-6">
                             {/* Timing Section */}
-                            <div className="pt-2 pb-4 px-4">
-                                <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-3">Timing</h3>
+                            <div className="pt-2 pb-4 px-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-100 dark:border-zinc-800">
+                                <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-3 capitalize">
+                                    {new Intl.DateTimeFormat('en-US', { weekday: 'long', hour: 'numeric', minute: 'numeric' }).format(new Date())}
+                                </h3>
                                 {/* Date Selector */}
-                                <div className="flex gap-2 mb-4">
+                                <div className="flex gap-2 mb-4 relative">
                                     <button
                                         onClick={() => setFormData({ ...formData, dateOption: 'today' })}
                                         className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-colors text-center ${formData.dateOption === 'today'
@@ -148,9 +299,23 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                                     >
                                         Tomorrow
                                     </button>
-                                    <button className="px-4 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium text-sm transition-colors flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-                                    </button>
+                                    
+                                    <div className="relative flex">
+                                        <button 
+                                            onClick={() => setFormData({ ...formData, dateOption: 'custom' })}
+                                            className={`px-4 py-2.5 rounded-lg border font-medium text-sm transition-colors flex items-center justify-center ${formData.dateOption === 'custom' ? 'bg-orange-100 border-orange-500 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400' : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">calendar_month</span>
+                                        </button>
+                                        {formData.dateOption === 'custom' && (
+                                            <input 
+                                                type="date" 
+                                                className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg p-2 z-10 dark:bg-zinc-800 dark:border-zinc-700" 
+                                                value={formData.customDate} 
+                                                onChange={(e) => setFormData({...formData, customDate: e.target.value})}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Time & Duration */}
@@ -168,7 +333,7 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                                         </div>
                                     </div>
                                     <div className="flex-1 flex flex-col gap-1">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-orange-455 ml-1">Duration</label>
+                                        <label className="text-xs font-bold text-gray-500 dark:text-orange-400 ml-1">Duration</label>
                                         <select
                                             className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-base font-medium text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 appearance-none font-semibold"
                                             value={formData.duration}
@@ -188,7 +353,7 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                                 <h3 className="text-gray-900 dark:text-white text-lg font-bold">Logistics</h3>
 
                                 {/* Session Type Segmented Control */}
-                                <div className="bg-gray-150 dark:bg-zinc-800 p-1 rounded-xl flex">
+                                <div className="bg-gray-100 dark:bg-zinc-800 p-1 rounded-xl flex">
                                     <button
                                         onClick={() => setFormData({ ...formData, sessionType: 'group' })}
                                         className={`flex-1 py-2 rounded-lg font-semibold text-sm transition-all ${formData.sessionType === 'group'
@@ -210,82 +375,103 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                                 </div>
 
                                 {/* Capacity Stepper */}
-                                <div className="flex items-center justify-between bg-white dark:bg-zinc-800 p-4 rounded-xl border border-gray-255 dark:border-zinc-700/60">
-                                    <div className="flex flex-col">
-                                        <span className="text-base font-medium text-gray-900 dark:text-white">Max Capacity</span>
-                                        <span className="text-xs text-gray-500 dark:text-orange-400">Students allowed</span>
-                                    </div>
-                                    <div className="flex items-center gap-4 bg-gray-50 dark:bg-zinc-900 rounded-lg p-1 border border-gray-100 dark:border-zinc-800">
-                                        <button
-                                            onClick={() => setFormData({ ...formData, maxCapacity: Math.max(1, formData.maxCapacity - 1) })}
-                                            className="w-8 h-8 flex items-center justify-center rounded bg-gray-105 dark:bg-zinc-800 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
-                                        >
-                                            <span className="material-symbols-outlined text-[18px]">remove</span>
-                                        </button>
-                                        <span className="text-base font-bold text-gray-900 dark:text-white w-8 text-center">{formData.maxCapacity}</span>
-                                        <button
-                                            onClick={() => setFormData({ ...formData, maxCapacity: formData.maxCapacity + 1 })}
-                                            className="w-8 h-8 flex items-center justify-center rounded bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-                                        >
-                                            <span className="material-symbols-outlined text-[18px]">add</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Recurrence */}
-                                <div className="flex items-center justify-between bg-white dark:bg-zinc-800 p-4 rounded-xl border border-gray-255 dark:border-zinc-700/60">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-zinc-900 flex items-center justify-center text-gray-550 dark:text-orange-400">
-                                            <span className="material-symbols-outlined">repeat</span>
-                                        </div>
+                                {formData.sessionType === 'group' && (
+                                    <div className="flex items-center justify-between bg-white dark:bg-zinc-800 p-4 rounded-xl border border-gray-200 dark:border-zinc-700/60">
                                         <div className="flex flex-col">
-                                            <span className="text-base font-medium text-gray-900 dark:text-white">Repeat Weekly</span>
-                                            <span className="text-xs text-gray-550 dark:text-orange-400 font-bold">Every Monday</span>
+                                            <span className="text-base font-medium text-gray-900 dark:text-white">Max Capacity</span>
+                                            <span className="text-xs text-gray-500 dark:text-orange-400">Students allowed</span>
+                                        </div>
+                                        <div className="flex items-center gap-4 bg-gray-50 dark:bg-zinc-900 rounded-lg p-1 border border-gray-100 dark:border-zinc-800">
+                                            <button
+                                                onClick={() => setFormData({ ...formData, maxCapacity: Math.max(1, formData.maxCapacity - 1) })}
+                                                className="w-8 h-8 flex items-center justify-center rounded bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">remove</span>
+                                            </button>
+                                            <span className="text-base font-bold text-gray-900 dark:text-white w-8 text-center">{formData.maxCapacity}</span>
+                                            <button
+                                                onClick={() => setFormData({ ...formData, maxCapacity: formData.maxCapacity + 1 })}
+                                                className="w-8 h-8 flex items-center justify-center rounded bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">add</span>
+                                            </button>
                                         </div>
                                     </div>
-                                    {/* Toggle Switch */}
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            className="sr-only peer"
-                                            type="checkbox"
-                                            checked={formData.repeatWeekly}
-                                            onChange={(e) => setFormData({ ...formData, repeatWeekly: e.target.checked })}
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-950 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>
-                                    </label>
-                                </div>
+                                )}
 
                                 {/* Attendees */}
                                 <div className="flex flex-col gap-2">
                                     <div className="flex justify-between items-end">
                                         <label className="text-sm font-bold text-gray-500 dark:text-orange-400">Attendees</label>
-                                        <span className="text-xs font-extrabold text-orange-600 dark:text-orange-400 cursor-pointer hover:underline">Select All</span>
+                                        <span 
+                                            className="text-xs font-extrabold text-orange-600 dark:text-orange-400 cursor-pointer hover:underline"
+                                            onClick={() => setIsEditListOpen(!isEditListOpen)}
+                                        >
+                                            {isEditListOpen ? 'Done' : 'Edit List'}
+                                        </span>
                                     </div>
-                                    <div className="bg-white dark:bg-zinc-800 p-4 rounded-xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform border border-gray-255 dark:border-zinc-700/60">
-                                        <div className="flex items-center -space-x-3 overflow-hidden">
-                                            {students.slice(0, 3).map((student) => (
-                                                student.avatar_url ? (
-                                                    <img key={student.id} className="inline-block h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-900 object-cover border border-gray-100 dark:border-zinc-700" src={student.avatar_url} alt={student.full_name} />
-                                                ) : (
-                                                    <div key={student.id} className="inline-block h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-900 bg-orange-100 dark:bg-orange-950/30 flex items-center justify-center text-xs font-bold text-orange-655 border border-orange-200">
-                                                        {(student.full_name || 'S')[0]}
+                                    
+                                    {!isEditListOpen ? (
+                                        <div 
+                                            className="bg-white dark:bg-zinc-800 p-4 rounded-xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform border border-gray-200 dark:border-zinc-700/60"
+                                            onClick={() => setIsEditListOpen(true)}
+                                        >
+                                            <div className="flex items-center -space-x-3 overflow-hidden">
+                                                {students.filter(s => selectedStudents.includes(s.id)).slice(0, 3).map((student) => (
+                                                    student.avatar_url ? (
+                                                        <img key={student.id} className="inline-block h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-900 object-cover border border-gray-100 dark:border-zinc-700" src={student.avatar_url} alt={student.full_name} />
+                                                    ) : (
+                                                        <div key={student.id} className="inline-block h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-900 bg-orange-100 dark:bg-orange-950/30 flex items-center justify-center text-xs font-bold text-orange-600 border border-orange-200">
+                                                            {(student.full_name || 'S')[0]}
+                                                        </div>
+                                                    )
+                                                ))}
+                                                {selectedStudents.length > 3 && (
+                                                    <div className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-900 bg-gray-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-white border border-gray-100 dark:border-zinc-700">
+                                                        +{selectedStudents.length - 3}
                                                     </div>
-                                                )
-                                            ))}
-                                            {students.length > 3 && (
-                                                <div className="h-10 w-10 rounded-full ring-2 ring-white dark:ring-zinc-900 bg-gray-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-white border border-gray-100 dark:border-zinc-700">
-                                                    +{students.length - 3}
-                                                </div>
-                                            )}
-                                            {students.length === 0 && (
-                                                <span className="text-xs text-gray-500 font-bold pl-2">No enrolled students</span>
+                                                )}
+                                                {selectedStudents.length === 0 && (
+                                                    <span className="text-xs text-gray-500 font-bold pl-2">No students selected</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                                                <span className="text-sm font-bold">{selectedStudents.length} Selected</span>
+                                                <span className="material-symbols-outlined text-[20px]">expand_more</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/60 rounded-xl p-2 max-h-48 overflow-y-auto">
+                                            {students.length === 0 ? (
+                                                <div className="p-4 text-center text-sm text-gray-500">No linked students found.</div>
+                                            ) : (
+                                                students.map(student => {
+                                                    const isSelected = selectedStudents.includes(student.id);
+                                                    return (
+                                                        <div 
+                                                            key={student.id} 
+                                                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700/50 transition-colors ${isSelected ? 'bg-orange-50/50 dark:bg-orange-950/20' : ''}`}
+                                                            onClick={() => handleStudentToggle(student.id)}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                {student.avatar_url ? (
+                                                                    <img className="size-8 rounded-full object-cover border border-gray-200" src={student.avatar_url} alt={student.full_name} />
+                                                                ) : (
+                                                                    <div className="size-8 rounded-full bg-orange-100 text-orange-700 font-bold flex items-center justify-center text-xs">
+                                                                        {(student.full_name || 'S')[0]}
+                                                                    </div>
+                                                                )}
+                                                                <span className={`text-sm font-semibold ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>{student.full_name}</span>
+                                                            </div>
+                                                            <div className={`size-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                                {isSelected && <span className="material-symbols-outlined text-white text-[14px]">check</span>}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 text-orange-600 dark:text-orange-450">
-                                            <span className="text-sm font-bold">Edit List</span>
-                                            <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -293,70 +479,11 @@ export const CreateSessionModal = ({ isOpen, onClose }: CreateSessionModalProps)
                 </div>
 
                 {/* Sticky Footer CTA */}
-                <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 z-50">
+                <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800 p-4 z-50">
                     <button
-                        onClick={async () => {
-                            if (!user?.id) return;
-                            setIsScheduling(true);
-                            try {
-                                const { data: dbProfiles } = await supabase
-                                    .from('profiles')
-                                    .select('id')
-                                    .eq('role', 'student')
-                                    .limit(1);
-                                    
-                                const studentId = dbProfiles && dbProfiles.length > 0 ? dbProfiles[0].id : null;
-                                if (!studentId) {
-                                    alert("No students found in the database. Please register a student first.");
-                                    return;
-                                }
-
-                                const getFormattedDate = (option: string) => {
-                                    const d = new Date();
-                                    if (option === 'tomorrow') {
-                                        d.setDate(d.getDate() + 1);
-                                    }
-                                    const yyyy = d.getFullYear();
-                                    const mm = String(d.getMonth() + 1).padStart(2, '0');
-                                    const dd = String(d.getDate()).padStart(2, '0');
-                                    return `${yyyy}-${mm}-${dd}`;
-                                };
-
-                                const sessionDate = getFormattedDate(formData.dateOption);
-                                
-                                const { data: newBooking, error } = await supabase
-                                    .from('bookings')
-                                    .insert({
-                                        student_id: studentId,
-                                        teacher_id: user.id,
-                                        subject: formData.title || formData.subject,
-                                        date: sessionDate,
-                                        time: formData.startTime,
-                                        status: 'confirmed'
-                                    })
-                                    .select('id')
-                                    .single();
-
-                                if (error) throw error;
-
-                                if (newBooking) {
-                                    const initiated = JSON.parse(localStorage.getItem('initiated_bookings') || '[]');
-                                    initiated.push(newBooking.id);
-                                    localStorage.setItem('initiated_bookings', JSON.stringify(initiated));
-                                }
-
-                                alert(`✅ Session "${formData.title || formData.subject}" scheduled successfully!`);
-                                onClose();
-                                window.location.reload();
-                            } catch (err: any) {
-                                console.error("Error scheduling session:", err);
-                                alert("Failed to schedule session: " + err.message);
-                            } finally {
-                                setIsScheduling(false);
-                            }
-                        }}
-                        disabled={isScheduling}
-                        className="w-full bg-orange-500 text-white text-lg font-bold py-4 rounded-xl shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-50"
+                        onClick={handleSchedule}
+                        disabled={isScheduling || selectedStudents.length === 0}
+                        className="w-full bg-orange-500 text-white text-lg font-bold py-4 rounded-xl shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span className="material-symbols-outlined">calendar_add_on</span>
                         {isScheduling ? "Scheduling..." : "Schedule Session"}

@@ -26,6 +26,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   logout: () => void;
   refreshUser: () => void;
+  endSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -353,8 +354,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         country: cachedUser?.country
       });
 
-      if (cachedUser) {
-        console.log('AuthContext: Found cached user, resolving isLoaded immediately');
+      if (cachedUser && localStorage.getItem('yadalearn-user-role')) {
+        console.log('AuthContext: Found cached user AND role, resolving isLoaded immediately to prevent flicker');
         setIsLoaded(true);
       }
 
@@ -584,6 +585,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const endSession = async () => {
+    console.log("AuthContext: Ending current session and refreshing profile state...");
+    fetchingUserIdRef.current = null;
+    fetchedUserIdRef.current = null;
+    if (user?.id) {
+      const { data: { session } } = await supabase.auth.getSession();
+      await handleSession(session);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -598,7 +609,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signUpWithEmail,
       signInWithGoogle,
       logout,
-      refreshUser
+      refreshUser,
+      endSession
     }}>
       {children}
     </AuthContext.Provider>
