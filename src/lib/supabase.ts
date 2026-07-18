@@ -9,16 +9,8 @@ const supabaseUrl = sanitizeEnvVal(import.meta.env.VITE_SUPABASE_URL);
 const supabaseAnonKey = sanitizeEnvVal(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('CRITICAL: Missing Supabase Environment Variables! Check Netlify configuration.');
     // Do not throw, let it fail downstream so we can see UI/Logs
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    flowType: 'implicit',
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
