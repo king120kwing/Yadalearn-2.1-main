@@ -7,11 +7,19 @@ interface AssignmentsModalProps {
     isOpen: boolean;
     onClose: () => void;
     studentId?: string;
+    childrenList?: any[];
 }
 
-export const AssignmentsModal = ({ isOpen, onClose, studentId }: AssignmentsModalProps) => {
+export const AssignmentsModal = ({ isOpen, onClose, studentId, childrenList }: AssignmentsModalProps) => {
     const { user, isLoaded } = useAuth();
-    const userId = studentId || user?.id;
+    const [activeStudentId, setActiveStudentId] = useState<string | undefined>(studentId);
+    
+    // Reset activeStudentId when modal opens with new studentId prop
+    useEffect(() => {
+        setActiveStudentId(studentId);
+    }, [studentId, isOpen]);
+
+    const userId = activeStudentId || user?.id;
 
     const [assignments, setAssignments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -20,10 +28,10 @@ export const AssignmentsModal = ({ isOpen, onClose, studentId }: AssignmentsModa
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        if (isOpen && user) {
+        if (isOpen && user && userId) {
             fetchAssignments();
         }
-    }, [isOpen, user]);
+    }, [isOpen, user, userId]);
 
     const fetchAssignments = async () => {
         try {

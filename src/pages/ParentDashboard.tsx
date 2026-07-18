@@ -494,10 +494,7 @@ const ParentDashboard = () => {
                 </div>
                 
                 <div 
-                  onClick={() => {
-                    if (!selectedChild) setActiveModal('progress');
-                    else navigate('/child-progress', { state: { studentId: selectedChild.id } });
-                  }}
+                  onClick={() => navigate('/child-progress', { state: { studentId: selectedChild?.id } })}
                   className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -683,14 +680,14 @@ const ParentDashboard = () => {
         onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 
         recipientId={selectedTeacherIdForChat} 
       />
-      {activeModal === 'assignments' && selectedChild && (
-        <AssignmentsModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild.id} />
+      {activeModal === 'assignments' && (
+        <AssignmentsModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild?.id} childrenList={linkedChildren} />
       )}
-      {(activeModal === 'classes' || activeModal === 'history') && selectedChild && (
-        <ClassesModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild.id} studentName={selectedChild.name} />
+      {(activeModal === 'classes' || activeModal === 'history') && (
+        <ClassesModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild?.id} studentName={selectedChild?.name} childrenList={linkedChildren} />
       )}
-      {activeModal === 'performance' && selectedChild && (
-        <PerformanceModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild.id} studentName={selectedChild.name} />
+      {activeModal === 'performance' && (
+        <PerformanceModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild?.id} studentName={selectedChild?.name} childrenList={linkedChildren} />
       )}
 
       {activeModal && !['message', 'scan', 'assignments', 'classes', 'history', 'performance'].includes(activeModal) && (

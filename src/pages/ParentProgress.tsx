@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 import { ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -13,7 +13,8 @@ const ParentProgress = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [selectedChild, setSelectedChild] = useState<any>(null);
+  const location = useLocation();
+  const [selectedChild, setSelectedChild] = useState<any>(location.state?.studentId || null);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
   const [childrenData, setChildrenData] = useState<any[]>([]);
