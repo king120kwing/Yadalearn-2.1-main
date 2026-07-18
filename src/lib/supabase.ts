@@ -13,5 +13,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
     // Do not throw, let it fail downstream so we can see UI/Logs
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    flowType: 'implicit',
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
 

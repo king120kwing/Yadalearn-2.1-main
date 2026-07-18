@@ -122,6 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchedUserIdRef = useRef<string | null>(null);
   const oauthTimeoutRef = useRef<any>(null);
   const initialCheckCompletedRef = useRef(false);
+  const oauthTokenPresentRef = useRef(false);
 
   // Real-time Presence sync
   useEffect(() => {
@@ -225,6 +226,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       window.location.hash.includes('refresh_token=') || 
       window.location.search.includes('code=') ||
       window.location.search.includes('access_token=');
+
+    if (hasHashToken) {
+      oauthTokenPresentRef.current = true;
+    }
 
     // Check active session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -432,7 +437,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         window.location.hash.includes('id_token=') || 
         window.location.hash.includes('refresh_token=') || 
         window.location.search.includes('code=') ||
-        window.location.search.includes('access_token=');
+        window.location.search.includes('access_token=') ||
+        oauthTokenPresentRef.current;
         
       if (!hasOAuthToken) {
         setIsLoaded(true);
