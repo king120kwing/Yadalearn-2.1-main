@@ -43,6 +43,14 @@ const Welcome = () => {
 
   console.log('Welcome: Rendering...', { isLoaded });
 
+  if (!isAuthLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center gradient-welcome relative overflow-hidden">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 relative z-20"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full gradient-welcome relative overflow-hidden">
       {/* Animated background elements */}
