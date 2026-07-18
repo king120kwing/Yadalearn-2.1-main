@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, QrCode } from 'lucide-react';
+import { X, QrCode, Loader2 } from 'lucide-react';
+import { Scanner } from '@yudiel/react-qr-scanner';
+import { supabase } from '@/lib/supabase';
 
 interface ScanQRModalProps {
   isOpen: boolean;
@@ -8,25 +10,63 @@ interface ScanQRModalProps {
 }
 
 export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
-  const [linkUrl, setLinkUrl] = useState('');
   const navigate = useNavigate();
+  const [scannedId, setScannedId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setScannedId(null);
+      setProfile(null);
+      setError('');
+      setLoading(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleScan = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!linkUrl.trim()) return;
-
-    // Extract ID if a full URL is pasted
-    let targetUrl = linkUrl.trim();
+  const handleScan = async (detectedCodes: any[]) => {
+    if (scannedId || loading || detectedCodes.length === 0) return;
+    
+    let targetUrl = detectedCodes[0].rawValue.trim();
+    let id = targetUrl;
+    
+    // Extract ID if a full URL is scanned
     if (targetUrl.includes('/link/')) {
-        const id = targetUrl.split('/link/')[1];
-        navigate(`/link/${id}`);
-    } else {
-        // Assume they just pasted the ID
-        navigate(`/link/${targetUrl}`);
+        id = targetUrl.split('/link/')[1];
     }
+    
+    setScannedId(id);
+    setLoading(true);
+    setError('');
+    
+    try {
+        const { data, error: err } = await supabase.from('profiles').select('*').eq('id', id).single();
+        if (err || !data) {
+            setError('User not found. Invalid QR Code.');
+        } else {
+            setProfile(data);
+        }
+    } catch (e: any) {
+        setError('Error fetching profile.');
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleConnect = () => {
+    if (!scannedId) return;
+    navigate(`/link/${scannedId}`);
     onClose();
+  };
+
+  const handleRetry = () => {
+    setScannedId(null);
+    setProfile(null);
+    setError('');
   };
 
   return (
@@ -49,39 +89,76 @@ export function ScanQRModal({ isOpen, onClose }: ScanQRModalProps) {
             </button>
           </div>
 
-          <div className="bg-slate-50 dark:bg-zinc-950 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 mb-6 flex flex-col items-center text-center">
-             <div className="w-32 h-32 bg-white rounded-xl border-4 border-dashed border-purple-200 dark:border-purple-900/50 flex items-center justify-center mb-4 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] animate-[scan_2s_ease-in-out_infinite]"></div>
-                <QrCode className="w-12 h-12 text-slate-300 dark:text-zinc-700" />
-             </div>
-             <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium">
-               Point your camera at the QR code, or manually enter the link below.
-             </p>
-          </div>
+          {!scannedId ? (
+              <div className="relative rounded-2xl overflow-hidden bg-black aspect-square flex items-center justify-center border-4 border-slate-100 dark:border-zinc-800">
+                <Scanner 
+                    onScan={handleScan} 
+                    formats={['qr_code']}
+                    components={{
+                        audio: false,
+                        zoom: false,
+                        finder: false,
+                    }}
+                />
+                <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
+                   <div className="w-full h-full border-2 border-dashed border-purple-500 relative">
+                     <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                   </div>
+                </div>
+              </div>
+          ) : (
+              <div className="bg-slate-50 dark:bg-zinc-950 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 flex flex-col items-center text-center">
+                  {loading && (
+                      <div className="flex flex-col items-center py-8">
+                          <Loader2 className="w-8 h-8 text-purple-500 animate-spin mb-4" />
+                          <p className="text-slate-500 dark:text-zinc-400 font-medium">Fetching profile...</p>
+                      </div>
+                  )}
+                  
+                  {error && (
+                      <div className="flex flex-col items-center py-6">
+                          <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-4">
+                              <X className="w-8 h-8" />
+                          </div>
+                          <p className="text-red-500 font-bold mb-6">{error}</p>
+                          <button onClick={handleRetry} className="px-6 py-2 bg-slate-200 dark:bg-zinc-800 rounded-full font-bold">Scan Again</button>
+                      </div>
+                  )}
 
-          <form onSubmit={handleScan} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-2">
-                QR Code Link / User ID
-              </label>
-              <input
-                type="text"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://... or User ID"
-                className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow dark:text-white"
-                autoFocus
-              />
-            </div>
-            
-            <button
-              type="submit"
-              disabled={!linkUrl.trim()}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-xl transition-colors shadow-lg shadow-purple-500/30"
-            >
-              Simulate Scan & Connect
-            </button>
-          </form>
+                  {profile && (
+                      <div className="w-full flex flex-col items-center animate-in zoom-in duration-300">
+                          {profile.avatar_url ? (
+                              <img src={profile.avatar_url} alt="Profile" className="w-24 h-24 rounded-full border-4 border-purple-500 mb-4 object-cover shadow-xl" />
+                          ) : (
+                              <div className="w-24 h-24 rounded-full border-4 border-purple-500 mb-4 bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shadow-xl">
+                                  <span className="material-symbols-outlined text-4xl text-purple-600 dark:text-purple-400">person</span>
+                              </div>
+                          )}
+                          <h3 className="text-xl font-bold text-slate-800 dark:text-white">{profile.full_name || profile.name || 'User'}</h3>
+                          <p className="text-sm text-slate-500 dark:text-zinc-400 mt-1 capitalize font-medium">{profile.role || 'Member'}</p>
+                          
+                          {profile.bio && (
+                              <p className="text-sm text-slate-600 dark:text-zinc-300 mt-4 line-clamp-2 italic">"{profile.bio}"</p>
+                          )}
+
+                          <div className="w-full grid grid-cols-2 gap-3 mt-8">
+                              <button onClick={handleRetry} className="py-3 px-4 rounded-xl font-bold bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-colors">
+                                  Cancel
+                              </button>
+                              <button onClick={handleConnect} className="py-3 px-4 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white transition-colors shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2">
+                                  Add
+                              </button>
+                          </div>
+                      </div>
+                  )}
+              </div>
+          )}
+          
+          {!scannedId && (
+            <p className="text-center text-sm text-slate-500 dark:text-zinc-400 mt-6 font-medium">
+                Point your camera at a YadaLearn QR code.
+            </p>
+          )}
         </div>
       </div>
       
