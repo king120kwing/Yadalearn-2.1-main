@@ -298,7 +298,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     }
 
                     list = Array.from(mergedMap.values());
-                } else {
+                } else if (role === 'teacher') {
                     console.log("Fetching teacher links natively...");
                     const linkData = await rawFetch('teacher_student_links', `teacher_id=eq.${userId}&status=eq.accepted&select=student:profiles!teacher_student_links_student_id_fkey(id,full_name,avatar_url,country,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
                     
@@ -319,6 +319,13 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                         if (recipientProfile) mergedMap.set(recipientId, recipientProfile);
                     }
 
+                    list = Array.from(mergedMap.values());
+                } else if (role === 'parent') {
+                    const mergedMap = new Map();
+                    if (recipientId) {
+                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,subjects,is_online,last_active_at`).then(d => d[0]).catch(() => null);
+                        if (recipientProfile) mergedMap.set(recipientId, recipientProfile);
+                    }
                     list = Array.from(mergedMap.values());
                 }
 

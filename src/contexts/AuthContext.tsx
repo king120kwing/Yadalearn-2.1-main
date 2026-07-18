@@ -15,11 +15,11 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoaded: boolean;
-  userRole: 'teacher' | 'student' | null;
+  userRole: 'teacher' | 'student' | 'parent' | null;
   onboardingCompleted: boolean;
   subjects: string[];
-  setUserRole: (role: 'teacher' | 'student' | null) => void;
-  setOnboardingCompleted: (completed: boolean, subjects?: string[], preferredLanguages?: string[], onboardingAnswers?: any, role?: 'teacher' | 'student' | null) => Promise<void>;
+  setUserRole: (role: 'teacher' | 'student' | 'parent' | null) => void;
+  setOnboardingCompleted: (completed: boolean, subjects?: string[], preferredLanguages?: string[], onboardingAnswers?: any, role?: 'teacher' | 'student' | 'parent' | null) => Promise<void>;
   clearUserRole: () => void;
   login: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<any>;
@@ -92,9 +92,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     return null;
   });
-  const [userRole, setUserRoleState] = useState<'teacher' | 'student' | null>(() => {
+  const [userRole, setUserRoleState] = useState<'teacher' | 'student' | 'parent' | null>(() => {
     const savedRole = localStorage.getItem('yadalearn-user-role');
-    return (savedRole === 'teacher' || savedRole === 'student') ? savedRole : null;
+    return (savedRole === 'teacher' || savedRole === 'student' || savedRole === 'parent') ? savedRole : null;
   });
   const [onboardingCompleted, setOnboardingCompletedState] = useState<boolean>(() => {
     return localStorage.getItem('yadalearn-onboarding-completed') === 'true';
@@ -497,7 +497,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     fetchedUserIdRef.current = null;
   };
 
-  const setUserRole = async (role: 'teacher' | 'student' | null) => {
+  const setUserRole = async (role: 'teacher' | 'student' | 'parent' | null) => {
     setUserRoleState(role);
     if (role) {
       localStorage.setItem('yadalearn-user-role', role);
@@ -521,7 +521,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     selectedSubjects: string[] = [],
     selectedLanguages: string[] = [],
     onboardingAnswers: any = null,
-    role: 'teacher' | 'student' | null = null
+    role: 'teacher' | 'student' | 'parent' | null = null
   ) => {
     setOnboardingCompletedState(completed);
     setSubjectsState(selectedSubjects);
@@ -568,6 +568,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             class_type: onboardingAnswers.classType,
             schedule: onboardingAnswers.schedule
           });
+        } else if (activeRole === 'parent') {
+          await supabase.from('profiles').update({
+            gender: onboardingAnswers.gender,
+            date_of_birth: onboardingAnswers.dateOfBirth,
+            contact_number: onboardingAnswers.contactNumber
+          }).eq('id', user.id);
         }
       }
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
+import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
 
 interface StudentOverviewModalProps {
     isOpen: boolean;
@@ -13,6 +14,8 @@ export const StudentOverviewModal = ({ isOpen, onClose }: StudentOverviewModalPr
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [students, setStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+    const [recipientId, setRecipientId] = useState<string | null>(null);
 
     // Fetch dynamic students
     useEffect(() => {
@@ -33,6 +36,23 @@ export const StudentOverviewModal = ({ isOpen, onClose }: StudentOverviewModalPr
                         .map((l: any) => l.student)
                         .filter(Boolean);
 
+                    // Fetch parents for these students
+                    const studentIds = uniqueStudents.map((s: any) => s.id);
+                    const { data: parentLinks } = await supabase
+                        .from('parent_student_links')
+                        .select('student_id, parent:profiles!parent_student_links_parent_id_fkey(id, full_name, avatar_url, contact_number)')
+                        .in('student_id', studentIds);
+
+                    const parentsMap = new Map();
+                    if (parentLinks) {
+                        parentLinks.forEach((pl: any) => {
+                            if (pl.parent) {
+                                if (!parentsMap.has(pl.student_id)) parentsMap.set(pl.student_id, []);
+                                parentsMap.get(pl.student_id).push(pl.parent);
+                            }
+                        });
+                    }
+
                     const list = uniqueStudents.map((s: any) => {
                         const name = s.full_name || 'Unknown Student';
                         const initials = name.split(' ').map((n: any) => n[0]).join('');
@@ -44,6 +64,7 @@ export const StudentOverviewModal = ({ isOpen, onClose }: StudentOverviewModalPr
                             status: 'good',
                             avatar: s.avatar_url,
                             initials,
+                            parents: parentsMap.get(s.id) || [],
                             lastActive: 'Active now',
                             missing: 0,
                             stats: {
@@ -275,10 +296,56 @@ export const StudentOverviewModal = ({ isOpen, onClose }: StudentOverviewModalPr
                                         </div>
                                     </div>
 
+                                    {/* Parents Section */}
+                                    {activeStudent.parents && activeStudent.parents.length > 0 && (
+                                        <div className="p-4 rounded-xl bg-white dark:bg-zinc-800/80 border border-gray-150 dark:border-zinc-700/60 shadow-sm">
+                                            <span className="text-gray-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider block mb-3 flex items-center">
+                                                <span className="material-symbols-outlined text-sm mr-1">family_restroom</span>
+                                                Linked Parents/Guardians
+                                            </span>
+                                            <div className="space-y-3">
+                                                {activeStudent.parents.map((parent: any) => (
+                                                    <div key={parent.id} className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            {parent.avatar_url ? (
+                                                                <img className="size-8 rounded-full object-cover" src={parent.avatar_url} alt={parent.full_name} />
+                                                            ) : (
+                                                                <div className="flex items-center justify-center size-8 rounded-full bg-blue-100 text-blue-600 font-bold text-xs">
+                                                                    {parent.full_name ? parent.full_name.charAt(0) : 'P'}
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900 dark:text-white">{parent.full_name}</p>
+                                                                {parent.contact_number && (
+                                                                    <p className="text-xs text-gray-500">{parent.contact_number}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            className="p-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                                            onClick={() => {
+                                                                setRecipientId(parent.id);
+                                                                setIsMessageModalOpen(true);
+                                                            }}
+                                                        >
+                                                            <span className="material-symbols-outlined text-[18px]">chat</span>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-3 pt-2">
-                                        <button className="flex-1 py-3 px-4 rounded-xl bg-[#FF7D46] hover:bg-[#e06634] active:scale-[0.98] text-white text-sm font-bold shadow-md shadow-[#FF7D46]/20 hover:shadow-[#FF7D46]/30 transition-all flex items-center justify-center gap-2">
+                                        <button 
+                                            className="flex-1 py-3 px-4 rounded-xl bg-[#FF7D46] hover:bg-[#e06634] active:scale-[0.98] text-white text-sm font-bold shadow-md shadow-[#FF7D46]/20 hover:shadow-[#FF7D46]/30 transition-all flex items-center justify-center gap-2"
+                                            onClick={() => {
+                                                setRecipientId(activeStudent.id);
+                                                setIsMessageModalOpen(true);
+                                            }}
+                                        >
                                             <span className="material-symbols-outlined text-[18px]">mail</span>
-                                            Message
+                                            Message Student
                                         </button>
                                         <button className="flex-1 py-3 px-4 rounded-xl border border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-[0.98] text-gray-700 dark:text-gray-300 text-sm font-bold transition-all flex items-center justify-center gap-2">
                                             <span className="material-symbols-outlined text-[18px]">calendar_today</span>
@@ -291,6 +358,16 @@ export const StudentOverviewModal = ({ isOpen, onClose }: StudentOverviewModalPr
                     )}
                 </main>
             </DialogContent>
+            {isMessageModalOpen && recipientId && (
+                <MessageTeacherModal 
+                    isOpen={isMessageModalOpen}
+                    onClose={() => {
+                        setIsMessageModalOpen(false);
+                        setRecipientId(null);
+                    }}
+                    teacherId={recipientId}
+                />
+            )}
         </Dialog>
     );
 };

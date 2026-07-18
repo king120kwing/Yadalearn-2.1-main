@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BottomNav } from "@/components/BottomNav";
@@ -7,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { removeImageBackground } from "@/utils/imageProcessor";
 import { ScanQRModal } from "@/components/ScanQRModal";
+import ParentScanQRModal from "@/features/parent/ScanQRModal";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -209,14 +211,14 @@ const Settings = () => {
           <span className="material-symbols-outlined">arrow_back_ios_new</span>
         </button>
         <h1 className="flex-1 text-center text-xl font-bold text-text-light dark:text-text-dark">
-          {userRole === 'teacher' ? 'Teacher Settings' : 'Student Settings'}
+          {userRole === 'teacher' ? 'Teacher Settings' : userRole === 'parent' ? 'Parent Settings' : 'Student Settings'}
         </h1>
         <div className="h-10 w-10"></div>
       </header>
 
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-5 pb-24 safe-bottom">
         {/* Profile Card */}
-        <section className="flex items-center gap-4 rounded-4xl bg-gradient-to-br from-indigo-50 to-purple-50 p-5 shadow-soft dark:from-indigo-900/40 dark:to-purple-900/40">
+        <section className={cn("flex items-center gap-4 rounded-4xl p-5 shadow-soft", userRole === 'parent' ? "bg-gradient-to-br from-emerald-50 to-lime-50 dark:from-emerald-900/40 dark:to-lime-900/40" : "bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/40")}>
           <input
             ref={profileInputRef}
             type="file"
@@ -236,7 +238,7 @@ const Settings = () => {
               />
             ) : (
               <Avatar className="h-16 w-16 border-4 border-white/50 group-hover:opacity-80 transition-opacity">
-                <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-xl">
+                <AvatarFallback className={cn("text-white text-xl", userRole === 'parent' ? "bg-gradient-to-br from-emerald-400 to-lime-400" : "bg-gradient-to-br from-purple-400 to-pink-400")}>
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
@@ -250,7 +252,7 @@ const Settings = () => {
             <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
               {getDisplayName()}
             </h2>
-            <p className="text-xs text-purple-600 font-medium cursor-pointer" onClick={() => profileInputRef.current?.click()}>
+            <p className={cn("text-xs font-medium cursor-pointer", userRole === 'parent' ? "text-emerald-600" : "text-purple-600")} onClick={() => profileInputRef.current?.click()}>
               Change Profile Photo
             </p>
           </div>
@@ -455,10 +457,18 @@ const Settings = () => {
 
       <BottomNav />
       
-      <ScanQRModal 
-        isOpen={isScanQRModalOpen}
-        onClose={() => setIsScanQRModalOpen(false)}
-      />
+      {userRole === 'parent' ? (
+        isScanQRModalOpen && (
+          <ParentScanQRModal 
+            onClose={() => setIsScanQRModalOpen(false)}
+          />
+        )
+      ) : (
+        <ScanQRModal 
+          isOpen={isScanQRModalOpen}
+          onClose={() => setIsScanQRModalOpen(false)}
+        />
+      )}
 
       {/* Edit Profile Modal Dialog */}
       {isEditingProfile && (
@@ -512,29 +522,31 @@ const Settings = () => {
                 </div>
               )}
 
-              <div className="mt-4">
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Your Unique QR Code</label>
-                <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800">
-                  <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 dark:border-zinc-800 mb-3">
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + '/link/' + user?.id)}`} 
-                      alt="Unique QR Code"
-                      className="w-32 h-32 md:w-[150px] md:h-[150px]"
-                    />
+              {userRole !== 'parent' && (
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">Your Unique QR Code</label>
+                  <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800">
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 dark:border-zinc-800 mb-3">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + '/link/' + user?.id)}`} 
+                        alt="Unique QR Code"
+                        className="w-32 h-32 md:w-[150px] md:h-[150px]"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 text-center max-w-[250px]">
+                      {userRole === 'teacher' 
+                        ? "Students can scan this code to instantly link with you and book classes."
+                        : "Teachers can scan this code to connect with you instantly."}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400 text-center max-w-[250px]">
-                    {userRole === 'teacher' 
-                      ? "Students can scan this code to instantly link with you and book classes."
-                      : "Teachers can scan this code to connect with you instantly."}
-                  </p>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleSaveProfile}
                   disabled={isSaving}
-                  className="flex-1 rounded-2xl bg-purple-600 hover:bg-purple-700 py-3 text-center text-sm font-bold text-white shadow-md transition-colors disabled:opacity-50"
+                  className={cn("flex-1 rounded-2xl py-3 text-center text-sm font-bold text-white shadow-md transition-colors disabled:opacity-50", userRole === 'parent' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-600 hover:bg-purple-700")}
                 >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>

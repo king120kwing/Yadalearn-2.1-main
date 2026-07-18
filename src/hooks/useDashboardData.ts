@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function useDashboardData() {
+export function useDashboardData(studentId?: string) {
     const { user, subjects: studentSubjects } = useAuth();
-    const userId = user?.id;
+    const userId = studentId || user?.id;
     const [upcomingClasses, setUpcomingClasses] = useState<any[]>(() => {
         try {
             const cached = localStorage.getItem('yadalearn-cached-classes');

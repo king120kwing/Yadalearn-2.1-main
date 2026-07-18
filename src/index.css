@@ -798,6 +798,24 @@ Inspired by modern learning applications with soft pastel palette
 }
 
 /* Enhanced Focus States for Accessibility */
+.focus-ring {
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2;
+}
+
+/* 
+ * Progress Widget Animations 
+ * (Moved here to prevent React re-render flickering)
+ */
+@keyframes wave-rotation-1 {
+  from { transform: translate(-50%, 0) rotate(0deg); }
+  to { transform: translate(-50%, 0) rotate(360deg); }
+}
+
+@keyframes wave-rotation-2 {
+  from { transform: translate(-50%, 0) rotate(45deg); }
+  to { transform: translate(-50%, 0) rotate(405deg); }
+}
+
 .focus-enhanced:focus {
   outline: 2px solid rgba(168, 85, 247, 0.5);
   outline-offset: 2px;

@@ -51,6 +51,7 @@ const Onboarding = () => {
 
   const getMaxStep = () => {
     if (role === 'student') return 7;
+    if (role === 'parent') return 3;
     // Teacher
     if (isDualPath) return 16;
     return 9;
@@ -98,7 +99,7 @@ const Onboarding = () => {
       setOnboardingCompleted?.(true, selectedSubjectsList, selectedLanguagesList, answers, role);
       refreshUser?.();
 
-      const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : '/student-dashboard';
+      const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : role === 'parent' ? '/parent-dashboard' : '/student-dashboard';
       setTimeout(() => {
         navigate(dashboardPath, { replace: true });
       }, 100);
@@ -550,6 +551,92 @@ const Onboarding = () => {
     return null;
   };
 
+  const renderParentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-6 animate-fade-in-up">
+            <Illustration><UndrawPresentation primaryColor='#9333ea' height='200px' /></Illustration>
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Guardian!</h2>
+              <p className="text-gray-500 text-lg">Let's set up your profile to track progress.</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-gray-700 text-sm font-semibold mb-2 block">What's your name?</Label>
+                <Input
+                  autoFocus
+                  placeholder="e.g. Sarah Connor"
+                  value={answers.userName || ''}
+                  onChange={(e) => handleAnswer('userName', e.target.value)}
+                  className="w-full text-lg p-6 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      case 2:
+        return (
+          <div className="space-y-6 animate-fade-in-up">
+            <Illustration><UndrawChoose primaryColor='#9333ea' height='200px' /></Illustration>
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Personal Details</h2>
+              <p className="text-gray-500 text-lg">Help us personalize your experience.</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-gray-700 text-sm font-semibold mb-2 block">Gender</Label>
+                <select
+                  value={answers.gender || ''}
+                  onChange={(e) => handleAnswer('gender', e.target.value)}
+                  className="w-full text-lg p-4 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-purple-500 transition-all duration-200 bg-white"
+                >
+                  <option value="" disabled>Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-gray-700 text-sm font-semibold mb-2 block">Date of Birth</Label>
+                <Input
+                  type="date"
+                  value={answers.dateOfBirth || ''}
+                  onChange={(e) => handleAnswer('dateOfBirth', e.target.value)}
+                  className="w-full text-lg p-6 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-6 animate-fade-in-up">
+            <Illustration><UndrawChat primaryColor='#9333ea' height='200px' /></Illustration>
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Contact Info</h2>
+              <p className="text-gray-500 text-lg">How can teachers reach you?</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-gray-700 text-sm font-semibold mb-2 block">Contact Number</Label>
+                <Input
+                  type="tel"
+                  placeholder="+1 234 567 8900"
+                  value={answers.contactNumber || ''}
+                  onChange={(e) => handleAnswer('contactNumber', e.target.value)}
+                  className="w-full text-lg p-6 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const maxStep = getMaxStep();
 
   const renderDots = () => (
@@ -571,7 +658,7 @@ const Onboarding = () => {
             </select>
           </div>
 
-          {role === 'student' ? renderStudentStep() : renderTeacherStep()}
+          {role === 'student' ? renderStudentStep() : role === 'parent' ? renderParentStep() : renderTeacherStep()}
 
           {renderDots()}
 
@@ -601,12 +688,17 @@ const Onboarding = () => {
                     if (effectiveStep === 8) return true;
                   }
                 }
+                if (role === 'parent') {
+                  if (currentStep === 1 && answers.userName?.trim()) return true;
+                  if (currentStep === 2 && answers.gender && answers.dateOfBirth) return true;
+                  if (currentStep === 3 && answers.contactNumber?.trim()) return true;
+                }
                 return false;
               };
 
               if (getShowNext()) {
                 return (
-                  <Button onClick={nextStep} variant="ghost" className="text-purple-600 font-semibold hover:bg-purple-50">Next →</Button>
+                  <Button onClick={nextStep} variant="ghost" className="text-purple-600 font-semibold hover:bg-purple-50">{currentStep === maxStep ? 'Complete' : 'Next →'}</Button>
                 );
               }
               return null;

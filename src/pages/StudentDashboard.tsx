@@ -20,7 +20,12 @@ import { ScanQRModal } from '@/components/ScanQRModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { removeImageBackground } from '@/utils/imageProcessor';
 
-const StudentDashboard = () => {
+interface StudentDashboardProps {
+  viewAsStudentId?: string;
+  onBackToParent?: () => void;
+}
+
+const StudentDashboard = ({ viewAsStudentId, onBackToParent }: StudentDashboardProps = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, refreshUser, logout } = useAuth();
@@ -32,7 +37,7 @@ const StudentDashboard = () => {
   const [selectedTeacherIdForBooking, setSelectedTeacherIdForBooking] = useState<string | undefined>(undefined);
   const [presenceData, setPresenceData] = useState<Record<string, boolean>>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData();
+  const { topTeachers, upcomingClasses, unratedClasses, loading } = useDashboardData(viewAsStudentId);
   const [liveClassInfo, setLiveClassInfo] = useState<{ room_id: string; teacher_id: string } | null>(null);
 
   useEffect(() => {
@@ -201,17 +206,17 @@ const StudentDashboard = () => {
           setDetectedCountryName(geo.countryName);
           
           // Update database profiles table if database country does not match or is empty
-          const { data: profile } = await supabase
+          const { data: profile, error } = await supabase
             .from('profiles')
             .select('country')
-            .eq('id', user.id)
+            .eq('id', viewAsStudentId || user.id)
             .single();
              
           if (profile && (!profile.country || profile.country.trim() !== geo.countryName)) {
             await supabase
               .from('profiles')
               .update({ country: geo.countryName })
-              .eq('id', user.id);
+              .eq('id', viewAsStudentId || user.id);
             
             if (refreshUser) {
               await refreshUser();
@@ -322,7 +327,7 @@ const StudentDashboard = () => {
           rating,
           teacher:profiles!bookings_teacher_id_fkey(id, full_name, avatar_url)
         `)
-        .eq('student_id', user.id);
+        .eq('student_id', viewAsStudentId || user.id);
       
       if (bookingsData) {
         setAllBookings(bookingsData);
@@ -357,7 +362,7 @@ const StudentDashboard = () => {
       }
     }
     fetchBookings();
-  }, [user?.id]);
+  }, [viewAsStudentId, user?.id]);
 
   const studentSchedule = allBookings.map((b: any) => ({
     id: b.id,
@@ -419,7 +424,7 @@ const StudentDashboard = () => {
 
     const savedUser = localStorage.getItem('yadalearn-user');
     const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-    const userId = user?.id || parsedUser?.id;
+    const userId = viewAsStudentId || user?.id || parsedUser?.id;
 
     if (!userId) {
       console.error("Upload failed: User not identified.");
@@ -597,12 +602,21 @@ const StudentDashboard = () => {
         {/* Header (Desktop matching layout) */}
         <header className="relative flex justify-between items-center mb-8 z-10">
           <div className="flex items-center gap-4">
-            {isSidebarCollapsed && (
+            {isSidebarCollapsed && !viewAsStudentId && (
               <button 
                 onClick={() => setIsSidebarCollapsed(false)} 
                 className="hidden md:flex p-2.5 rounded-xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-slate-200/40 dark:border-zinc-700/40 text-slate-700 dark:text-zinc-200 shadow-sm hover:scale-105 active:scale-95 transition-all"
               >
                 <Menu className="h-6 w-6" />
+              </button>
+            )}
+            {viewAsStudentId && onBackToParent && (
+              <button 
+                onClick={onBackToParent}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 rounded-xl font-bold transition-all shadow-sm"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                <span>Back to Parent Dashboard</span>
               </button>
             )}
           </div>
@@ -752,17 +766,6 @@ const StudentDashboard = () => {
             <div className="shrink-0 flex flex-col items-center justify-center p-5 bg-white/45 dark:bg-zinc-900/30 backdrop-blur-md border border-white/20 rounded-[2.5rem] shadow-sm z-20 hover:scale-[1.02] transition-transform">
               {/* Circular Liquid Progress Animation */}
               <div className="relative w-44 h-44 rounded-full border border-purple-500/35 overflow-hidden flex items-center justify-center bg-purple-50/10 dark:bg-zinc-950/20 shadow-[0_8px_32px_0_rgba(91,74,159,0.15)] shrink-0">
-                <style>{`
-                  @keyframes wave-rotation-1 {
-                    from { transform: translate(-50%, 0) rotate(0deg); }
-                    to { transform: translate(-50%, 0) rotate(360deg); }
-                  }
-                  @keyframes wave-rotation-2 {
-                    from { transform: translate(-50%, 0) rotate(45deg); }
-                    to { transform: translate(-50%, 0) rotate(405deg); }
-                  }
-                `}</style>
-                
                 {/* Liquid Wave 1 */}
                 <div 
                   className="absolute bg-gradient-to-t from-[#5B4A9F]/60 to-[#8F81D6]/60 w-[200%] h-[200%] rounded-[38%] opacity-85"

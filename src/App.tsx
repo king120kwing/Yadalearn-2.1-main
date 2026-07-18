@@ -24,6 +24,8 @@ import RateTeacher from './pages/RateTeacher';
 import Logout from "./pages/Logout";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
+import ParentDashboard from "./pages/ParentDashboard";
+import ParentProgress from "./pages/ParentProgress";
 import MobileScreensShowcase from "./pages/MobileScreensShowcase";
 import Meeting from "./pages/Meeting";
 import LinkTeacher from "./pages/LinkTeacher";
@@ -64,6 +66,10 @@ const App = () => {
             <Route path="/teacher-dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
             <Route path="/teacher-students" element={<ProtectedRoute><TeacherStudents /></ProtectedRoute>} />
             <Route path="/teacher-calendar" element={<ProtectedRoute><TeacherCalendar /></ProtectedRoute>} />
+
+            {/* Parent Routes */}
+            <Route path="/parent-dashboard" element={<ProtectedRoute><ParentDashboard /></ProtectedRoute>} />
+            <Route path="/child-progress" element={<ProtectedRoute><ParentProgress /></ProtectedRoute>} />
 
             <Route path="/learning-class" element={<ProtectedRoute><LearningClass /></ProtectedRoute>} />
             <Route path="/ai-features" element={<ProtectedRoute><AIFeatures /></ProtectedRoute>} />

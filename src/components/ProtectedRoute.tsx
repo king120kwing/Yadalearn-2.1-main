@@ -30,7 +30,8 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
     // If they HAVE completed onboarding, prevent them from going to role-selection or onboarding
     if (onboardingCompleted && (location.pathname === '/role-selection' || location.pathname === '/onboarding')) {
-        return <Navigate to={userRole === 'teacher' ? '/teacher-dashboard' : '/student-dashboard'} replace />;
+        const targetPath = userRole === 'teacher' ? '/teacher-dashboard' : userRole === 'parent' ? '/parent-dashboard' : '/student-dashboard';
+        return <Navigate to={targetPath} replace />;
     }
 
     return <>{children}</>;

@@ -9,29 +9,19 @@ interface NavItem {
   action?: () => void;
 }
 
-const getNavItems = (isTeacherDashboard: boolean): NavItem[] => {
-  if (isTeacherDashboard) {
+const getNavItems = (role: 'teacher' | 'student' | 'parent'): NavItem[] => {
+  if (role === 'teacher') {
     return [
-      {
-        icon: Home,
-        label: "Home",
-        path: "/teacher-dashboard",
-      },
-      {
-        icon: Search,
-        label: "Students",
-        path: "/teacher-students",
-      },
-      {
-        icon: Calendar,
-        label: "Calendar",
-        path: "/teacher-calendar",
-      },
-      {
-        icon: User,
-        label: "Profile",
-        path: "/settings"
-      },
+      { icon: Home, label: "Home", path: "/teacher-dashboard" },
+      { icon: Search, label: "Students", path: "/teacher-students" },
+      { icon: Calendar, label: "Calendar", path: "/teacher-calendar" },
+      { icon: User, label: "Profile", path: "/settings" },
+    ];
+  } else if (role === 'parent') {
+    return [
+      { icon: Home, label: "Home", path: "/parent-dashboard" },
+      { icon: Search, label: "Progress", path: "/child-progress" },
+      { icon: User, label: "Profile", path: "/settings" },
     ];
   } else {
     // Student Navigation
@@ -48,14 +38,12 @@ export const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine if we're on teacher or student dashboard
-  const savedRole = localStorage.getItem('yadalearn-user-role');
-  const isTeacherDashboard = location.pathname.includes('/teacher') ||
-    (location.pathname.includes('/settings') && savedRole === 'teacher');
+  // Determine current role based on local storage
+  const savedRole = localStorage.getItem('yadalearn-user-role') as 'teacher' | 'student' | 'parent' || 'student';
+  const isTeacherDashboard = savedRole === 'teacher';
+  const isParentDashboard = savedRole === 'parent';
 
-  // We want the same styling for both, but maybe different active colors?
-  // User said "not be of a different colour at all". So we use the same base style.
-  const navItems = getNavItems(isTeacherDashboard);
+  const navItems = getNavItems(savedRole);
 
   return (
     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-zinc-800 rounded-3xl py-2 px-6 shadow-lg z-50 flex justify-between items-center md:hidden">
@@ -81,10 +69,14 @@ export const BottomNav = () => {
                 isActive
                   ? isTeacherDashboard
                     ? "text-[#FF7D46] bg-[#FF7D46]/10 dark:bg-[#FF7D46]/20 shadow-sm font-bold"
-                    : "text-[#5B4A9F] bg-[#5B4A9F]/10 dark:bg-[#5B4A9F]/20 shadow-sm font-bold"
+                    : isParentDashboard 
+                      ? "text-[#F97316] bg-[#F97316]/10 dark:bg-[#F97316]/20 shadow-sm font-bold"
+                      : "text-[#5B4A9F] bg-[#5B4A9F]/10 dark:bg-[#5B4A9F]/20 shadow-sm font-bold"
                   : isTeacherDashboard
                     ? "text-gray-500 dark:text-gray-450 hover:text-[#FF7D46] hover:bg-[#FF7D46]/5 dark:hover:bg-[#FF7D46]/10"
-                    : "text-gray-500 dark:text-gray-450 hover:text-[#5B4A9F] hover:bg-[#5B4A9F]/5 dark:hover:bg-[#5B4A9F]/10"
+                    : isParentDashboard 
+                      ? "text-gray-500 dark:text-gray-450 hover:text-[#F97316] hover:bg-[#F97316]/5 dark:hover:bg-[#F97316]/10"
+                      : "text-gray-500 dark:text-gray-450 hover:text-[#5B4A9F] hover:bg-[#5B4A9F]/5 dark:hover:bg-[#5B4A9F]/10"
               )}
             >
               <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />
