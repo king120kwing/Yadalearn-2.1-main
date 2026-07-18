@@ -267,13 +267,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // Fallback timer: in case OAuth parsing fails or takes too long, set isLoaded to true after 15 seconds
+    // Fallback timer: in case OAuth parsing fails or takes too long, attempt manual recovery after 5 seconds
     if (hasHashToken) {
       oauthTimeoutRef.current = setTimeout(() => {
-        console.warn('AuthContext: OAuth fallback timer fired (15s), setting isLoaded to true');
+        console.warn('AuthContext: OAuth fallback timer fired (5s), attempting manual recovery');
+        
+        const h = window.location.hash;
+        const s = window.location.search;
+        
+        if (s.includes('code=')) {
+          const code = new URLSearchParams(s).get('code');
+          if (code) {
+            console.log('AuthContext: Manual PKCE recovery');
+            supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+              if (error) console.error('AuthContext: Manual PKCE failed', error);
+              if (data?.session) {
+                handleSession(data.session);
+              } else {
+                initialCheckCompletedRef.current = true;
+                setIsLoaded(true);
+              }
+            });
+            return;
+          }
+        } else if (h.includes('access_token=')) {
+          const hashStr = h.startsWith('#') ? h.substring(1) : h;
+          const params = new URLSearchParams(hashStr);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            console.log('AuthContext: Manual Implicit recovery');
+            supabase.auth.setSession({ access_token, refresh_token }).then(({ data, error }) => {
+              if (error) console.error('AuthContext: Manual Implicit failed', error);
+              if (data?.session) {
+                handleSession(data.session);
+              } else {
+                initialCheckCompletedRef.current = true;
+                setIsLoaded(true);
+              }
+            });
+            return;
+          }
+        }
+
         initialCheckCompletedRef.current = true;
         setIsLoaded(true);
-      }, 15000);
+      }, 5000);
     }
 
     return () => {
@@ -469,10 +508,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signInWithGoogle = async (): Promise<void> => {
+    let redirectUrl = window.location.origin;
+    if (redirectUrl.startsWith('http://') && !redirectUrl.includes('localhost')) {
+      redirectUrl = redirectUrl.replace('http://', 'https://');
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: redirectUrl,
         queryParams: {
           prompt: 'select_account',
         }
