@@ -231,20 +231,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       oauthTokenPresentRef.current = true;
     }
 
-    // Check active session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      initialCheckCompletedRef.current = true;
-      try {
-        await handleSession(session);
-      } catch (err) {
-        console.error('AuthContext: getSession handleSession failed:', err);
+    // Check active session on mount, but ONLY if there's no OAuth token in URL to prevent deadlocking Supabase's PKCE exchange
+    if (!hasHashToken) {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        initialCheckCompletedRef.current = true;
+        try {
+          await handleSession(session);
+        } catch (err) {
+          console.error('AuthContext: getSession handleSession failed:', err);
+          setIsLoaded(true);
+        }
+      }).catch(err => {
+        console.error('AuthContext: getSession promise rejected:', err);
+        initialCheckCompletedRef.current = true;
         setIsLoaded(true);
-      }
-    }).catch(err => {
-      console.error('AuthContext: getSession promise rejected:', err);
-      initialCheckCompletedRef.current = true;
-      setIsLoaded(true);
-    });
+      });
+    } else {
+      console.log('AuthContext: Skipping getSession() on mount because URL has OAuth token. Deferring to onAuthStateChange.');
+    }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
