@@ -167,16 +167,46 @@ export const StartClassModal = ({ isOpen, onClose, session }: StartClassModalPro
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
 
-                const { data: links } = await supabase
-                    .from('teacher_student_links')
-                    .select('student:profiles!teacher_student_links_student_id_fkey(*)')
-                    .eq('teacher_id', user.id)
-                    .eq('status', 'accepted');
+                let uniqueStudents: any[] = [];
 
-                if (links) {
-                    const uniqueStudents = links
-                        .map((l: any) => l.student)
-                        .filter(Boolean);
+                if (session && session.date) {
+                    // Fetch specifically booked students for this scheduled slot
+                    const { data: bookings } = await supabase
+                        .from('bookings')
+                        .select('student:profiles!bookings_student_id_fkey(*)')
+                        .eq('teacher_id', user.id)
+                        .eq('status', 'confirmed')
+                        .eq('date', session.date);
+                    
+                    if (bookings && bookings.length > 0) {
+                        // Filter by time if strictly available, but date is primary
+                        const filteredBookings = session.time ? bookings.filter(b => (b as any).time === session.time) : bookings;
+                        const matching = filteredBookings.length > 0 ? filteredBookings : bookings;
+                        uniqueStudents = matching.map((b: any) => b.student).filter(Boolean);
+                    }
+                }
+
+                if (uniqueStudents.length === 0) {
+                    // Fallback to all linked students if no specific booking is found
+                    const { data: links } = await supabase
+                        .from('teacher_student_links')
+                        .select('student:profiles!teacher_student_links_student_id_fkey(*)')
+                        .eq('teacher_id', user.id)
+                        .eq('status', 'accepted');
+
+                    if (links) {
+                        uniqueStudents = links.map((l: any) => l.student).filter(Boolean);
+                    }
+                }
+
+                if (uniqueStudents.length > 0) {
+                    // Deduplicate
+                    const seen = new Set();
+                    uniqueStudents = uniqueStudents.filter(s => {
+                        if (seen.has(s.id)) return false;
+                        seen.add(s.id);
+                        return true;
+                    });
 
                     const list = uniqueStudents.map((s: any, idx) => {
                         const statuses = ['ready', 'connecting', 'lobby'];
@@ -222,15 +252,23 @@ export const StartClassModal = ({ isOpen, onClose, session }: StartClassModalPro
         try {
             const roomName = `class-${user.id}-${Date.now()}`;
             
-            // Insert into live_classes table
-            await supabase.from('live_classes').insert({
-                teacher_id: user.id,
-                room_id: roomName,
-                status: 'active',
-                scheduled_at: new Date().toISOString(),
-                title: session?.title || 'Ad-Hoc Session',
-                subject: session?.subject || 'General'
-            });
+            if (session?.id) {
+                // Update existing scheduled class
+                await supabase.from('live_classes').update({
+                    room_id: roomName,
+                    status: 'active'
+                }).eq('id', session.id);
+            } else {
+                // Insert new ad-hoc class
+                await supabase.from('live_classes').insert({
+                    teacher_id: user.id,
+                    room_id: roomName,
+                    status: 'active',
+                    scheduled_at: new Date().toISOString(),
+                    title: session?.title || 'Ad-Hoc Session',
+                    subject: session?.subject || 'General'
+                });
+            }
 
             // Close the modal and navigate to the meeting page
             onClose();

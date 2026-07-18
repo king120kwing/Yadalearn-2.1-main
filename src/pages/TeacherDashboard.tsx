@@ -975,7 +975,7 @@ const TeacherDashboard = () => {
                       if (filtered.length > 0) {
                         return filtered.map((session) => {
                           const sessionTime = parseDateTime(session.date, session.time);
-                          const hasPassed = sessionTime < now;
+                          const hasPassed = session.status === 'completed' || session.status === 'cancelled';
                           const isNext = nextEvent && session.id === nextEvent.id;
                           
                           if (hasPassed) {

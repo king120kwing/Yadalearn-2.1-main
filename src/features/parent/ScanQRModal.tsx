@@ -100,12 +100,8 @@ const ScanQRModal: React.FC<ScanQRModalProps> = ({ onClose }) => {
 
       if (linkError) throw linkError;
 
-      // Update parent profile name to identify them to teachers
-      const newFullName = `${user.user_metadata?.first_name || 'Guardian'} (Parent of ${student.full_name})`;
-      await supabase
-        .from('profiles')
-        .update({ full_name: newFullName })
-        .eq('id', user.id);
+      // The parent's profile name should remain their normal name on the dashboard.
+      // An automated introductory message will be sent to teachers when the parent first chats with them.
 
       setLinkedStudentData(student);
       setScanStatus('success');

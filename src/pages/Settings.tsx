@@ -195,8 +195,27 @@ const Settings = () => {
         alert('File size must be less than 5MB');
         return;
       }
-      setUploadedCV(file.name);
-      alert(`CV "${file.name}" uploaded successfully!`);
+      
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result as string;
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ cv_url: base64Data })
+            .eq('id', user.id);
+            
+          if (error) {
+            alert('Error uploading CV: ' + error.message);
+          } else {
+            setUploadedCV(file.name);
+            alert(`CV "${file.name}" uploaded successfully!`);
+          }
+        } catch (err) {
+            console.error(err);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 

@@ -9,7 +9,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { removeImageBackground } from '@/utils/imageProcessor';
 import ScanQRModal from '@/features/parent/ScanQRModal';
 import { MessageTeacherModal } from '@/features/student/quick-actions/MessageTeacherModal';
+import { AssignmentsModal } from '@/features/student/quick-actions/AssignmentsModal';
 import StudentDashboard from '@/pages/StudentDashboard';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ClassesModal } from '@/features/parent/ClassesModal';
+import { PerformanceModal } from '@/features/parent/PerformanceModal';
 
 const ParentDashboard = () => {
   const navigate = useNavigate();
@@ -25,6 +29,7 @@ const ParentDashboard = () => {
   const [selectedChild, setSelectedChild] = useState<any | null>(null);
   const [viewingStudentId, setViewingStudentId] = useState<string | null>(null);
   const [childTeachers, setChildTeachers] = useState<any[]>([]);
+  const [childAlerts, setChildAlerts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const [uploading, setUploading] = useState(false);
@@ -34,7 +39,16 @@ const ParentDashboard = () => {
   const [progressPercent, setProgressPercent] = useState(0);
 
   const userId = user?.id;
-  const userName = user?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName) || user?.user_metadata?.first_name || 'Guardian';
+  let userName = user?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.firstName) || user?.user_metadata?.first_name || 'Guardian';
+  
+  // Clean up any "(Parent of X)" suffix if it somehow got saved into the user's name
+  if (userName.includes('(Parent of')) {
+      userName = userName.split('(Parent of')[0].trim();
+  }
+  // Also replace 'Guardian' with actual first name if available via metadata
+  if (userName === 'Guardian' && user?.user_metadata?.first_name) {
+      userName = user.user_metadata.first_name;
+  }
 
   // Real data fetching logic
   useEffect(() => {
@@ -74,6 +88,40 @@ const ParentDashboard = () => {
     }
     fetchLinkedChildren();
   }, [user?.id]);
+
+  useEffect(() => {
+    async function fetchAlerts() {
+      if (!linkedChildren || linkedChildren.length === 0) return;
+      const studentIds = linkedChildren.map(c => c.id);
+      
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('student_id')
+        .in('student_id', studentIds);
+      
+      const { data: submissions } = await supabase
+        .from('submissions')
+        .select('student_id')
+        .in('student_id', studentIds)
+        .is('grade', null);
+      
+      const alerts: Record<string, string> = {};
+      linkedChildren.forEach(child => {
+        const childBookings = bookings?.filter(b => b.student_id === child.id) || [];
+        const childSubmissions = submissions?.filter(s => s.student_id === child.id) || [];
+        
+        if (childSubmissions.length > 0) {
+            alerts[child.id] = `${childSubmissions.length} Pending Assignment${childSubmissions.length > 1 ? 's' : ''}`;
+        } else if (childBookings.length > 0) {
+            alerts[child.id] = `Upcoming Class Scheduled`;
+        } else {
+            alerts[child.id] = `Grade ${child.grade} • ${child.focus}`;
+        }
+      });
+      setChildAlerts(alerts);
+    }
+    fetchAlerts();
+  }, [linkedChildren]);
 
   useEffect(() => {
     async function fetchChildTeachers() {
@@ -225,7 +273,7 @@ const ParentDashboard = () => {
           <nav className="flex flex-col gap-2">
             {[
               { label: 'Home', path: '/parent-dashboard', icon: Home },
-              { label: 'Search', path: '/parent-search', icon: Search },
+              { label: 'Progress', path: '/child-progress', icon: Search },
               { label: 'Profile', path: '/settings', icon: User }
             ].map((item) => {
               const isActive = location.pathname === item.path;
@@ -446,7 +494,10 @@ const ParentDashboard = () => {
                 </div>
                 
                 <div 
-                  onClick={() => setActiveModal('progress')}
+                  onClick={() => {
+                    if (!selectedChild) setActiveModal('progress');
+                    else navigate('/child-progress', { state: { studentId: selectedChild.id } });
+                  }}
                   className="bg-white/50 hover:bg-white/70 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/50 p-5 rounded-[1.5rem] border border-white/60 dark:border-zinc-700/20 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all text-center h-28"
                 >
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -527,7 +578,7 @@ const ParentDashboard = () => {
                   {linkedChildren.map(child => (
                     <div 
                       key={child.id} 
-                      onClick={() => setViewingStudentId(child.id)}
+                      onClick={() => setSelectedChild(child)}
                       className={cn(
                         "flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all border-2",
                         selectedChild?.id === child.id 
@@ -543,7 +594,9 @@ const ParentDashboard = () => {
                        </Avatar>
                        <div className="flex-1">
                          <h4 className="font-bold text-slate-800">{child.name}</h4>
-                         <p className="text-xs text-slate-500 font-medium">Grade {child.grade} • {child.focus}</p>
+                         <p className="text-xs text-slate-500 font-medium">
+                           {childAlerts[child.id] || `Grade ${child.grade} • ${child.focus}`}
+                         </p>
                        </div>
                        {selectedChild?.id === child.id && (
                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
@@ -628,8 +681,41 @@ const ParentDashboard = () => {
       <MessageTeacherModal 
         isOpen={activeModal === 'message'} 
         onClose={() => { setActiveModal(null); setSelectedTeacherIdForChat(undefined); }} 
-        teacherId={selectedTeacherIdForChat} 
+        recipientId={selectedTeacherIdForChat} 
       />
+      {activeModal === 'assignments' && selectedChild && (
+        <AssignmentsModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild.id} />
+      )}
+      {(activeModal === 'classes' || activeModal === 'history') && selectedChild && (
+        <ClassesModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild.id} studentName={selectedChild.name} />
+      )}
+      {activeModal === 'performance' && selectedChild && (
+        <PerformanceModal isOpen={true} onClose={() => setActiveModal(null)} studentId={selectedChild.id} studentName={selectedChild.name} />
+      )}
+
+      {activeModal && !['message', 'scan', 'assignments', 'classes', 'history', 'performance'].includes(activeModal) && (
+        <Dialog open={true} onOpenChange={() => setActiveModal(null)}>
+          <DialogContent className="sm:max-w-[425px] rounded-[2rem] p-6 bg-white dark:bg-zinc-900 border-0 shadow-2xl">
+            <div className="flex flex-col items-center justify-center text-center gap-4 py-8">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <span className="material-symbols-outlined text-3xl">info</span>
+                </div>
+                {!selectedChild ? (
+                    <>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Select a Child</h3>
+                        <p className="text-sm text-slate-500 dark:text-zinc-400">Please select a child from the list first to view their {activeModal}.</p>
+                    </>
+                ) : (
+                    <>
+                        <h3 className="text-xl font-bold capitalize text-slate-900 dark:text-white">{activeModal}</h3>
+                        <p className="text-sm text-slate-500 dark:text-zinc-400">Viewing {activeModal} data for {selectedChild.name} is coming soon.</p>
+                    </>
+                )}
+                <button onClick={() => setActiveModal(null)} className="mt-4 px-6 py-2 bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-full font-bold hover:bg-slate-800 dark:hover:bg-white transition-colors">Close</button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

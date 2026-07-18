@@ -161,6 +161,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
     const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
     const [selectedPartner, setSelectedPartner] = useState<any>(null);
     const [isFallbackMode, setIsFallbackMode] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     // Messages state
     const [messages, setMessages] = useState<any[]>([]);
@@ -190,6 +191,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
     const [typingStatus, setTypingStatus] = useState<string | null>(null);
     const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
     const typingChannelRef = useRef<any>(null);
+    const typingTimeoutRef = useRef<any>(null);
 
     useEffect(() => {
         if (isRecording) {
@@ -278,10 +280,10 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
                 if (role === 'student') {
                     console.log("Fetching student links natively...");
-                    const linkData = await rawFetch('teacher_student_links', `student_id=eq.${userId}&status=eq.accepted&select=teacher:profiles!teacher_student_links_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
+                    const linkData = await rawFetch('teacher_student_links', `student_id=eq.${userId}&status=eq.accepted&select=teacher:profiles!teacher_student_links_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at,country,bio,cv_url,teacher_profiles(rating))`).catch(e => { console.error(e); return []; });
                     
                     console.log("Fetching student bookings natively...");
-                    const bookingData = await rawFetch('bookings', `student_id=eq.${userId}&select=teacher:profiles!bookings_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at)`).catch(e => { console.error(e); return []; });
+                    const bookingData = await rawFetch('bookings', `student_id=eq.${userId}&select=teacher:profiles!bookings_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at,country,bio,cv_url,teacher_profiles(rating))`).catch(e => { console.error(e); return []; });
 
                     const linkList = linkData ? linkData.map((item: any) => item.teacher).filter(Boolean) : [];
                     const bookingList = bookingData ? bookingData.map((item: any) => item.teacher).filter(Boolean) : [];
@@ -293,7 +295,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                     if (linkList.length > 0 || bookingList.length > 0) hasActiveConnections = true;
 
                     if (recipientId && !mergedMap.has(recipientId)) {
-                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,subjects,is_online,last_active_at`).then(d => d[0]).catch(() => null);
+                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,subjects,is_online,last_active_at,country,bio,cv_url,teacher_profiles(rating)`).then(d => d[0]).catch(() => null);
                         if (recipientProfile) mergedMap.set(recipientId, recipientProfile);
                     }
 
@@ -321,15 +323,39 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
                     list = Array.from(mergedMap.values());
                 } else if (role === 'parent') {
+                    console.log("Fetching parent linked children and their teachers...");
+                    const linkData = await rawFetch('parent_student_links', `parent_id=eq.${userId}&select=student_id`).catch(e => { console.error(e); return []; });
+                    const studentIds = linkData ? linkData.map((l: any) => l.student_id) : [];
+                    
+                    let bookingList: any[] = [];
+                    if (studentIds.length > 0) {
+                        const studentIdsStr = `(${studentIds.join(',')})`;
+                        const bookingData = await rawFetch('bookings', `student_id=in.${studentIdsStr}&select=teacher:profiles!bookings_teacher_id_fkey(id,full_name,avatar_url,subjects,is_online,last_active_at,country,bio,cv_url,teacher_profiles(rating))`).catch(e => { console.error(e); return []; });
+                        bookingList = bookingData ? bookingData.map((item: any) => item.teacher).filter(Boolean) : [];
+                    }
+
                     const mergedMap = new Map();
-                    if (recipientId) {
-                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,subjects,is_online,last_active_at`).then(d => d[0]).catch(() => null);
+                    bookingList.forEach((t: any) => mergedMap.set(t.id, t));
+
+                    if (recipientId && !mergedMap.has(recipientId)) {
+                        const recipientProfile = await rawFetch('profiles', `id=eq.${recipientId}&select=id,full_name,avatar_url,subjects,is_online,last_active_at,country,bio,cv_url,teacher_profiles(rating)`).then(d => d[0]).catch(() => null);
                         if (recipientProfile) mergedMap.set(recipientId, recipientProfile);
                     }
                     list = Array.from(mergedMap.values());
                 }
 
                 console.log("Active connections list:", list.length);
+
+                // Flatten teacher_profiles details into main profile object for teachers
+                list = list.map(p => {
+                    if (p.teacher_profiles && p.teacher_profiles.length > 0) {
+                        return {
+                            ...p,
+                            rating: p.teacher_profiles[0].rating
+                        };
+                    }
+                    return p;
+                });
 
                 setIsFallbackMode(false); // Backend strictness: Never show random fallback profiles!
 
@@ -377,6 +403,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
     useEffect(() => {
         if (!userId || !selectedPartnerId) {
             setMessages([]);
+            setShowProfileModal(false);
             return;
         }
 
@@ -524,6 +551,61 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
         markAsRead();
     }, [userId, selectedPartnerId, isOpen, messages.length]);
 
+    const automatedMessageSentRef = useRef<Record<string, boolean>>({});
+
+    useEffect(() => {
+        if (!isOpen || role !== 'parent' || !userId || !selectedPartnerId) return;
+        if (loadingMessages || messages.length > 0) return;
+        if (automatedMessageSentRef.current[selectedPartnerId]) return;
+        
+        const storageKey = `has_sent_intro_${userId}_${selectedPartnerId}`;
+        if (localStorage.getItem(storageKey)) {
+            automatedMessageSentRef.current[selectedPartnerId] = true;
+            return;
+        }
+
+        const sendAutomatedIntro = async () => {
+            automatedMessageSentRef.current[selectedPartnerId] = true;
+            try {
+                // Fetch children names
+                const linkData = await rawFetchGlobal('parent_student_links', `parent_id=eq.${userId}&select=student:profiles!parent_student_links_student_id_fkey(full_name)`);
+                let childrenNames = '';
+                if (linkData && linkData.length > 0) {
+                    childrenNames = linkData.map((d: any) => d.student.full_name).join(' and ');
+                }
+
+                // Fetch parent gender
+                const profileData = await rawFetchGlobal('profiles', `id=eq.${userId}&select=gender`);
+                let parentGender = profileData?.[0]?.gender?.toLowerCase();
+                let parentRelation = 'parent';
+                if (parentGender === 'male') {
+                    parentRelation = 'father';
+                } else if (parentGender === 'female') {
+                    parentRelation = 'mother';
+                }
+
+                // We want the parent's actual name, not a constructed string
+                // The user object's name was overridden elsewhere, so let's fetch the actual full_name from profiles
+                let parentName = user?.name || 'a parent';
+                if (profileData?.[0]) {
+                   const nameData = await rawFetchGlobal('profiles', `id=eq.${userId}&select=full_name`);
+                   if (nameData?.[0]?.full_name) {
+                       parentName = nameData[0].full_name;
+                   }
+                }
+
+                const introText = `Hi, my name is ${parentName}. I am the ${parentRelation} of ${childrenNames}. I'm reaching out to introduce myself, to know the progress of my child.`;
+                
+                await handleSendRichMessage(introText);
+                localStorage.setItem(storageKey, 'true');
+            } catch (err) {
+                console.error("Failed to send automated intro:", err);
+            }
+        };
+
+        sendAutomatedIntro();
+    }, [isOpen, role, userId, selectedPartnerId, messages.length, loadingMessages, user]);
+
     // Scroll to bottom on new messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -602,9 +684,11 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
 
     const handleDeleteMessage = async (msgId: string) => {
         try {
-            await rawFetchGlobal('chat_messages', `id=eq.${msgId}`, 'DELETE');
+            const { error } = await supabase.from('chat_messages').delete().eq('id', msgId);
+            if (error) throw error;
         } catch (err) {
             console.error("Error deleting message:", err);
+            alert("Failed to delete message. You may not have permission.");
         }
     };
 
@@ -783,7 +867,7 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                         {selectedPartner ? (
                             <>
                                 {/* Chat Header */}
-                                <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                                <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between shrink-0 relative z-10 bg-white dark:bg-zinc-900">
                                     <div className="flex items-center gap-3">
                                         {/* Back Button for mobile */}
                                         <button 
@@ -793,23 +877,32 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                         >
                                             <ChevronLeft className="h-5 w-5" />
                                         </button>
-                                        <div className="relative">
-                                            <Avatar className="h-10 w-10 border border-gray-200 dark:border-zinc-850">
-                                                <AvatarImage src={selectedPartner.avatar_url || `https://i.pravatar.cc/150?u=${selectedPartner.id}`} />
-                                                <AvatarFallback>{selectedPartner.full_name?.[0]}</AvatarFallback>
-                                            </Avatar>
-                                            <div className={cn(
-                                                "absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-zinc-900 rounded-full",
-                                                selectedPartner.is_online ? "bg-green-500" : "bg-gray-300"
-                                            )} />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{selectedPartner.full_name}</h3>
-                                            <p className="text-xs text-gray-400 mt-0.5">
-                                                {selectedPartner.is_online ? "Active now" : "Offline"}
-                                            </p>
+                                        <div 
+                                            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                                            onClick={() => setShowProfileModal(true)}
+                                            role="button"
+                                            tabIndex={0}
+                                        >
+                                            <div className="relative">
+                                                <Avatar className="h-10 w-10 border border-gray-200 dark:border-zinc-850">
+                                                    <AvatarImage src={selectedPartner.avatar_url || `https://i.pravatar.cc/150?u=${selectedPartner.id}`} />
+                                                    <AvatarFallback>{selectedPartner.full_name?.[0]}</AvatarFallback>
+                                                </Avatar>
+                                                <div className={cn(
+                                                    "absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-zinc-900 rounded-full",
+                                                    selectedPartner.is_online ? "bg-green-500" : "bg-gray-300"
+                                                )} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-sm text-gray-900 dark:text-white leading-tight hover:underline">{selectedPartner.full_name}</h3>
+                                                <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 max-w-[200px] sm:max-w-xs truncate">
+                                                    {selectedPartner.country ? `${selectedPartner.country} • ` : ''} 
+                                                    {selectedPartner.bio || (selectedPartner.is_online ? "Active now" : "Offline")}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
+                                    
                                     <button
                                         onClick={onClose}
                                         className="h-9 w-9 rounded-full flex items-center justify-center bg-gray-50 dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
@@ -817,6 +910,65 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                         <span className="material-symbols-outlined text-gray-500 text-lg">close</span>
                                     </button>
                                 </div>
+
+                                {/* Profile Overlay Modal */}
+                                {showProfileModal && (
+                                    <div className="absolute inset-0 z-20 bg-white dark:bg-zinc-900 flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-300">
+                                        <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                                            <div className="flex items-center gap-3">
+                                                <button 
+                                                    onClick={() => setShowProfileModal(false)}
+                                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-850 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                                                >
+                                                    <ChevronLeft className="h-5 w-5" />
+                                                </button>
+                                                <h2 className="font-bold text-lg text-gray-900 dark:text-white">Profile Details</h2>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center text-center">
+                                            <Avatar className="h-32 w-32 border-4 border-gray-50 dark:border-zinc-800 mb-4 shadow-lg">
+                                                <AvatarImage src={selectedPartner.avatar_url || `https://i.pravatar.cc/150?u=${selectedPartner.id}`} />
+                                                <AvatarFallback className="text-4xl">{selectedPartner.full_name?.[0]}</AvatarFallback>
+                                            </Avatar>
+                                            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-1">{selectedPartner.full_name}</h2>
+                                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-4">
+                                                {selectedPartner.country || 'Global'}
+                                            </p>
+                                            
+                                            {selectedPartner.bio && (
+                                                <div className="bg-gray-50 dark:bg-zinc-800/50 p-4 rounded-2xl w-full max-w-md mb-6 border border-gray-100 dark:border-zinc-700/50">
+                                                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed italic">
+                                                        "{selectedPartner.bio}"
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-2 gap-4 w-full max-w-md mb-6">
+                                                <div className="bg-gray-50 dark:bg-zinc-800 p-4 rounded-2xl border border-gray-100 dark:border-zinc-700 flex flex-col items-center">
+                                                    <span className="material-symbols-outlined text-orange-500 text-2xl mb-1">star</span>
+                                                    <span className="text-sm font-bold text-gray-900 dark:text-white">{Number(selectedPartner.rating || 5.0).toFixed(1)} / 5.0</span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">Rating</span>
+                                                </div>
+                                                <div className="bg-gray-50 dark:bg-zinc-800 p-4 rounded-2xl border border-gray-100 dark:border-zinc-700 flex flex-col items-center">
+                                                    <span className="material-symbols-outlined text-purple-500 text-2xl mb-1">menu_book</span>
+                                                    <span className="text-sm font-bold text-gray-900 dark:text-white truncate w-full px-2">{selectedPartner.subjects?.join(', ') || 'General'}</span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">Subjects</span>
+                                                </div>
+                                            </div>
+
+                                            {role === 'parent' && selectedPartner.cv_url && (
+                                                <a 
+                                                    href={selectedPartner.cv_url} 
+                                                    download={`CV_${selectedPartner.full_name.replace(/\s+/g, '_')}`}
+                                                    className="w-full max-w-md px-6 py-4 bg-[#5B4A9F] text-white rounded-xl text-sm font-bold hover:bg-[#4a3b82] transition-colors shadow-lg flex items-center justify-center gap-2"
+                                                >
+                                                    <FileText className="w-5 h-5" />
+                                                    Download Resume / CV
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Messages History List */}
                                 <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-slate-50/30 dark:bg-zinc-950/10">
@@ -845,10 +997,10 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                                 isMe ? "justify-end" : "justify-start"
                                                             )}
                                                         >
-                                                            <div className="relative group flex items-center">
+                                                            <div className="relative group flex items-center" tabIndex={0}>
                                                                 {/* Edit/Delete hover triggers for my messages */}
                                                                 {isMe && (
-                                                                    <div className="absolute left-[-60px] top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white dark:bg-zinc-800 shadow-lg border border-gray-100 dark:border-zinc-700 p-1.5 rounded-xl z-20">
+                                                                    <div className="absolute left-[-60px] top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 focus-within:opacity-100 flex items-center gap-1 bg-white dark:bg-zinc-800 shadow-lg border border-gray-100 dark:border-zinc-700 p-1.5 rounded-xl z-20 transition-opacity duration-200">
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => {
@@ -871,14 +1023,16 @@ export const MessageTeacherModal = ({ isOpen, onClose, recipientId }: MessageTea
                                                                     </div>
                                                                 )}
 
-                                                                <div
-                                                                    className={cn(
-                                                                        "rounded-2xl px-4 py-2.5 shadow-sm flex flex-col gap-1 relative",
-                                                                        isMe 
-                                                                            ? role === 'teacher'
-                                                                                ? "bg-[#FF7D46] text-white rounded-br-sm pr-16"
-                                                                                : "bg-[#5B4A9F] text-white rounded-br-sm pr-16"
-                                                                            : "bg-gray-100 dark:bg-zinc-850 text-gray-900 dark:text-white rounded-bl-sm pr-16"
+                                                                    <div
+                                                                        className={cn(
+                                                                            "rounded-2xl px-4 py-2.5 shadow-sm flex flex-col gap-1 relative",
+                                                                            isMe 
+                                                                                ? role === 'teacher'
+                                                                                    ? "bg-[#FF7D46] text-white rounded-br-sm pr-16"
+                                                                                    : role === 'parent'
+                                                                                        ? "bg-emerald-500 text-white rounded-br-sm pr-16"
+                                                                                        : "bg-[#5B4A9F] text-white rounded-br-sm pr-16"
+                                                                                : "bg-gray-100 dark:bg-zinc-850 text-gray-900 dark:text-white rounded-bl-sm pr-16"
                                                                     )}
                                                                 >
                                                                     {msg.attachment_type === 'image' && (

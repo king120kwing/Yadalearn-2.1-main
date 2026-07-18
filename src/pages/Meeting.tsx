@@ -53,13 +53,13 @@ const Meeting = () => {
         channel.send({
           type: 'broadcast',
           event: 'waiting',
-          payload: { id: user.id, name: user.name || 'Student', avatar: user.avatar }
+          payload: { id: user.id, name: user.name || 'Student', avatar: user.imageUrl }
         });
         pingInterval = setInterval(() => {
             channel.send({
               type: 'broadcast',
               event: 'waiting',
-              payload: { id: user.id, name: user.name || 'Student', avatar: user.avatar }
+              payload: { id: user.id, name: user.name || 'Student', avatar: user.imageUrl }
             });
         }, 5000);
       }
@@ -251,7 +251,7 @@ const Meeting = () => {
         </div>
       </div>
 
-      {/* Inject custom CSS overrides for Stream Video to match Yadalearn theme and True Full Screen */}
+      {/* Inject custom CSS overrides for Stream Video to match Yadalearn theme */}
       <style>{`
         .custom-stream-theme {
           --str-video-bg: transparent;
@@ -261,29 +261,6 @@ const Meeting = () => {
         .str-video__speaker-layout__wrapper {
           height: 100% !important;
           width: 100% !important;
-          gap: 0 !important;
-          padding: 0 !important;
-          margin: 0 !important;
-        }
-
-        .str-video__participant-view {
-          border-radius: 0 !important;
-          overflow: hidden !important;
-          width: 100vw !important;
-          height: 100vh !important;
-          max-width: none !important;
-          position: absolute !important;
-          inset: 0 !important;
-          background: #000 !important;
-          border: none !important;
-          box-shadow: none !important;
-        }
-
-        .str-video__video {
-          object-fit: cover !important;
-          width: 100% !important;
-          height: 100% !important;
-          transform: none !important;
         }
 
         .str-video__call-controls {

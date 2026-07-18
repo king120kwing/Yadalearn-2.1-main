@@ -7,11 +7,12 @@ import { seedDatabase } from '@/utils/seedData';
 interface AssignmentsModalProps {
     isOpen: boolean;
     onClose: () => void;
+    studentId?: string;
 }
 
-export const AssignmentsModal = ({ isOpen, onClose }: AssignmentsModalProps) => {
+export const AssignmentsModal = ({ isOpen, onClose, studentId }: AssignmentsModalProps) => {
     const { user, isLoaded } = useAuth();
-    const userId = user?.id;
+    const userId = studentId || user?.id;
 
     const [assignments, setAssignments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);

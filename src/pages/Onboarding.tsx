@@ -49,6 +49,50 @@ const Onboarding = () => {
   const showIGCSEPath = answers.teachingFocus?.includes('IGCSE Subjects') &&
     (!answers.teachingFocus?.includes('Languages') || currentStep > 9);
 
+  const handleFinish = async () => {
+    const userName = answers.userName || (role === 'teacher' ? 'Teacher' : 'Student');
+    const defaultUser = {
+      email: 'onboarding@yadalearn.com',
+      name: userName,
+      firstName: userName.split(' ')[0],
+      lastName: userName.split(' ').slice(1).join(' ') || '',
+      imageUrl: ''
+    };
+    localStorage.setItem('yadalearn-user', JSON.stringify(defaultUser));
+    localStorage.setItem('yadalearn-user-role', role);
+    localStorage.setItem('yadalearn-lang', language);
+    localStorage.setItem('yadalearn-onboarding-answers', JSON.stringify(answers));
+
+    // Extract selected subjects & languages
+    const selectedSubjectsList: string[] = [];
+    const selectedLanguagesList: string[] = [];
+    if (role === 'student') {
+      if (answers.studyPath === 'Languages') {
+        if (answers.selectedLanguages) {
+          selectedLanguagesList.push(...answers.selectedLanguages);
+          selectedSubjectsList.push(...answers.selectedLanguages);
+        }
+      } else if (answers.studyPath === 'IGCSE') {
+        if (answers.selectedSubjects) selectedSubjectsList.push(...answers.selectedSubjects);
+      }
+    } else { // teacher
+      if (answers.languageSpecialization) {
+        selectedLanguagesList.push(...answers.languageSpecialization);
+        selectedSubjectsList.push(...answers.languageSpecialization);
+      }
+      if (answers.subjectSpecialization) selectedSubjectsList.push(...answers.subjectSpecialization);
+    }
+
+    setUserRole?.(role);
+    await setOnboardingCompleted?.(true, selectedSubjectsList, selectedLanguagesList, answers, role);
+    await refreshUser?.();
+
+    const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : role === 'parent' ? '/parent-dashboard' : '/student-dashboard';
+    setTimeout(() => {
+      navigate(dashboardPath, { replace: true });
+    }, 100);
+  };
+
   const getMaxStep = () => {
     if (role === 'student') return 7;
     if (role === 'parent') return 3;
@@ -96,8 +140,8 @@ const Onboarding = () => {
       }
 
       setUserRole?.(role);
-      setOnboardingCompleted?.(true, selectedSubjectsList, selectedLanguagesList, answers, role);
-      refreshUser?.();
+      await setOnboardingCompleted?.(true, selectedSubjectsList, selectedLanguagesList, answers, role);
+      await refreshUser?.();
 
       const dashboardPath = role === 'teacher' ? '/teacher-dashboard' : role === 'parent' ? '/parent-dashboard' : '/student-dashboard';
       setTimeout(() => {
